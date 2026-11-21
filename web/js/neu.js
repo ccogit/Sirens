@@ -149,6 +149,8 @@ export function neuAnsicht(el, id) {
         if (stand === ablaufStand) leeren(ablauf).append(ablaufListe(schritte));
       } catch { ablaufStand = ""; }
     };
+    const ablaufVorschau = h("details", { class: "ablauf-vorschau", ontoggle: (e) => { if (e.target.open) ablaufLaden(); } },
+      h("summary", {}, "So läuft die Produktion ab"), ablauf);
     const abschicken = h("button", { type: "button", class: "knopf gross", onclick: async () => {
       const luecken = fehlend(w);
       fehlerZeigen(el, "", "");
@@ -164,7 +166,7 @@ export function neuAnsicht(el, id) {
       } catch (fehler) {
         if (!fehlerZeigen(el, fehlerFeld(fehler.feld), fehler.meldung)) meldung(fehler.meldung, "fehler");
       } finally { abschicken.disabled = false; }
-    } }, "Abschicken");
+    } }, "Auftrag starten →");
     const verwerfen = h("button", { type: "button", class: "schlicht", onclick: async () => {
       clearTimeout(timer);
       schmutzig = false;
@@ -185,30 +187,36 @@ export function neuAnsicht(el, id) {
         : "z. B. ein lustiges Electro-Funk-Album über Büroalltag, tanzbar, mit trockenem Humor";
       for (const c of chips.children) c.setAttribute("aria-pressed", String(hatRichtungswort(w.wunsch, c.dataset.wort)));
       satz.textContent = zusammenfassung(w);
-      ablaufLaden();
+      if (ablaufVorschau.open) ablaufLaden();
     };
 
     el.append(
       h("header", { class: "seitenkopf" },
-        h("h1", {}, vorgaengerId ? "Folgeauftrag" : "Neuer Auftrag"),
+        h("p", { class: "eyebrow" }, "NEUE KREATION"),
+        h("h1", {}, vorgaengerId ? "Deine nächste Idee." : "Was möchtest du erschaffen?"),
+        h("p", { class: "dashboard-intro" }, "Ein paar Angaben genügen. Den Rest übernimmt Claude."),
         vorgaengerId ? h("p", { class: "hinweis" }, "Vorausgefüllt aus ", h("a", { href: `#/auftrag/${vorgaengerId}` }, vorgaengerId), ". Ändere, was du möchtest.") : ""),
       h("form", { class: "formular zweispaltig", onsubmit: (e) => e.preventDefault(), novalidate: true },
         h("div", {},
-          h("section", { class: "block" }, wege),
+          h("section", { class: "block creation-start" }, h("h2", {}, "Wie starten wir?"), wege),
           h("section", { class: "block zeile" },
             h("div", { class: "feld" }, h("span", { class: "label" }, "Umfang"), umfang), anzahlFeld,
-            feld("Künstler", kuenstler, { name: "artist_slug", hinweis: "Unter diesem Namen entsteht der Song." }), kuenstlerListe, releaseListe),
+            feld("Künstlerprojekt", kuenstler, { name: "artist_slug", hinweis: "Unter diesem Namen wird deine Musik abgelegt." }), kuenstlerListe, releaseListe),
           referenzTeil,
-          h("section", { class: "block" },
+          h("section", { class: "block creation-idea" },
+            h("h2", {}, "Deine kreative Richtung"),
             h("div", { class: "feld" }, textLabel, text, h("p", { class: "fehler", role: "alert", hidden: true, "data-fehler": "wunsch" })),
-            h("p", { class: "hinweis" }, "Anklicken ergänzt den Text:"), chips),
+            h("details", { class: "inspiration" }, h("summary", {}, "Inspiration hinzufügen"),
+              h("p", { class: "hinweis" }, "Wähle passende Begriffe – sie ergänzen deinen Wunsch."), chips)),
           wuensche.el, optionen),
         // Bleibt beim Ausfüllen sichtbar: der Auftrag als Satz, Abschicken und was danach passiert.
         h("aside", { class: "block abschluss haftet", "aria-label": "Dein Auftrag" },
+          h("p", { class: "eyebrow" }, "DEIN BRIEFING"),
+          h("h2", {}, "Bereit, wenn du es bist."),
           satz,
           h("div", { class: "knopfzeile" }, abschicken, verwerfen),
           gespeichert,
-          h("details", { class: "ablauf-vorschau", open: true }, h("summary", {}, "So läuft es ab"), ablauf))));
+          ablaufVorschau)));
     zeichneAlles();
   }
 
