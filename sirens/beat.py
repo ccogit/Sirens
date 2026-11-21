@@ -1,0 +1,116 @@
+"""Leichtgewichtige Beatgrid-Schätzung für den lokalen Auto-DJ.
+
+Nur die ersten 90 Sekunden werden mit ffmpeg auf 4 kHz/mono heruntergerechnet.
+Kein ML-Modell, keine Datenbank und keine Änderung an Songdateien.
+"""
+from array import array
+import math
+import subprocess
+import sys
+import threading
+from pathlib import Path
+
+from .contracts import Ablehnung, safe_audio_path
+
+HOP = 40                   # 10 ms bei 4 kHz
+HZ = 100
+MAX_SECONDS = 90
+
+
+def beatgrid(onset, hz=HZ):
+    """Aus einem Onset-Verlauf BPM und Beatphase gewinnen (4/4-Bar-Annahme)."""
+    if len(onset) < 8 * hz:
+        raise ValueError("Zu wenig Musik für die Tempoerkennung.")
+    signal = [max(0.0, float(v)) for v in onset]
+    peak = max(signal)
+    if peak < 1e-6:
+        raise ValueError("Keine deutlichen rhythmischen Impulse gefunden.")
+    signal = [s / peak if s / peak >= 0.07 else 0.0 for s in signal]
+    e = sum(v * v for v in signal)
+    if e < 0.1:
+        raise ValueError("Kein auswertbarer Rhythmus vorhanden.")
+    kandidaten = []
+    for lag in range(round(60 * hz / 185), round(60 * hz / 65) + 1):
+        bpm = 60 * hz / lag
+        korrelation = sum(a * b for a, b in zip(signal[:-lag], signal[lag:]))
+        # Bei Halb-/Doppeltempo ist das Ergebnis mehrdeutig. Sanfte DJ-Priorisierung.
+        bevorzugung = max(0.5, 1 - 0.000035 * (bpm - 116) ** 2)
+        score = korrelation / (len(signal) - lag) * bevorzugung
+        kandidaten.append((score, lag))
+    score, lag = max(kandidaten)
+    if score <= 0:
+        raise ValueError("Kein regelmäßiger Beat gefunden.")
+    phasen = [0.0] * lag
+    for i, v in enumerate(signal):
+        phasen[i % lag] += v
+    phase = max(range(lag), key=phasen.__getitem__)
+    phase_anteil = phasen[phase] / max(sum(phasen), 1e-9)
+    bpm = 60 * hz / lag
+    # Konfidenz ist eine Schätzung, kein Beweis für Taktart/Downbeat.
+    staerke = min(1.0, score * (len(signal) - lag) / max(e, 1e-9) * 1.3)
+    sicherheit = round(min(0.99, max(0.05, staerke * 0.8 + phase_anteil * 0.2)), 2)
+    return {"bpm": round(bpm, 2), "beat0": round(phase / hz, 3),
+            "confidence": sicherheit, "meter": 4, "method": "onset-autocorrelation"}
+
+
+def _onsets(pcm, hz=4000):
+    """Positive Energieanstiege unterdrücken stationäre laute Abschnitte."""
+    samples = array("h")
+    samples.frombytes(pcm[:len(pcm) - len(pcm) % 2])
+    if sys.byteorder != "little":
+        samples.byteswap()
+    energy = []
+    for i in range(0, len(samples) - HOP + 1, HOP):
+        part = samples[i:i + HOP]
+        energy.append(math.sqrt(sum(v * v for v in part) / HOP))
+    if not energy:
+        return []
+    # Zeitlich geglättete RMS-Lautheit, dann positive Flanken über dem lokalen Grundpegel.
+    n = len(energy)
+    result = [0.0] * n
+    for i in range(5, n):
+        baseline = sum(energy[i - 5:i]) / 5
+        result[i] = max(0.0, energy[i] - baseline)
+    return result
+
+
+def analysieren(datei, ffmpeg="ffmpeg"):
+    """Audio kurz decodieren. Die Auswertung bleibt CPU-schonend und lokal."""
+    cmd = [str(ffmpeg), "-nostdin", "-v", "error", "-i", str(datei),
+           "-t", str(MAX_SECONDS), "-vn", "-ac", "1", "-ar", "4000",
+           "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1"]
+    try:
+        lauf = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Ablehnung("beat_unavailable", "Tempoanalyse nicht verfügbar (ffmpeg prüfen).",
+                        status=503) from exc
+    if lauf.returncode != 0:
+        raise Ablehnung("beat_decode", "Die Audiodatei konnte nicht analysiert werden.", status=422)
+    try:
+        return beatgrid(_onsets(lauf.stdout))
+    except ValueError as exc:
+        raise Ablehnung("beat_missing", str(exc), status=422) from exc
+
+
+class BeatCache:
+    """Einfacher, begrenzter RAM-Cache nach Dateigröße und Änderungszeit."""
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.lock = threading.Lock()
+        self.daten = {}
+
+    def holen(self, pfad):
+        datei = safe_audio_path(self.cfg.music_root, pfad)
+        if not datei.is_file():
+            raise Ablehnung("not_found", "Dieser Song existiert nicht.", "pfad", 404)
+        stat = datei.stat()
+        schluessel = (str(Path(datei)), stat.st_mtime_ns, stat.st_size)
+        with self.lock:
+            if schluessel in self.daten:
+                return dict(self.daten[schluessel])
+        info = analysieren(datei, self.cfg.ffmpeg)
+        with self.lock:
+            if len(self.daten) >= 128:
+                self.daten.pop(next(iter(self.daten)))
+            self.daten[schluessel] = info
+        return dict(info)
