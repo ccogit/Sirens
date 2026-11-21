@@ -245,6 +245,45 @@ Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontex
 geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben
 unverändert.
 
+## Auto-DJ: ein endloses, takt- und dramaturgiesynchrones Set
+
+Im **Live Lab** das Spielzeug **♾ Auto-DJ & Endlos-Set** öffnen. Nach dem Klick
+„Endlos-Set starten“ beginnt Sirens mit einem Song, sucht selbst den nächsten
+und plant passende Übergänge. Mindestens zwei Songs sind nötig.
+
+- **Listen:** Favoriten (+1/+2), gesamter Katalog oder selbst angekreuzte Songs.
+  Stichwörter aus Künstler-, Release- oder Dateinamen sind keine sicher erkannten Genres.
+- **Gewichteter Zufall:** Bewertung, vermutete Stilnähe, zuletzt gespielte Songs und
+  Tempoverträglichkeit beeinflussen die Auswahl. Der Zufallsmodus kann deaktiviert werden.
+- **Tempo und Takt:** Der lokale ffmpeg-Dienst analysiert mehrere Ausschnitte,
+  schätzt BPM, Beat und den 4/4-Taktbeginn und speichert unveränderte Ergebnisse
+  nach Dateigröße und Änderungszeit im RAM.
+- **Dramaturgie:** Energie, Transienten und Brillanz über bis zu sechs Minuten
+  identifizieren mutmaßliche Breaks, Build-ups, stabile und ruhige Passagen.
+  Ein- und Ausstiegs-Cues werden paarweise nach Phrasenlage, Energieentwicklung
+  und Tempo-Kompatibilität bewertet.
+- **Übergänge:** Songs vorladen, auf geschätzten Taktanfang setzen, Tempo
+  automatisch anpassen (Browser-Tonhöhenerhalt), Equal-Power-Crossfade über
+  4, 8 oder 16 Takte. „Am nächsten Takt mixen“ erzwingt einen früheren Übergang.
+- **Kontrolle:** Echtzeit-Energieverlauf, Cue-Zeiten und Sicherheitsschätzung
+  der Struktur-/BPM-Erkennung. Fehlt ein sicherer Match, ist ein
+  nach Möglichkeit hörbarer **Notübergang** explizit gekennzeichnet.
+
+**Ressourcen und Grenzen:** Für die Analyse muss ffmpeg im PATH sein (oder
+SIRENS_FFMPEG gesetzt werden). Es laufen höchstens zwei gleichzeitige
+Analyseanfragen; Originale und Auftragsdaten bleiben unverändert. Der Auto-DJ
+verwendet weder Cloud-APIs noch zusätzliche CUDA-Modelle. Die RTX 5080 bleibt
+für die Visualisierung und Musikerzeugung frei.
+
+Der Downbeat und die Phrasen sind **Schätzungen**, keine garantierte musikalische
+Segmentierung. Genres werden nicht aus dem Audio klassifiziert; Dynamik-Tags
+hingegen basieren auf Audiodaten. HTMLAudioElement lässt sich nicht
+samplegenau synchronisieren; leichte Timingabweichungen sind möglich.
+Songs über sechs Minuten werden bis Minute sechs analysiert.
+Das Endlos-Set benötigt eine geöffnete Browser-Seite und darf bei
+Hintergrundtab-Drosselung ungenauer laufen. Der Stopp oder ein Wechsel
+des Spielzeugs beendet die Wiedergabe.
+
 ## Grenzen
 
 - Die gestartete Sitzung läuft ohne Fenster und ohne Rückfragen im Chat; Fragen an dich kommen als
