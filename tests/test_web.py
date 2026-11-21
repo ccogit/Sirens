@@ -31,6 +31,17 @@ class Seite(unittest.TestCase):
                 self.assertNotIn(modul.split(".")[0], ("app", "requests", "psycopg", "psycopg2", "fastapi"), datei.name)
 
     @unittest.skipUnless(shutil.which("node"), "Node ist nicht installiert")
+    def test_javascript_module_syntax(self):
+        """Auch Änderungen an reinen DOM-Modulen müssen syntaktisch gültig sein."""
+        for datei in (WEB / "js").glob("*.js"):
+            lauf = subprocess.run(
+                ["node", "--input-type=module", "--check"],
+                input=datei.read_text(encoding="utf-8"),
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
+            )
+            self.assertEqual(lauf.returncode, 0, f"{datei.name}: {lauf.stderr}")
+
+    @unittest.skipUnless(shutil.which("node"), "Node ist nicht installiert")
     def test_logik_mit_node(self):
         lauf = subprocess.run(["node", "--test", str(ROOT / "tests" / "logic.test.mjs")], capture_output=True, text=True,
                               encoding="utf-8", errors="replace", timeout=120)
