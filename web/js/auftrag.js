@@ -9,9 +9,10 @@ import { nachlaufAnsicht } from "./nachlauf.js";
 
 const ABBRECHBAR = ["offen", "in_arbeit", "rueckfrage", "plan_wartet", "antwort_da", "fehler"];
 
-export function auftragAnsicht(el, id) {
+export function auftragAnsicht(el, id, unterseite = "") {
   let order = null;
   let beendet = false;
+  let masteringFokussiert = false;
   const inhalt = h("div", {});
   el.append(inhalt);
 
@@ -77,7 +78,7 @@ export function auftragAnsicht(el, id) {
         archivieren: (pfad) => tun("version", { entscheidung: "archivieren", pfad, bestaetigt: true }),
       });
     }
-    if (s === "nachlauf") return nachlaufAnsicht(order, { tun, neuLaden: () => laden(true) });
+    if (s === "nachlauf") return nachlaufAnsicht(order, { tun, neuLaden: () => laden(true), masteringOffen: unterseite === "mastering" });
     return null;
   }
 
@@ -137,6 +138,10 @@ export function auftragAnsicht(el, id) {
     eingabenWiederherstellen(inhalt, merk);
     for (const d of inhalt.querySelectorAll("details[data-auf]")) if (auf.has(d.dataset.auf)) d.open = auf.get(d.dataset.auf);
     knoepfeAktualisieren();
+    if (unterseite === "mastering" && order.status === "nachlauf" && !masteringFokussiert) {
+      masteringFokussiert = true;
+      inhalt.querySelector('[aria-label="Mastering"]')?.scrollIntoView({ block: "start" });
+    }
   }
 
   async function laden(erzwingen = false) {
