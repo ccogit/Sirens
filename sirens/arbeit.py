@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from . import ablauf, nachlauf
+from .catalog import ACHSEN
 from .contracts import AUDIO_EXT, Ablehnung, _text, safe_audio_path
 from .service import eintrag, nur
 from .store import write_json_atomic
@@ -224,13 +225,19 @@ class ClaudeAktionen:
 
     def catalog_ratings(self, data):
         if not isinstance(data, dict):
-            raise Ablehnung("invalid", "Erwartet wird ein Objekt {pfad: {score, label}}.", "file")
+            raise Ablehnung("invalid", "Erwartet wird ein Objekt {pfad: {score, label, achsen}}.", "file")
         sauber = {}
         for pfad, wert in data.items():
-            score = nur(wert, ("score", "label")).get("score")
+            score = nur(wert, ("score", "label", "achsen")).get("score")
             if isinstance(score, bool) or not isinstance(score, int) or not -2 <= score <= 2:
                 raise Ablehnung("invalid", f"Ungültige Bewertung für {pfad}.", "score")
             sauber[pfad] = {"score": score, "label": _text(wert.get("label"), "label")}
+            achsen = wert.get("achsen")  # freiwillig: die Ästhetik-Achsen des Songs (0–10) für das Emblem der Spielwiese
+            if achsen is not None:
+                if not isinstance(achsen, dict) or set(achsen) - set(ACHSEN) or any(
+                        isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 10 for v in achsen.values()):
+                    raise Ablehnung("invalid", f"Ungültige Achsen für {pfad}.", "achsen")
+                sauber[pfad]["achsen"] = achsen
         self.cfg.data_dir.mkdir(parents=True, exist_ok=True)
         write_json_atomic(self.cfg.catalog_ratings_file, sauber)
         return {"anzahl": len(sauber), "datei": str(self.cfg.catalog_ratings_file)}

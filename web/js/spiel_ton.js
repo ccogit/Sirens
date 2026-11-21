@@ -77,6 +77,7 @@ export function tonwerk() {
     get dauer() { return puffer ? puffer.duration : 0; },
     get messer() { return knoten ? knoten.messer : null; },
     get daten() { return puffer ? puffer.getChannelData(0) : null; },
+    get rate() { return puffer ? puffer.sampleRate : 0; },
 
     // Song holen und entpacken. Muss aus einem Klick heraus aufgerufen werden (der Browser verlangt das für Ton).
     async laden(url) {

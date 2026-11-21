@@ -22,8 +22,13 @@ def richtungswoerter(cfg):
     return worte or list(RICHTUNGSWOERTER)
 
 
+# Die zwölf Ästhetik-Achsen eines Songs (je 0–10); sie bestimmen Form und Farbe des Emblems in der Spielwiese.
+ACHSEN = ("energy", "danceability", "experimentalism", "warmth", "darkness", "psychedelia", "organicness",
+          "electronicness", "melodicity", "groove", "vocal_presence", "sampling_intensity")
+
+
 def bekannte_bewertungen(cfg, store):
-    """{pfad: {score, label, quelle}} aus katalog-bewertungen.json und allen Aufträgen; der höhere Wert gilt."""
+    """{pfad: {score, label, quelle, achsen?}} aus katalog-bewertungen.json und allen Aufträgen; der höhere Wert gilt."""
     result = {}
     try:
         data = json.loads(cfg.catalog_ratings_file.read_text(encoding="utf-8"))
@@ -33,10 +38,15 @@ def bekannte_bewertungen(cfg, store):
         for pfad, wert in data.items():
             if isinstance(wert, dict) and isinstance(wert.get("score"), int):
                 result[pfad] = {"score": wert["score"], "label": str(wert.get("label") or ""), "quelle": "katalog"}
+                if isinstance(wert.get("achsen"), dict):
+                    result[pfad]["achsen"] = wert["achsen"]
     for order in store.list():
         for b in order.get("bewertungen", []):
             if b["pfad"] not in result or b["score"] > result[b["pfad"]]["score"]:
+                achsen = result.get(b["pfad"], {}).get("achsen")  # die Achsen des Songs bleiben, auch wenn die Bewertung wechselt
                 result[b["pfad"]] = {"score": b["score"], "label": f"Bewertung aus {order['id']}", "quelle": "auftrag"}
+                if achsen:
+                    result[b["pfad"]]["achsen"] = achsen
     return result
 
 
