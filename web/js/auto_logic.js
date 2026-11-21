@@ -56,12 +56,12 @@ export function stimmung(info) {
   return "schnell";
 }
 
-export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.random) {
+export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.random, vorherigerSong = null) {
   if (!songs.length) return null;
   const letzte = new Set(history.slice(-Math.min(6, Math.max(0, songs.length - 1))));
   const pool = songs.filter((s) => !letzte.has(s.pfad));
   const liste = pool.length ? pool : songs;
-  const vorher = songs.find((s) => s.pfad === history[history.length-1]);
+  const vorher = vorherigerSong || songs.find((s) => s.pfad === history[history.length-1]);
   const gewichte = liste.map((s) => {
     const match = s.beat && ziel ? tempoAngleichung(s.beat.bpm, ziel) : null;
     const kompatibilitaet = match ? (match.kompatibel ? 3.5/(1+match.abweichung*15) : 0.25) : 1;
