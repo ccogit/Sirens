@@ -177,6 +177,9 @@ Wartet ein Auftrag nur noch auf Claude, zeigt die Auftragsseite eine Spielwiese.
 bewerteten Song (+1 oder +2) und spielt ihn; nach dem Stück folgt der nächste. Der Song lässt sich in Echtzeit verbiegen:
 auf der Fläche ziehen (links dumpf, rechts dünn, oben Echo), dazu Stottern, Rückwärts, Bremse und Tempo.
 
+Dieselbe Spielwiese steht auch im **Live Lab** (`#/lab`), dort neben dem DJ-Pult mit Beat-Pads; die Übersicht hat
+dafür den Knopf „Spielen“.
+
 Zwei Ansichten zum Umschalten:
 
 - **Wellen:** drei Wellenbänder wie im Logo, die mit Bass, Mitten und Höhen gehen.

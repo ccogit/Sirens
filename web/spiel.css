@@ -23,3 +23,39 @@
   .spiel-tempo { margin-left: 0; width: 100%; }
   .spiel-tempo input { flex: 1; }
 }
+
+/* Im Live Lab hat die Spielwiese mehr Platz */
+.lab-toy { display: grid; gap: 1.2rem; min-width: 0; }
+.lab-toys { margin: 0 0 1.2rem; }
+.lab-toy .spielwiese { margin-top: 0; }
+.lab-toy .spiel-flaeche { height: clamp(18rem, calc(100vh - 31rem), 46rem); }
+
+/* Spiel-Knopf der Startseite: der Rand dreht sich, die Buchstaben hüpfen, die Balken tanzen */
+.dashboard-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.spiel-knopf { position: relative; isolation: isolate; overflow: hidden; display: inline-grid; grid-template-columns: auto auto; align-items: center; gap: .05rem .8rem;
+  padding: .75rem 1.4rem .7rem 1.1rem; border-radius: 20px; text-decoration: none; color: #fff; transition: transform .2s ease; }
+.spiel-knopf::before { content: ""; position: absolute; z-index: -2; left: 50%; top: 50%; width: 240%; aspect-ratio: 1; translate: -50% -50%;
+  background: conic-gradient(#ff8a4c, #f0c24a, #6fe3c1, #7f8cff, #d06bff, #ff5fa2, #ff8a4c); animation: spiel-dreh 3.4s linear infinite; }
+.spiel-knopf::after { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 17px; background: #121a36; }
+.spiel-knopf:hover { transform: rotate(-2deg) scale(1.06); }
+.spiel-knopf:active { transform: rotate(2deg) scale(.97); }
+.spiel-knopf-takt { display: flex; gap: 3px; align-items: flex-end; height: 1.7rem; grid-row: 1 / span 2; }
+.spiel-knopf-takt i { width: 5px; height: 100%; border-radius: 3px; background: linear-gradient(#f0c24a, #ff8a4c); transform-origin: bottom; animation: spiel-takt .8s ease-in-out infinite alternate; }
+.spiel-knopf-takt i:nth-child(2) { animation-delay: -.5s; } .spiel-knopf-takt i:nth-child(3) { animation-delay: -.2s; }
+.spiel-knopf-takt i:nth-child(4) { animation-delay: -.65s; } .spiel-knopf-takt i:nth-child(5) { animation-delay: -.35s; }
+.spiel-knopf-wort { display: flex; }
+.spiel-knopf-wort b { display: inline-block; font-family: var(--titel); font-size: 1.3rem; font-weight: 800; letter-spacing: .07em; animation: spiel-huepf 1.6s ease-in-out infinite; }
+.spiel-knopf-wort b:nth-child(1) { color: #ffb37a; } .spiel-knopf-wort b:nth-child(2) { color: #f0c24a; animation-delay: .09s; }
+.spiel-knopf-wort b:nth-child(3) { color: #6fe3c1; animation-delay: .18s; } .spiel-knopf-wort b:nth-child(4) { color: #9aa8ff; animation-delay: .27s; }
+.spiel-knopf-wort b:nth-child(5) { color: #d99bff; animation-delay: .36s; } .spiel-knopf-wort b:nth-child(6) { color: #ff8fbd; animation-delay: .45s; }
+.spiel-knopf-wort b:nth-child(7) { color: #ffb37a; animation-delay: .54s; }
+.spiel-knopf:hover .spiel-knopf-wort b { animation-duration: .45s; }
+.spiel-knopf:hover .spiel-knopf-takt i { animation-duration: .25s; }
+.spiel-knopf small { grid-column: 2; font-size: .72rem; color: #c3cbec; white-space: nowrap; }
+@keyframes spiel-dreh { to { rotate: 360deg; } }
+@keyframes spiel-takt { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+@keyframes spiel-huepf { 0%, 55%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-6px) rotate(-8deg); } 40% { transform: translateY(1px) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spiel-knopf::before, .spiel-knopf-takt i, .spiel-knopf-wort b { animation: none; }
+  .spiel-knopf:hover, .spiel-knopf:active { transform: none; }
+}

@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { h, meldung } from "./dom.js";
 import { LiveAudio } from "./live_audio.js";
 import { visualisieren } from "./live_visual.js";
+import { spielAnhalten, spielwiese } from "./spielwiese.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -148,6 +149,19 @@ export function liveLabAnsicht(el) {
     onclick: () => { mitAudio(() => engine.pad(art)); }
   }, h("span", {}, label), h("kbd", {}, key)));
 
+  // Spielzeuge: immer nur eines ist zu sehen und zu hören.
+  let spielzeug = (() => { try { return localStorage.getItem("sirens.spielzeug") === "wiese" ? "wiese" : "pult"; } catch { return "pult"; } })();
+  const kisten = {};
+  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"]].map(([key, label]) =>
+    h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
+  function waehlen(key) {
+    spielzeug = key;
+    try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
+    for (const b of spielzeugKnoepfe) b.setAttribute("aria-pressed", String(b.dataset.toy === key));
+    for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
+    if (key === "wiese") { for (const audio of engine.decks) audio.pause(); } else spielAnhalten();
+  }
+
   el.append(h("div", { class: "lab-page" },
     h("header", { class: "lab-header" },
       h("div", {},
@@ -155,6 +169,9 @@ export function liveLabAnsicht(el) {
         h("h1", {}, "Die Wartezeit wird zum Auftritt."),
         h("p", {}, "Zwei Decks. Echtzeit-Effekte. Sound-Pads. Ein audioreaktiver Neon-Kosmos.")),
       h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
+    h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
+    kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
+    kisten.pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
       canvas, hud,
       h("div", { class: "lab-stage-top" }, h("span", { class: "lab-live" }, "● VISUAL ENGINE"), status),
@@ -175,16 +192,17 @@ export function liveLabAnsicht(el) {
     h("section", { class: "lab-pads" },
       h("div", {}, h("h2", {}, "Mach deinen eigenen Beat."),
         h("p", {}, "Tippen oder Tasten A · S · D · F · G spielen. Original-Sounds, live synthetisiert.")),
-      h("div", { class: "lab-pad-row" }, pads)),
+      h("div", { class: "lab-pad-row" }, pads))),
     h("p", { class: "lab-foot" },
       "Performance-Modus: begrenzte Auflösung und Bildrate, um die eigentliche Musikproduktion nicht zu behindern. Audio läuft lokal im Browser.")));
+  waehlen(spielzeug);
   cross.addEventListener("input", () => engine.setCrossfade(cross.value));
   const removeKeyboard = (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
         /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || "")) return;
     const keys = { a:0, s:1, d:2, f:3, g:4 };
     const idx = keys[event.key?.toLowerCase()];
-    if (idx !== undefined) { event.preventDefault(); pads[idx].click(); }
+    if (idx !== undefined && spielzeug === "pult") { event.preventDefault(); pads[idx].click(); }
   };
   window.addEventListener("keydown", removeKeyboard);
   // Bestehenden Sirens-Player nicht gleichzeitig überlagern.
@@ -237,6 +255,7 @@ export function liveLabAnsicht(el) {
     clearInterval(statusTimer);
     window.removeEventListener("keydown", removeKeyboard);
     stopVisual();
+    spielAnhalten();
     engine.beenden();
   };
 }

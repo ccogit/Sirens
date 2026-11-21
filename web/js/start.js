@@ -22,6 +22,14 @@ function karte(a) {
     h("span", { class: "karte-link", "aria-hidden": "true" }, "Ansehen ↗")));
 }
 
+// Der Weg zu den Spielzeugen (Live Lab): hüpfende Buchstaben, tanzende Balken, ein Rand, der sich dreht.
+function spielKnopf() {
+  return h("a", { class: "spiel-knopf", href: "#/lab", "aria-label": "Spielen: DJ-Pult, Beat-Pads, Emblem und Wellen" },
+    h("span", { class: "spiel-knopf-takt", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map(() => h("i", {}))),
+    h("span", { class: "spiel-knopf-wort", "aria-hidden": "true" }, [..."SPIELEN"].map((buchstabe) => h("b", {}, buchstabe))),
+    h("small", { "aria-hidden": "true" }, "DJ-Pult, Beat-Pads, Emblem, Wellen"));
+}
+
 function zaehler(zahl, text, farbe) {
   return h("div", { class: "dashboard-stat " + farbe },
     h("strong", { class: "zahlen" }, String(zahl)),
@@ -75,7 +83,8 @@ export function startAnsicht(el) {
           h("p", { class: "eyebrow" }, "DEIN KREATIVSTUDIO"),
           h("h1", {}, "Musik entsteht hier."),
           h("p", { class: "dashboard-intro" }, "Alles im Blick. Nur das Wichtige im Fokus.")),
-        h("a", { href: "#/neu", class: "knopf gross new-order" }, "＋ Neuer Auftrag")),
+        h("div", { class: "dashboard-actions" }, spielKnopf(),
+          h("a", { href: "#/neu", class: "knopf gross new-order" }, "＋ Neuer Auftrag"))),
       h("div", { class: "dashboard-stats", "aria-label": "Auftragsübersicht" },
         zaehler(g.nutzer.length, "Wartet auf dich", "nutzer"),
         zaehler(g.claude.length, "Bei Claude", "claude"),
@@ -107,11 +116,6 @@ export function startAnsicht(el) {
               daten.claude?.laeuft ? "Arbeitet gerade" : g.claude.length ? (daten.claude?.aktiv ? "Bereit für den nächsten Lauf" : "Manueller Start nötig") : "Im Standby"),
             g.claude.length ? claudeKasten(daten.claude, "", () => { letzter = ""; laden(); })
               : h("p", { class: "status-help" }, "Sobald ein Auftrag an Claude übergeht, erscheint hier sein Status.")),
-          (daten.claude?.laeuft || g.laeuft.length || inProduktion.length)
-            ? h("section", { class: "lab-cta" },
-                h("a", { href: "#/lab" }, "✦ Live Lab öffnen →"),
-                h("p", {}, "Während produziert wird: Lieblingssongs remixen, Beats spielen und GPU-Visuals erleben."))
-            : null,
           h("section", { class: "quiet-tip" },
             h("span", { "aria-hidden": "true", class: "tip-icon" }, "♫"),
             h("p", {}, "Von der ersten Idee bis zum fertigen Master – du entscheidest, wann es weitergeht.")))),

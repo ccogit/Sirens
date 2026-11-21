@@ -3,6 +3,8 @@ import { h } from "./dom.js";
 import { ACHSEN } from "./logic.js";
 
 const RAND = 0.7; // Anteil des halben Feldes, den der volle Ausschlag einnimmt (außen bleibt Platz für die Namen)
+// Länge eines Strahls: so, dass links und rechts noch die Namen der Achsen hinpassen (`platz` in derselben Einheit wie w und h).
+const strahl = (w, h, platz) => Math.max(20, Math.min((Math.min(w, h) / 2) * RAND, w / 2 - platz));
 
 // `beiAenderung(nr, wert)` meldet jedes Verziehen. Liefert { el, malen(werte, eigen, farben) }.
 export function achsenRad(beiAenderung) {
@@ -13,7 +15,7 @@ export function achsenRad(beiAenderung) {
   function ziehen(e) {
     const r = leinwand.getBoundingClientRect();
     const [x, y] = [e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2];
-    const voll = (Math.min(r.width, r.height) / 2) * RAND;
+    const voll = strahl(r.width, r.height, 84);
     if (gegriffen < 0) { // den Strahl nehmen, der der Maus am nächsten liegt
       const w = Math.atan2(y, x);
       gegriffen = ACHSEN.map((_, i) => Math.abs(Math.atan2(Math.sin(w - winkel(i)), Math.cos(w - winkel(i))))).reduce((b, v, i, a) => (v < a[b] ? i : b), 0);
@@ -31,7 +33,7 @@ export function achsenRad(beiAenderung) {
     if (!w || !hoehe) return;
     if (leinwand.width !== w || leinwand.height !== hoehe) { leinwand.width = w; leinwand.height = hoehe; }
     const stift = leinwand.getContext("2d");
-    const [mx, my, voll] = [w / 2, hoehe / 2, (Math.min(w, hoehe) / 2) * RAND];
+    const [mx, my, voll] = [w / 2, hoehe / 2, strahl(w, hoehe, 84 * devicePixelRatio)];
     const rgb = (f, a = 1) => `rgba(${f.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255)).join(",")},${a})`;
     const punkt = (i, wert) => [mx + Math.cos(winkel(i)) * voll * (wert / 10), my + Math.sin(winkel(i)) * voll * (wert / 10)];
     const zug = (liste) => { stift.beginPath(); liste.forEach((wert, i) => { const [x, y] = punkt(i, wert); if (i) stift.lineTo(x, y); else stift.moveTo(x, y); }); stift.closePath(); };
