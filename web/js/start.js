@@ -107,6 +107,11 @@ export function startAnsicht(el) {
               daten.claude?.laeuft ? "Arbeitet gerade" : g.claude.length ? (daten.claude?.aktiv ? "Bereit für den nächsten Lauf" : "Manueller Start nötig") : "Im Standby"),
             g.claude.length ? claudeKasten(daten.claude, "", () => { letzter = ""; laden(); })
               : h("p", { class: "status-help" }, "Sobald ein Auftrag an Claude übergeht, erscheint hier sein Status.")),
+          (daten.claude?.laeuft || g.laeuft.length || inProduktion.length)
+            ? h("section", { class: "lab-cta" },
+                h("a", { href: "#/lab" }, "✦ Live Lab öffnen →"),
+                h("p", {}, "Während produziert wird: Lieblingssongs remixen, Beats spielen und GPU-Visuals erleben."))
+            : null,
           h("section", { class: "quiet-tip" },
             h("span", { "aria-hidden": "true", class: "tip-icon" }, "♫"),
             h("p", {}, "Von der ersten Idee bis zum fertigen Master – du entscheidest, wann es weitergeht.")))),

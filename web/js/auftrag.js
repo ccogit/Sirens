@@ -118,7 +118,10 @@ export function auftragAnsicht(el, id, unterseite = "") {
           // Solange nur gewartet wird: im Fertigmachen über den Schritten, sonst darunter.
           wartet && order.status === "nachlauf" ? spielwiese() : null,
           jetztTun(),
-          wartet && order.status !== "nachlauf" ? spielwiese() : null),
+          wartet && order.status !== "nachlauf" ? spielwiese() : null,
+          wartet ? h("div", { class: "lab-cta" },
+            h("a", { href: "#/lab" }, "✦ Zum erweiterten Live Lab →"),
+            h("p", {}, "Zwei DJ-Decks, Sound-Pads und GPU-Visuals – zusätzlich zur Spielwiese.")) : null),
         h("aside", { class: "order-sidebar", "aria-label": "Projektübersicht" },
           h("section", { class: "block order-progress", "aria-label": "Fortschritt" },
             h("div", { class: "progress-top" },

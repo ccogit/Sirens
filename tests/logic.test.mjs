@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as L from "../web/js/logic.js";
+import { katalogEintraege } from "../web/js/live_lab.js";
 
 const lage = (dran, extra = {}) => ({ dran, claude_auch_dran: dran === "claude", station: 1, offene_bewertungen: 0, ...extra });
 
@@ -128,6 +129,21 @@ test("Spielwiese: Filter aus der Position, Hüllkurve, Lieblingssongs", () => {
     { titel: "B", dateien: [{ pfad: "b1.mp3" }, { pfad: "b2.wav", bewertung: { score: 2 } }] }] }] }] };
   assert.deepEqual(L.lieblingsDateien(katalog), [{ pfad: "a2.mp3", titel: "A", artist: "cco", achsen: null }]);
   assert.deepEqual(L.lieblingsDateien({}), []);
+});
+
+test("Live Lab liest nur vorhandene Audio-Dateien aus dem Katalogbaum", () => {
+  const daten = { artists: [{ slug: "Nova", releases: [{ slug: "Echo", songs: [
+    { titel: "Pulse", dateien: [
+      { pfad: "Nova/Echo/Pulse 1.mp3", fassung: "Original" },
+      { pfad: "Nova/Echo/Pulse 2.wav", fassung: "Master" }
+    ] }
+  ] }] }] };
+  assert.deepEqual(katalogEintraege(daten), [
+    { pfad: "Nova/Echo/Pulse 1.mp3", text: "Nova · Pulse (Original)" },
+    { pfad: "Nova/Echo/Pulse 2.wav", text: "Nova · Pulse (Master)" }
+  ]);
+  assert.deepEqual(katalogEintraege({ artists: [] }), []);
+  assert.deepEqual(katalogEintraege({}), []);
 });
 
 test("Emblem: Achsen aus Profil und Schätzung, Tempo aus dem Klang, Farben aus Wärme und Dunkelheit", () => {
