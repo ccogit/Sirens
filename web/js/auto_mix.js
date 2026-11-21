@@ -1,7 +1,7 @@
 // Auto-DJ transport: Übergänge auf musikalisch geschätzten Phrasen.
 // Browser-Media-Elemente haben Jitter; Timing ist nicht samplegenau.
 import { LiveAudio } from "./live_audio.js";
-import { findeUebergang, naechsterTakt, waehleNaechsten } from "./auto_logic.js";
+import { findeUebergang, naechsterTakt, waehleNaechsten, tempoAngleichung } from "./auto_logic.js";
 
 function wartenAufAudio(audio, timeout=15000) {
   if (audio.readyState >= 1 && Number.isFinite(audio.duration)) return Promise.resolve();
@@ -62,11 +62,12 @@ export class AutoMixer {
     this.cb.history?.(this.history.map((p)=>({...p})));
   }
 
-  async starten(songs,{bars=8,tolerance=.19}={}) {
+  async starten(songs,{bars=8,tolerance=.19,randomness=true}={}) {
     this.stop();
     this.pool=songs.slice();
     this.bars=Number(bars)||8;
     this.tolerance=Number(tolerance)||.19;
+    this.randomness=Boolean(randomness);
     if (this.pool.length<2) throw new Error("Bitte mindestens zwei Songs für das Set auswählen.");
     const token=this.session;
     await this.engine.aktivieren();
@@ -74,7 +75,9 @@ export class AutoMixer {
     let picked=null, info=null;
     const versucht=new Set();
     while (versucht.size<this.pool.length && versucht.size<8) {
-      const song=waehleNaechsten(this.pool,[...versucht]);
+      const offen=this.pool.filter(s=>!versucht.has(s.pfad));
+      const song=this.randomness?waehleNaechsten(offen,[...versucht]):
+        offen.sort((a,b)=>b.rating-a.rating||a.text.localeCompare(b.text,"de"))[0];
       if (!song||versucht.has(song.pfad)) break;
       versucht.add(song.pfad);
       try { info=await this.info(song); picked=song; break; }
@@ -112,14 +115,17 @@ export class AutoMixer {
     const kandidaten=[];
     // Ein kleines exploratives Sample statt hundert gleichzeitig laufender ffmpeg-Prozesse.
     while(versucht.size<pool.length && kandidaten.length<6) {
-      const sample=waehleNaechsten(pool,
-        [...this.history.map(s=>s.pfad),...versucht],infoA.bpm);
+      const offen=pool.filter(s=>!versucht.has(s.pfad));
+      const sample=this.randomness ?
+        waehleNaechsten(offen,this.history.map(s=>s.pfad),infoA.bpm) :
+        offen.sort((a,b)=>b.rating-a.rating||a.text.localeCompare(b.text,"de"))[0];
       if(!sample||versucht.has(sample.pfad)) break;
       versucht.add(sample.pfad);
       kandidaten.push(sample);
     }
     try {
       let beste=null;
+      let reserve=null;
       // Maximal zwei Analyseaufträge gleichzeitig: Claude bleibt priorisiert.
       for(let i=0;i<kandidaten.length;i+=2) {
         const batch=await Promise.allSettled(kandidaten.slice(i,i+2).map(async song =>
@@ -128,17 +134,34 @@ export class AutoMixer {
         for(const answer of batch) {
           if(answer.status!=="fulfilled") continue;
           const {song,info}=answer.value;
+          reserve||={song,info};
           const cue= findeUebergang(infoA,info,
             this.engine.decks[this.slot].currentTime+1,this.bars,this.tolerance);
           if (!cue) continue;
-          const taste=cue.score+(Math.random()-.5)*.09; // bewusst etwas Varianz
+          const taste=cue.score+(this.randomness?(Math.random()-.5)*.09:0);
           if(!beste||taste>beste.taste) beste={song,info,cue,taste};
         }
         if(beste) break;  // erst möglichst wenig Rechenzeit
       }
+      if(!beste && reserve) {
+        // Sicherheitsnetz: im Endlos-Modus ist ein klar ausgewiesener Not-Mix
+        // besser als Stille, wenn Phrase/Tempo nicht zusammenpassen.
+        const {song,info}=reserve;
+        const quelle=this.engine.decks[this.slot];
+        const rest=Math.max(1,quelle.duration-quelle.currentTime-1);
+        const dau=Math.min(4*240/infoA.bpm,Math.max(1,rest*.55));
+        const startA=naechsterTakt(quelle.currentTime+Math.min(4,rest*.2),
+          {bpm:infoA.bpm,beat0:infoA.bar0||0});
+        const match=tempoAngleichung(info.bpm,infoA.bpm);
+        const cue={startA:Math.min(startA,Math.max(0,quelle.duration-1.5)),
+          startB:info.cues_in?.[0]?.zeit||0,rateB:Math.min(1.33,Math.max(.75,match?.rate||1)),
+          bpm:infoA.bpm,bars:4,dauer:dau,score:0,ausgang:"Notübergang (keine sichere Phrase)",
+          eingang:"sicherer Einstieg",energieA:0,energieB:0,confidence:0};
+        beste={song,info,cue,taste:0};
+        this.say("Kein sicherer Match – bereite einen hörbaren Notübergang vor.");
+      }
       if(!beste) {
-        this.say("Noch kein geeigneter Cue: weitere Songs/Tempos testen oder Toleranz erhöhen.");
-        // Ein neues Kandidaten-Sample nach einem kurzen Abstand probieren.
+        this.say("Keine analysierbaren Kandidaten: Wiederhole die Suche in Kürze.");
         this.preparing=false;
         this.retry=setTimeout(()=>this.vorbereiten(token),4500);
         return;
