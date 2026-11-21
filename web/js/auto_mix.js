@@ -47,7 +47,9 @@ export class AutoMixer {
       });
       this.cache.set(song.pfad,request);
     }
-    return this.cache.get(song.pfad);
+    const result=await this.cache.get(song.pfad);
+    song.beat=result;
+    return result;
   }
 
   setPool(songs) { this.pool=songs.slice(); }
@@ -120,7 +122,7 @@ export class AutoMixer {
     while(versucht.size<pool.length && kandidaten.length<6) {
       const offen=pool.filter(s=>!versucht.has(s.pfad));
       const sample=this.randomness ?
-        waehleNaechsten(offen,this.history.map(s=>s.pfad),infoA.bpm) :
+        waehleNaechsten(offen,this.history.map(s=>s.pfad),infoA.bpm,Math.random,aktuell) :
         offen.sort((a,b)=>b.rating-a.rating||a.text.localeCompare(b.text,"de"))[0];
       if(!sample||versucht.has(sample.pfad)) break;
       versucht.add(sample.pfad);
