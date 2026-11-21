@@ -86,3 +86,22 @@
   .stems-perf { font-size:.62rem; }
   .stems-gpu-controls { grid-template-columns:1fr; }
 }
+
+/* Instrumenten-Neubelegung: Basic-Pitch-Timeline + Web-Audio-Synth. */
+.stems-labor { border-radius:20px; padding:clamp(1rem,2.5vw,1.6rem);
+  border:1px solid #3b6681; background:linear-gradient(145deg,#13294a,#142849); color:#e0efff; }
+.stems-labor h2 { color:#efffff; margin:.3rem 0 1rem; font-size:1.3rem; }
+.stems-labor-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)) auto auto;
+  gap:.8rem; align-items:end; margin-bottom:.9rem; }
+.stems-labor-grid label { display:grid; gap:.35rem; min-width:0; color:#c3deed; font-weight:750; font-size:.8rem; }
+.stems-labor-grid select { width:100%; min-width:0; border:1px solid #55769d; border-radius:9px;
+  padding:.65rem; color:#eaf8ff; background:#12223f; font:inherit; }
+.stems-labor-grid button { min-height:2.7rem; }
+.stems-labor-grid button:disabled { opacity:.5; cursor:not-allowed; }
+.stems-labor .stems-hint { margin-top:.6rem; }
+@media (max-width:65rem) {
+ .stems-labor-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:42rem) {
+ .stems-labor-grid { grid-template-columns:minmax(0,1fr); }
+}
