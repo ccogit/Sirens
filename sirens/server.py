@@ -16,6 +16,8 @@ from .contracts import BILD_EXT, Ablehnung, safe_audio_path
 from .service import NutzerAktionen
 from .kicktausch import KickTausch
 from .starter import SATZ, ClaudeStarter
+from .stems import StemDienst
+from .stem_notes import StemNoten
 from .store import Store
 from .workflow import lage
 
@@ -44,6 +46,8 @@ class App:
         self.starter = ClaudeStarter(cfg)
         self.beats = BeatCache(cfg)
         self.kick = KickTausch(cfg, umgebung())
+        self.stems = StemDienst(cfg)
+        self.stem_noten = StemNoten(self.stems)
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""
@@ -188,6 +192,13 @@ class Handler(BaseHTTPRequestHandler):
                                                     query.get("q", ""), min_score))
         if pfad == "/api/beat":
             return self._json(200, app.beats.holen(query.get("pfad")))
+        if pfad == "/api/stems":
+            return self._json(200, app.stems.zustand(query.get("pfad"), query.get("modell", "htdemucs")))
+        if pfad == "/api/stems/notes":
+            return self._json(200, app.stem_noten.zustand(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem")))
+        if pfad == "/api/stems/audio":
+            datei = app.stems.audiodatei(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem"))
+            return self._senden(datei)
         if pfad == "/api/audio":
             return self._audio(query.get("pfad"))
         if pfad == "/api/bild":
@@ -208,6 +219,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _schreiben(self, pfad, data):
         app = self.app
+        if self.command == "POST" and pfad == "/api/stems/notes":
+            if not isinstance(data, dict):
+                raise Ablehnung("invalid", "Die Notenanfrage muss ein Objekt sein.")
+            stand = app.stem_noten.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("stem"))
+            return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
+        if self.command == "POST" and pfad == "/api/stems":
+            if not isinstance(data, dict):
+                raise Ablehnung("invalid", "Die Stem-Anfrage muss ein Objekt sein.")
+            if data.get("device", "cpu") == "cuda" and app.starter.zustand()["laeuft"]:
+                raise Ablehnung("busy_gpu", "Claude produziert gerade. Bitte CPU wählen oder später CUDA starten.", "device", 409)
+            stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("device", "cpu"))
+            return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
         if self.command == "POST" and pfad == "/api/catalog/refresh":
             app.katalog.scan_im_hintergrund()
             return self._json(202, {"zustand": "laeuft"})

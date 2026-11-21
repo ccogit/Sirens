@@ -40,6 +40,8 @@ Adresse: <http://127.0.0.1:8093/>. Im Vordergrund läuft der Dienst mit
 | `SOUNDCLOUD_…` (in `.env` in diesem Ordner) | – | Zugang für den Upload: `SOUNDCLOUD_CLIENT_ID` und `SOUNDCLOUD_CLIENT_SECRET` eintragen (Vorlage: `.env.example`), dann einmal im Projektordner `py -3.11 scripts/soundcloud_auth.py`; fehlt das Zugangstoken, sagt die Seite es im Schritt SoundCloud |
 | `SIRENS_MUSIC_ROOT` | `E:\AMM\generated-music` | Musikordner; die Seite liest ihn und schreibt nur neue Master-Dateien des Studios |
 | `SIRENS_FFMPEG` | leer | Pfad zu ffmpeg; leer = `ffmpeg` aus dem `PATH` |
+| `SIRENS_STEMS_PYTHON` | leer | Eigene Demucs-Python-Umgebung für KI-Stem-Trennung (CPU/CUDA) |
+| `SIRENS_STEMS_PITCH_PYTHON` | leer | Eigene Basic-Pitch-Python-Umgebung für optionale Notenerkennung |
 | `SIRENS_DATA_DIR` | `E:\AMM\song-auftraege` | Auftragsablage, außerhalb des Repos |
 | `SIRENS_PORT` | `8093` | Port |
 | `SIRENS_CLAUDE` | `an` | `aus` schaltet den selbständigen Start von Claude Code ab |
@@ -255,7 +257,8 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Breite und 1,5-fache Pixelauflösung begrenzt. Wenn Claude tatsächlich arbeitet,
   wird auf etwa 15 FPS und 1000 Pixel Breite gedrosselt; im Hintergrundtab pausiert das Zeichnen.
   Die Wahl der tatsächlichen GPU trifft der Browser bzw. das Betriebssystem. Es wird
-  **kein CUDA-Modell** gestartet, das der Musikgenerierung GPU-Speicher wegnehmen würde.
+  Im DJ-Pult startet kein CUDA-KI-Modell; nur eine ausdrücklich gewählte Stem-Trennung
+  kann CUDA benutzen (nicht während Claude produziert).
 
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
@@ -303,6 +306,14 @@ Songs über sechs Minuten werden bis Minute sechs analysiert.
 Das Endlos-Set benötigt eine geöffnete Browser-Seite und darf bei
 Hintergrundtab-Drosselung ungenauer laufen. Der Stopp oder ein Wechsel
 des Spielzeugs beendet die Wiedergabe.
+
+## KI Stem Studio & RTX Warp Stage
+
+Im **Live Lab** steht das zusätzliche Spiel **🎚 KI Stem Studio & Warp Stage** zur Verfügung.
+Es kombiniert lokale Demucs-Stem-Trennung, einen samplegenauen Mehrspurmixer,
+optional wechselbare Instrumentenklänge über Basic Pitch und drei audioreaktive
+Raymarching-3D-Welten für die RTX 5080. Die vollständige Einrichtung und
+Performance-Steuerung steht in [docs/stem-studio.md](docs/stem-studio.md).
 
 ## Grenzen
 

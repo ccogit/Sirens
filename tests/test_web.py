@@ -43,7 +43,7 @@ class Seite(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "Node ist nicht installiert")
     def test_logik_mit_node(self):
-        lauf = subprocess.run(["node", "--test", str(ROOT / "tests" / "logic.test.mjs")], capture_output=True, text=True,
+        lauf = subprocess.run(["node", "--test", str(ROOT / "tests" / "logic.test.mjs"), str(ROOT / "tests" / "stem_visual.test.mjs")], capture_output=True, text=True,
                               encoding="utf-8", errors="replace", timeout=120)
         self.assertEqual(lauf.returncode, 0, lauf.stdout + lauf.stderr)
 

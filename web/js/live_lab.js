@@ -6,6 +6,7 @@ import { visualisieren } from "./live_visual.js";
 import { spielAnhalten, spielwiese } from "./spielwiese.js";
 import { autoDjAnsicht } from "./auto_dj.js";
 import { kickTausch } from "./kicktausch.js";
+import { stemSpiel } from "./stems.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -153,10 +154,11 @@ export function liveLabAnsicht(el) {
 
   const autoToy = autoDjAnsicht(() => produktionLaeuft);
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "auto", "kick"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
+  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "auto", "kick", "stems"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
   const kick = kickTausch();
+  const stems = stemSpiel(() => produktionLaeuft);
   const kisten = {};
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"]].map(([key, label]) =>
+  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"], ["stems", "🎚 KI Stem Studio & Warp Stage"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
   function waehlen(key) {
     spielzeug = key;
@@ -166,6 +168,7 @@ export function liveLabAnsicht(el) {
     if (key !== "pult") for (const audio of engine.decks) audio.pause();
     if (key !== "wiese") spielAnhalten();
     if (key !== "kick") kick.anhalten();
+    if (key !== "stems") stems.pausieren();
     if (key === "auto") autoToy.activate(); else { autoToy.deactivate(); autoToy.stop(); }
   }
 
@@ -174,12 +177,13 @@ export function liveLabAnsicht(el) {
       h("div", {},
         h("p", { class: "lab-eyebrow" }, "SIRENS · INTERACTIVE MUSIC SPACE"),
         h("h1", {}, "Die Wartezeit wird zum Auftritt."),
-        h("p", {}, "Zwei Decks. Echtzeit-Effekte. Sound-Pads. Ein audioreaktiver Neon-Kosmos.")),
+        h("p", {}, "DJ-Pult, Auto-DJ, Kick-Tausch und KI Stem Studio mit audioreaktivem RTX Warp Stage.")),
       h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
     h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
     kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
     kisten.auto = h("div", { class: "lab-toy" }, autoToy.el),
     kisten.kick = h("div", { class: "lab-toy" }, kick.el),
+    kisten.stems = h("div", { class: "lab-toy" }, stems.el),
     kisten.pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
       canvas, hud,
@@ -267,6 +271,7 @@ export function liveLabAnsicht(el) {
     spielAnhalten();
     autoToy.destroy();
     kick.anhalten();
+    stems.beenden();
     engine.beenden();
   };
 }
