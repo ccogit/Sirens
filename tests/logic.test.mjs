@@ -207,3 +207,13 @@ test("Auto-DJ klassifiziert geschätzte Dynamik und vermeidet direkte Wiederholu
   const songs=[{pfad:"a",rating:1},{pfad:"b",rating:2},{pfad:"c",rating:0}];
   assert.notEqual(DJ.waehleNaechsten(songs,["a"],120,()=>0).pfad,"a");
 });
+
+
+test("Auto-DJ komponiert Energieverläufe über mehrere Songs",()=>{
+  const initial=DJ.setEnergieZiel("aufbau",0);
+  const spaeter=DJ.setEnergieZiel("aufbau",5);
+  assert.ok(spaeter>initial);
+  assert.ok(DJ.setEnergieZiel("chill",4)<DJ.setEnergieZiel("peak",4));
+  const welle=Array.from({length:8},(_,i)=>DJ.setEnergieZiel("welle",i));
+  assert.ok(Math.max(...welle)-Math.min(...welle)>.35);
+});
