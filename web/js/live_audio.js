@@ -69,8 +69,28 @@ export class LiveAudio {
   setCrossfade(position) {
     if (!this.gains) return;
     const x = Math.min(1, Math.max(0, Number(position) / 100));
+    for (const g of this.gains) g.gain.cancelScheduledValues(this.ctx.currentTime);
     this.gains[0].gain.setTargetAtTime(Math.cos(x * Math.PI / 2), this.ctx.currentTime, 0.02);
     this.gains[1].gain.setTargetAtTime(Math.sin(x * Math.PI / 2), this.ctx.currentTime, 0.02);
+  }
+
+  autoCrossfade(von, sekunden) {
+    if (!this.ctx || !this.gains) return;
+    const start = this.ctx.currentTime + 0.03;
+    const n = 128;
+    const weg = new Float32Array(n);
+    const hin = new Float32Array(n);
+    for (let i=0; i<n; i++) {
+      const phase = (i/(n-1))*Math.PI/2;
+      weg[i] = Math.max(0.00001,Math.cos(phase));
+      hin[i] = Math.max(0.00001,Math.sin(phase));
+    }
+    for (const gain of this.gains) gain.gain.cancelScheduledValues(this.ctx.currentTime);
+    const aus=this.gains[von].gain, ein=this.gains[1-von].gain;
+    aus.setValueAtTime(1,start);
+    ein.setValueAtTime(0,start);
+    aus.setValueCurveAtTime(weg,start,Math.max(.1,sekunden));
+    ein.setValueCurveAtTime(hin,start,Math.max(.1,sekunden));
   }
 
   setFilter(position) {
