@@ -55,6 +55,11 @@ export function autoDjAnsicht(isProducing=()=>false) {
     h("option",{value:".19",selected:true},"±19 % – ausgewogen"),
     h("option",{value:".30"},"±30 % – experimentell"));
   const random=h("input",{type:"checkbox",checked:true,"aria-label":"Abwechslungsreiche Zufallsauswahl"});
+  const story=h("select",{"aria-label":"Energie-Dramaturgie für das Set"},
+    h("option",{value:"welle"},"Energie-Wellen"),
+    h("option",{value:"aufbau"},"Langsamer Aufbau zum Peak"),
+    h("option",{value:"chill"},"Entspannt & atmosphärisch"),
+    h("option",{value:"peak"},"Peak-Time & Power"));
   const toy=h("section",{class:"auto-dj"},
     h("header",{class:"auto-head"},
       h("div",{},
@@ -83,7 +88,8 @@ export function autoDjAnsicht(isProducing=()=>false) {
         h("label",{},"Quelle",mode),
         h("label",{},"Stil nach Dateiname",genre),
         h("label",{},"Mix-Länge",bars),
-        h("label",{},"Tempo-Spielraum",tolerance)),
+        h("label",{},"Tempo-Spielraum",tolerance),
+        h("label",{},"Energie-Regie",story)),
       h("label",{class:"auto-random"},random,"Musikalisch gewichtete Zufallsauswahl – keine festen Trackfolgen"),
       h("div",{class:"auto-search"},search,count),
       h("p",{class:"auto-selection-help"},"Mit den Häkchen kannst du Songs für „Nur manuell ausgewählte Songs“ vormerken."),
@@ -111,6 +117,7 @@ export function autoDjAnsicht(isProducing=()=>false) {
         h("p",{},"Ausgang: "+cue.ausgang+" · Eingang: "+cue.eingang),
         h("p",{},cue.bpm.toFixed(1)+" BPM · "+"Tempo B: "+
           (cue.rateB*100).toFixed(1)+" % · "+cue.bars+" Takte überblenden"),
+        h("p",{},"Regie-Ziel: "+Math.round(plan.zielEnergie*100)+" % Energie"),
         h("p",{class:"auto-confidence"},"Struktur-Schätzung "+Math.round(cue.confidence*100)+" % · Energiematch "+
           Math.round((1-Math.abs(cue.energieA-cue.energieB))*100)+" %"));
     },
@@ -179,8 +186,8 @@ export function autoDjAnsicht(isProducing=()=>false) {
   search.addEventListener("input",aktualisieren);
   mode.addEventListener("change",aktualisieren);
   genre.addEventListener("change",aktualisieren);
-  for(const el of [bars,tolerance]) el.addEventListener("change",()=>{
-    mixer.bars=Number(bars.value);mixer.tolerance=Number(tolerance.value);
+  for(const el of [bars,tolerance,story]) el.addEventListener("change",()=>{
+    mixer.bars=Number(bars.value);mixer.tolerance=Number(tolerance.value);mixer.story=story.value;
     stand.textContent="Mix-Einstellungen gelten ab dem nächsten noch nicht vorbereiteten Übergang.";
   });
   random.addEventListener("change",()=>{
@@ -196,7 +203,7 @@ export function autoDjAnsicht(isProducing=()=>false) {
     start.textContent="▶ Läuft …";
     try {
       const started=await mixer.starten(songs,{bars:Number(bars.value),
-        tolerance:Number(tolerance.value),randomness:random.checked});
+        tolerance:Number(tolerance.value),randomness:random.checked,story:story.value});
       if(!started||beendet)return;
       laufend=true; nextBeat.disabled=false;
     }catch(err){
