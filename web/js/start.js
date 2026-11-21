@@ -84,7 +84,7 @@ export function startAnsicht(el) {
         h("div", { class: "dashboard-primary" },
           erster ? fokus(erster)
             : h("section", { class: "focus-card focus-empty" },
-                h("span", { class: "focus-eyebrow" }, h("span", { class: "focus-dot" }), "ALLES ERLEDIGT"),
+                h("span", { class: "focus-eyebrow" }, h("span", { class: "focus-dot" }), daten.auftraege.length ? "ALLES ERLEDIGT" : "DEIN STARTPUNKT"),
                 h("h2", {}, daten.auftraege.length ? "Du bist auf dem Laufenden." : "Dein nächster Song beginnt hier."),
                 h("p", {}, daten.auftraege.length ? "Aktuell ist keine Entscheidung von dir nötig." : "Beschreibe deine Idee oder wähle einen Song als Inspiration."),
                 h("a", { href: "#/neu", class: "focus-button" }, "Neuen Auftrag starten →")),
@@ -104,7 +104,7 @@ export function startAnsicht(el) {
               h("div", {}, h("h2", {}, "Claude Code"), h("p", {}, "Dein Produktionspartner"))),
             h("p", { class: "status-state" },
               h("span", { class: "status-indicator" + (daten.claude?.laeuft ? " online" : "") }),
-              daten.claude?.laeuft ? "Arbeitet gerade" : g.claude.length ? "Bereit für den nächsten Lauf" : "Im Standby"),
+              daten.claude?.laeuft ? "Arbeitet gerade" : g.claude.length ? (daten.claude?.aktiv ? "Bereit für den nächsten Lauf" : "Manueller Start nötig") : "Im Standby"),
             g.claude.length ? claudeKasten(daten.claude, "", () => { letzter = ""; laden(); })
               : h("p", { class: "status-help" }, "Sobald ein Auftrag an Claude übergeht, erscheint hier sein Status.")),
           h("section", { class: "quiet-tip" },
