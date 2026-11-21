@@ -311,6 +311,8 @@ class NachlaufAktionen:
             return self._cover_ersetzen(oid, revision(data))
         if wahl in ("metadaten", "audio_bestaetigt"):
             return versionen.soundcloud_aktualisieren(self, oid, data)
+        if wahl == "wieder_oeffnen":
+            return versionen.soundcloud_wieder_oeffnen(self, oid, data)
         if wahl not in ("hochladen", "ohne"):
             raise Ablehnung("invalid", "„entscheidung“ muss hochladen, ohne oder cover sein.", "entscheidung")
         if wahl == "hochladen" and data.get("bestaetigt") is not True:  # Nutzer, 14.11.2026: Upload nur nach Bestätigung
