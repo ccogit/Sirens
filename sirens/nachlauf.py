@@ -227,51 +227,10 @@ class NachlaufAktionen:
         return self.store.mutate(oid, revision(data), fn)
 
     def version(self, oid, data):
-        """Alte Fassung behalten oder nach Bestätigung sicher aus dem Musikordner archivieren."""
-        nur(data, ("revision", "entscheidung", "pfad", "bestaetigt"))
-        entscheidung = data.get("entscheidung")
-        if entscheidung not in ("behalten", "archivieren"):
-            raise Ablehnung("invalid", "Bitte Behalten oder Archivieren wählen.", "entscheidung")
-        if entscheidung == "archivieren" and data.get("bestaetigt") is not True:
-            raise Ablehnung("confirm_required", "Das Archivieren muss bestätigt werden.", "bestaetigt", 409)
-        def fn(order):
-            if order["status"] not in ("nachlauf", "fertig", "abgeschlossen"):
-                raise Ablehnung("invalid_transition", "Versionen erst nach der Produktion bearbeiten.", "status", 409)
-            n = order.get("nachlauf")
-            offen = (n or {}).get("version_entscheidung")
-            pfad = data.get("pfad") or (offen or {}).get("alt")
-            if not isinstance(pfad, str) or not pfad:
-                raise Ablehnung("required", "Bitte die bisherige Version wählen.", "pfad")
-            if entscheidung == "behalten":
-                if not offen or pfad != offen["alt"]:
-                    raise Ablehnung("invalid_transition", "Für diese Version liegt keine Entscheidung vor.", "pfad", 409)
-                n["version_entscheidung"] = None
-                eintrag(order, NUTZER, "status", "Vorherige Master-Version bleibt erhalten.")
-                return
-            archiv = versionen.archivieren(self.cfg, self.store, order, pfad)
-            order.setdefault("archivierte_versionen", []).append(archiv)
-            if offen and offen["alt"] == pfad:
-                n["version_entscheidung"] = None
-            eintrag(order, NUTZER, "status", f"Version archiviert: {PurePosixPath(pfad).name}")
-        return self.store.mutate(oid, revision(data), fn)
+        return versionen.entscheiden(self, oid, data)
 
     def text_aendern(self, oid, data):
-        """Beschreibung/Text nach Fertigstellung auf Wunsch von Claude erneuern lassen."""
-        nur(data, ("revision", "wunsch"))
-        wunsch = _text(data.get("wunsch"), "wunsch")
-        def fn(order):
-            n = _im_nachlauf(order)
-            if n["soundcloud"]["stand"] == "beauftragt":
-                raise Ablehnung("invalid_transition", "Bitte den laufenden Upload abwarten.", "status", 409)
-            t = n["text"]
-            if t["stand"] not in ERLEDIGT:
-                raise Ablehnung("invalid_transition", "Eine Textänderung ist gerade nicht möglich.", "status", 409)
-            t.update(stand="offen", wunsch=wunsch)
-            if n["soundcloud"]["stand"] == "fertig":
-                n["soundcloud"]["text_offen"] = True
-            eintrag(order, NUTZER, "antwort", "Songbeschreibung und Songtext aktualisieren"
-                    + (f": {wunsch}" if wunsch else "."))
-        return self.store.mutate(oid, revision(data), fn)
+        return versionen.text_aendern(self, oid, data)
 
     def ableton(self, oid, data):
         nur(data, ("revision",))
