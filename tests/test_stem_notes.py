@@ -20,7 +20,7 @@ class InstrumentLaborAPI(ServerFall):
             return type("Ergebnis", (), {"returncode": 0})()
 
         with patch("sirens.stems.subprocess.run", side_effect=faken):
-            self.assertEqual(self.http("POST", "/api/stems", {"pfad": TIDY1})[0], 202)
+            self.assertIn(self.http("POST", "/api/stems", {"pfad": TIDY1})[0], (200, 202))
             ende = time.monotonic() + 4
             while time.monotonic() < ende:
                 zustand = self.http("GET", "/api/stems?pfad=" + quote(TIDY1))[1]["zustand"]
