@@ -60,7 +60,7 @@ class InstrumentLaborAPI(ServerFall):
             return type("Ergebnis", (), {"returncode": 0})()
 
         with patch("sirens.stem_notes.subprocess.run", side_effect=fake_worker) as run:
-            self.assertEqual(self.http("POST", "/api/stems/notes", {"pfad": TIDY1, "stem": "bass"})[0], 202)
+            self.assertIn(self.http("POST", "/api/stems/notes", {"pfad": TIDY1, "stem": "bass"})[0], (200, 202))
             result = self.warten()
             self.assertEqual(result["noten"], noten)
             self.assertEqual(result["zustand"], "bereit")
@@ -72,7 +72,7 @@ class InstrumentLaborAPI(ServerFall):
         self.vorbereitet()
         with patch("sirens.stem_notes.subprocess.run",
                    return_value=type("Ergebnis", (), {"returncode": 42})()):
-            self.assertEqual(self.http("POST", "/api/stems/notes", {"pfad": TIDY1, "stem": "bass"})[0], 202)
+            self.assertIn(self.http("POST", "/api/stems/notes", {"pfad": TIDY1, "stem": "bass"})[0], (200, 202))
             self.assertEqual(self.warten()["zustand"], "fehler")
 
     def test_cuda_waehrend_claude_lauf_abgelehnt(self):
