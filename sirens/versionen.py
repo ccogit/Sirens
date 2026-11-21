@@ -110,3 +110,38 @@ def text_aendern(service, oid, data):
                 + (f": {wunsch}" if wunsch else "."))
 
     return service.store.mutate(oid, revision(data), fn)
+
+
+def soundcloud_aktualisieren(service, oid, data):
+    """Nur eine bestehende SoundCloud-Veröffentlichung bearbeiten; Audio bleibt manuell."""
+    from . import soundcloud as sc
+    wahl = data.get("entscheidung")
+    if data.get("bestaetigt") is not True:
+        raise Ablehnung("confirm_required", "SoundCloud-Änderungen bitte bestätigen.", "bestaetigt", 409)
+    if wahl == "audio_bestaetigt":
+        def fn(order):
+            if order["status"] != "nachlauf":
+                raise Ablehnung("invalid_transition", "Bitte den Song zur Bearbeitung öffnen.", "status", 409)
+            n = order["nachlauf"]
+            if n["soundcloud"]["stand"] != "fertig" or not n["soundcloud"].get("audio_offen"):
+                raise Ablehnung("invalid_transition", "Keine ausstehende Audio-Aktualisierung.", "status", 409)
+            n["soundcloud"].update(audio_offen=False, hochgeladen_datei=n["mastering"]["datei"] or n["favorit"])
+            eintrag(order, NUTZER, "status", "Audio-Austausch auf SoundCloud vom Nutzer bestätigt.")
+        return service.store.mutate(oid, revision(data), fn)
+
+    order = service.store.load(oid)
+    if revision(data) != order["revision"]:
+        raise Ablehnung("revision_conflict", "Der Auftrag wurde inzwischen geändert.", "revision", 409)
+    if order["status"] != "nachlauf":
+        raise Ablehnung("invalid_transition", "Bitte den Song zur Bearbeitung öffnen.", "status", 409)
+    n = order["nachlauf"]
+    if n["soundcloud"]["stand"] != "fertig" or n["text"]["stand"] != "fertig":
+        raise Ablehnung("invalid_transition", "Für SoundCloud muss die neue Beschreibung fertig sein.", "status", 409)
+    fehler = sc.metadaten_ersetzen(n["soundcloud"]["link"], n["text"]["beschreibung"], n["text"]["tags"])
+
+    def fn(order):
+        aktu = order["nachlauf"]["soundcloud"]
+        aktu.update(text_offen=bool(fehler), text_fehler=fehler)
+        if not fehler:
+            eintrag(order, NUTZER, "status", "Beschreibung auf dem bestehenden SoundCloud-Track aktualisiert.")
+    return service.store.mutate(oid, None, fn)
