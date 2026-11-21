@@ -171,6 +171,35 @@ py -3.11 -m unittest discover -s tests
 
 Ist Node installiert, laufen dabei auch die Tests der Seitenlogik (`tests/logic.test.mjs`).
 
+## Songs weiterbearbeiten und Versionen aufräumen
+
+Unter **Songs** stehen alle Songs in Bearbeitung und die in den letzten 30 Tagen aktualisierten Produktionen als
+kompakte Zeilen. Ältere Songs lassen sich zusätzlich einblenden. **Bearbeiten** öffnet einen vorhandenen
+Song erneut – auch nach dem Abschluss eines Auftrags. Der bestehende Auftrag und die Entscheidungen
+bleiben erhalten.
+
+- **Mastering:** Erneut rendern, Master wechseln oder ohne Master weiter. Nach dem Wechsel zwischen
+  vorhandenen Fassungen fragt Sirens, ob die alte Datei **behalten** oder **archiviert** werden soll.
+- **Cover und Text:** Neue Cover bzw. Beschreibungen anfordern. Entstehen neue Dateien mit anderem
+  Pfad, folgt dieselbe Versionsfrage. Ein versehentliches Überschreiben durch externe Skripte kann die
+  Oberfläche nicht verhindern; diese sollten daher neue Versionen unter neuem Dateinamen ablegen.
+- **Takes:** Nicht mehr benötigte Takes können nach einer zusätzlichen Bestätigung aussortiert werden.
+  Aktuelle Favoriten, Referenzen, Dateien in anderen Aufträgen und die bei SoundCloud hinterlegte
+  Audiofassung sind geschützt. Werden sie noch benötigt, lehnt der Dienst das Archivieren ab.
+- **Dateien:** Archivieren verschiebt die Datei aus dem aktiven Musikordner nach
+  \`SIRENS_DATA_DIR/versionen-archiv/<Auftrags-ID>/...\`. Die Datei wird **nicht endgültig gelöscht**.
+  Der Vorgang wird unter \`archivierte_versionen\` in der Auftrags-JSON dokumentiert. Behalten ist
+  die sichere Standardentscheidung; ohne ausdrückliche Bestätigung wird nichts verschoben.
+- **SoundCloud:** Nach Textänderungen lassen sich Beschreibung und Tags ausdrücklich **auf dem
+  vorhandenen Track** aktualisieren. Cover lassen sich ebenfalls auf dem bestehenden Track ersetzen.
+  Einen neuen Upload gibt es bei einer Aktualisierung nicht. Bei Fehlern bleibt der Sync-Hinweis offen.
+  **Audiodateien** lassen sich nicht über die SoundCloud-API austauschen: Sirens verweist auf den
+  bestehenden SoundCloud-Track und verlangt erst nach manuell bestätigtem Austausch eine
+  Synchronmarkierung. Die Funktion „Replace file“ setzt einen passenden SoundCloud-Tarif voraus.
+
+Über den Sonnen-/Mondknopf der Navigation wechselst du zwischen dem hellen Design und dem
+navyfarbenen Dark Mode. Die Einstellung wird lokal im Browser gespeichert.
+
 ## Grenzen
 
 - Die gestartete Sitzung läuft ohne Fenster und ohne Rückfragen im Chat; Fragen an dich kommen als
