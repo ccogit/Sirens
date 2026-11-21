@@ -108,7 +108,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .kacheln { gap: .8rem; }
 .kachel { border: 1px solid #e3e7f0; border-radius: 15px; background: #fbfcff; padding: 1.2rem; min-height: 110px; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease; }
 .kachel strong { font-size: 1.1rem; }
-.kachel span { color: #728098; }
+.kachel span { color: #66728b; }
 .kachel:hover { border-color: #b8b3eb; }
 .kachel[aria-pressed=true] { border: 1.5px solid #817bea; background: #f1f0ff; box-shadow: inset 0 0 0 1px rgba(118,110,231,.15); }
 .reihe { border-radius: 12px; border-color: #e0e5f0; }
@@ -122,7 +122,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 /* Aufträge: ein Fokusbereich statt eines dicht gepackten Kanban-Boards. */
 .dashboard-header { display: flex; align-items: end; justify-content: space-between; gap: 1rem 2rem; flex-wrap: wrap; margin-bottom: 1.7rem; }
 .dashboard-header h1 { margin: .05rem 0 .6rem; }
-.dashboard-intro { color: #727d95; font-size: 1rem; margin: .3rem 0 0; }
+.dashboard-intro { color: #626e85; font-size: 1rem; margin: .3rem 0 0; }
 .new-order { white-space: nowrap; }
 .dashboard-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .9rem; margin-bottom: 2rem; }
 .dashboard-stat { display: flex; gap: .88rem; align-items: center; min-height: 72px; padding: 1rem 1.2rem; border-radius: 16px; background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.98); box-shadow: 0 4px 18px rgba(62,76,123,.025); }
@@ -164,7 +164,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .karte-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
 .card-state { color: #6862b7; background: #f0eeff; font-size: .72rem; font-weight: 750; border-radius: 50px; padding: .17rem .55rem; }
 .karte-titel { color: #293252; font-size: 1.03rem; font-weight: 720; letter-spacing: -.025em; overflow-wrap: anywhere; }
-.karte-text { color: #778197; font-size: .86rem; line-height: 1.45; }
+.karte-text { color: #626f86; font-size: .86rem; line-height: 1.45; }
 .karte-link { font-size: .8rem; font-weight: 700; color: #5852c5; margin-top: .22rem; }
 .production-section { margin-top: 2.3rem; }
 .section-heading { margin-bottom: 1rem; }
@@ -184,10 +184,10 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .status-panel .satz { background: #f5f6ff; border: 1px solid #ebedff; border-radius: 13px; padding: .9rem; margin: .8rem 0 0; }
 .status-panel .satz p { color: #666f99; line-height: 1.5; font-size: .83rem; font-weight: 500; }
 .satz-zeile button { background: #5753cc; border-color: #5753cc; border-radius: 10px; color: white; }
-.quiet-tip { display: flex; align-items: flex-start; gap: 1rem; padding: 1.25rem .5rem; color: #8792a8; }
+.quiet-tip { display: flex; align-items: flex-start; gap: 1rem; padding: 1.25rem .5rem; color: #627087; }
 .quiet-tip p { font-size: .84rem; line-height: 1.6; margin: 0; }
 .tip-icon { font-size: 1.3rem; color: #8c8bd4; }
-.empty-small { color: #8b94a8; font-size: .86rem; padding: 1rem; background: rgba(255,255,255,.52); border-radius: 13px; }
+.empty-small { color: #627087; font-size: .86rem; padding: 1rem; background: rgba(255,255,255,.52); border-radius: 13px; }
 .archive-panel { margin-top: 2.7rem; border-top: 1px solid #dfe4f0; padding-top: 1.2rem; }
 .archive-panel > summary { list-style: none; display: flex; justify-content: space-between; max-width: 100%; align-items: center; font-weight: 750; }
 .archive-panel > summary::-webkit-details-marker { display: none; }
@@ -228,7 +228,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .order-more .kette { margin-top: .6rem; }
 .order-sidebar > .klappe { background: rgba(255,255,255,.7); }
 .abbrechen { margin-top: 1.5rem; }
-.abbrechen .schlicht { color: #8b93a5; font-size: .83rem; }
+.abbrechen .schlicht { color: #68748d; font-size: .83rem; }
 .station.aktiv summary { border-radius: 9px; }
 .station-inhalt { border-color: #e2e6f6; }
 .dran { font-size: 1.1rem; }
@@ -241,7 +241,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .noten button { background: #fff; }
 .take-fuss { align-items: center; }
 .comment-details { flex: 1 1 100%; font-size: .86rem; }
-.comment-details > summary { color: #747e98; font-weight: 600; }
+.comment-details > summary { color: #5c6982; font-weight: 600; }
 .comment-details .feld { margin: .5rem 0 0; }
 .weiter { border-color: #e9ecf5; margin-top: 1.6rem; padding-top: 1.25rem; }
 .weiter > .knopf { margin: .9rem 0; }
@@ -264,7 +264,7 @@ input:focus, textarea:focus, select:focus { border-color: #9e9bea; outline: none
 .abschluss .knopfzeile { gap: .7rem; margin: 1.3rem 0 .85rem; }
 .abschluss .knopfzeile .knopf { flex: 1; }
 .ablauf-vorschau { border-top: 1px solid #e7e9f4; margin-top: 1rem; padding-top: .9rem; }
-.ablauf-vorschau > summary { font-size: .83rem; color: #7c829b; }
+.ablauf-vorschau > summary { font-size: .83rem; color: #68748d; }
 .ablauf-vorschau .ablauf { padding-top: .8rem; }
 .gruppe { gap: 1rem; }
 .phase { border: 1px solid #e5e8f2; border-top: 3px solid var(--rolle); border-radius: 16px; background: #fbfcff; padding: 1rem 1.2rem; }
