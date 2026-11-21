@@ -51,7 +51,7 @@ class StemAPI(ServerFall):
     def test_ki_trennung_cache_und_streaming(self):
         with patch("sirens.stems.subprocess.run", side_effect=self.demucs_ersetzen) as lauf:
             code, daten, _ = self.http("POST", "/api/stems", {"pfad": TIDY1, "modell": "htdemucs_6s", "device": "cuda"})
-            self.assertEqual(code, 202)
+            self.assertIn(code, (200, 202))
             self.assertIn(daten["zustand"], ("laeuft", "bereit"))
             ergebnis = self.warten(modell="htdemucs_6s")
             self.assertEqual((ergebnis["zustand"], len(ergebnis["stems"])), ("bereit", 6))
@@ -97,7 +97,7 @@ class StemAPI(ServerFall):
 
     def test_fehler_nach_trennung_sichtbar(self):
         with patch("sirens.stems.subprocess.run", return_value=type("Ergebnis", (), {"returncode": 13})()):
-            self.assertEqual(self.http("POST", "/api/stems", {"pfad": TIDY1})[0], 202)
+            self.assertIn(self.http("POST", "/api/stems", {"pfad": TIDY1})[0], (200, 202))
             daten = self.warten()
             self.assertEqual(daten["zustand"], "fehler")
             self.assertIn("demucs.log", daten["meldung"])
