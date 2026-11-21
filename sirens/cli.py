@@ -123,6 +123,8 @@ def main(argv=None, env=None, out=None):
         out.reconfigure(encoding="utf-8")
     try:
         args = _parser().parse_args(argv)
+        if args.befehl == "serve" and env is None:
+            config.aus_datei_setzen()  # z. B. SIRENS_STEMS_PYTHON für das Stem Studio
         cfg = config.load(env)
         if args.befehl == "serve":
             from .server import serve

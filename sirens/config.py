@@ -41,6 +41,13 @@ def umgebung(env=None, datei=None):
     return werte
 
 
+def aus_datei_setzen(datei=None):
+    """`SIRENS_…`-Einstellungen aus der `.env` für den Dienst und seine Hilfsprogramme setzen; schon Gesetztes gilt weiter."""
+    for name, wert in umgebung({}, datei).items():
+        if name.startswith("SIRENS_"):
+            os.environ.setdefault(name, wert)
+
+
 def load(env=None):
     env = os.environ if env is None else env
 

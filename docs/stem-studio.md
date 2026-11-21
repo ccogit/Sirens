@@ -90,8 +90,10 @@ die PyTorch-Installation korrigieren oder den CPU-Modus verwenden.
 Siehe die offizielle [PyTorch-Installationsseite](https://pytorch.org/get-started/locally/)
 und [Demucs](https://github.com/facebookresearch/demucs).
 
-Damit Sirens die gesonderte Umgebung benutzt, beim Start in derselben
-PowerShell-Sitzung setzen (Pfad ggf. absolut angeben):
+Damit Sirens die gesonderte Umgebung benutzt, den Pfad dauerhaft in die `.env`
+im Ordner von Sirens schreiben (`SIRENS_STEMS_PYTHON=…`, ebenso
+`SIRENS_STEMS_PITCH_PYTHON=…`; siehe `.env.example`) – oder beim Start in
+derselben PowerShell-Sitzung setzen (Pfad ggf. absolut angeben):
 
 ```powershell
 $env:SIRENS_STEMS_PYTHON = (Resolve-Path ".\.venv-stems\Scripts\python.exe").Path

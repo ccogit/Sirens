@@ -135,5 +135,26 @@ class Ablauf(ServerFall):
         self.assertEqual((zweiter["id"], zweiter["stand"]), (job["id"], "fertig"))  # … und das Ergebnis wird wiederverwendet
 
 
+class Einstellungen(unittest.TestCase):
+    def test_env_datei_gilt_fuer_den_dienst_aber_gesetztes_bleibt(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from sirens import config
+        with tempfile.TemporaryDirectory() as ordner:
+            datei = Path(ordner) / ".env"
+            datei.write_text(chr(10).join(["# Kommentar", "GEHEIM=nicht fuer den Dienst", "SIRENS_PROBE_A=aus der Datei",
+                                           "SIRENS_PROBE_B=aus der Datei"]), encoding="utf-8")
+            os.environ["SIRENS_PROBE_B"] = "schon gesetzt"
+            try:
+                config.aus_datei_setzen(datei)
+                self.assertEqual(os.environ.get("SIRENS_PROBE_A"), "aus der Datei")
+                self.assertEqual(os.environ.get("SIRENS_PROBE_B"), "schon gesetzt")
+                self.assertNotIn("GEHEIM", os.environ)                    # Zugangsdaten bleiben in der Datei
+            finally:
+                os.environ.pop("SIRENS_PROBE_A", None)
+                os.environ.pop("SIRENS_PROBE_B", None)
+
+
 if __name__ == "__main__":
     unittest.main()
