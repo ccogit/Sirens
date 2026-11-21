@@ -1,7 +1,7 @@
-// Stem Studio: ein Song wird vorab lokal mit Demucs getrennt, danach live im Browser gemischt.
-// Mehrere Audioelemente bleiben anhand einer Masterspur synchron; keine externen Dienste.
+// Stem Studio: KI-Trennung im Sirens-Dienst, danach samplegenaues Live-Mixing im Browser.
 import { api } from "./api.js";
 import { h, leeren } from "./dom.js";
+import { StemAudio } from "./stem_audio.js";
 
 const NAMEN = { vocals: "Gesang", drums: "Schlagzeug", bass: "Bass",
                 other: "Übrige Instrumente", piano: "Klavier", guitar: "Gitarre" };
@@ -14,12 +14,13 @@ function zeit(sekunden) {
 }
 
 export function stemSpiel() {
-  let beendet = false, token = 0, timer = null, takt = null, spuren = [], solo = null;
+  let beendet = false, token = 0, timer = null, takt = null, engine = null;
+  let spuren = [], solo = null;
   const song = h("select", { "aria-label": "Song für Stem Studio" },
     h("option", { value: "" }, "Songs werden geladen …"));
   const modell = h("select", { "aria-label": "KI-Trennmodell" },
     h("option", { value: "htdemucs" }, "4 Stems · Standard"),
-    h("option", { value: "htdemucs_6s" }, "6 Stems · auch Gitarre & Klavier (experimentell)"));
+    h("option", { value: "htdemucs_6s" }, "6 Stems · Gitarre & Klavier (experimentell)"));
   const geraet = h("select", { "aria-label": "Rechenmodus" },
     h("option", { value: "cpu" }, "CPU · GPU freihalten"),
     h("option", { value: "cuda" }, "RTX 5080 · CUDA"));
@@ -37,8 +38,15 @@ export function stemSpiel() {
     position, h("div", { class: "stems-mix-head" }, h("h2", {}, "Instrumente live mischen"), alle),
     spurenEl);
 
+  function aktualisieren() {
+    if (!engine?.bereit) return;
+    const t = engine.position(), dauer = engine.dauer;
+    uhr.textContent = zeit(t) + " / " + zeit(dauer);
+    if (dauer > 0) position.value = String(Math.round(t / dauer * 1000));
+  }
+
   function pausieren() {
-    for (const s of spuren) s.audio.pause();
+    engine?.pause();
     play.textContent = "▶ Spielen";
   }
 
@@ -46,10 +54,8 @@ export function stemSpiel() {
     pausieren();
     if (takt) clearInterval(takt);
     takt = null;
-    for (const s of spuren) {
-      s.audio.removeAttribute("src");
-      s.audio.load();
-    }
+    engine?.beenden();
+    engine = null;
     spuren = [];
     solo = null;
     mixer.hidden = true;
@@ -59,56 +65,57 @@ export function stemSpiel() {
   }
 
   function mischen() {
-    for (const s of spuren) {
-      s.audio.volume = (!s.mute && (solo === null || solo === s.name)) ? s.pegel / 100 : 0;
+    for (const [i, s] of spuren.entries()) {
+      engine?.pegel(i, (!s.mute && (solo === null || solo === s.name)) ? s.pegel / 100 : 0);
       s.solo.setAttribute("aria-pressed", String(solo === s.name));
       s.muteButton.setAttribute("aria-pressed", String(s.mute));
       s.muteButton.textContent = s.mute ? "Stumm ✓" : "Stumm";
     }
   }
 
-  function sync() {
-    if (!spuren.length) return;
-    const master = spuren[0].audio;
-    const dauer = master.duration;
-    uhr.textContent = zeit(master.currentTime) + " / " + zeit(dauer);
-    if (Number.isFinite(dauer) && dauer > 0) position.value = String(Math.round(master.currentTime / dauer * 1000));
-    if (master.paused) return;
-    for (const s of spuren.slice(1)) {
-      if (s.audio.readyState >= 1 && Math.abs(s.audio.currentTime - master.currentTime) > 0.12) {
-        s.audio.currentTime = master.currentTime;
-      }
-    }
-  }
-
-  function bereit(stems) {
+  async function bereit(stems, nummer) {
     stoppen();
-    for (const name of stems) {
-      const audio = new Audio(api.stemAudioUrl(song.value, modell.value, name));
-      audio.preload = "auto";
-      const wert = h("output", {}, "100 %");
-      const pegel = h("input", { type: "range", min: "0", max: "100", value: "100",
-        "aria-label": "Lautstärke " + (NAMEN[name] || name) });
-      const muteButton = h("button", { type: "button", class: "stems-action", "aria-pressed": "false" }, "Stumm");
-      const soloButton = h("button", { type: "button", class: "stems-action", "aria-pressed": "false" }, "Solo");
-      const spur = { name, audio, pegel: 100, mute: false, solo: soloButton, muteButton };
-      pegel.addEventListener("input", () => { spur.pegel = Number(pegel.value); wert.textContent = pegel.value + " %"; mischen(); });
-      muteButton.addEventListener("click", () => { spur.mute = !spur.mute; mischen(); });
-      soloButton.addEventListener("click", () => { solo = solo === name ? null : name; mischen(); });
-      spurenEl.append(h("div", { class: "stems-track" },
-        h("span", { class: "stems-instrument" }, (SYMBOLE[name] || "♫") + " " + (NAMEN[name] || name)),
-        pegel, wert, soloButton, muteButton));
-      spuren.push(spur);
+    const player = new StemAudio();
+    engine = player;
+    trennen.hidden = true;
+    status.textContent = "Lade Stems in den samplegenauen Mixer …";
+    try {
+      const urls = stems.map((name) => api.stemAudioUrl(song.value, modell.value, name));
+      await player.laden(urls, (i, gesamt) => {
+        if (!beendet && nummer === token) status.textContent = "Lade Spur " + i + " von " + gesamt + " …";
+      });
+      if (beendet || nummer !== token || engine !== player) return;
+      for (const name of stems) {
+        const wert = h("output", {}, "100 %");
+        const pegel = h("input", { type: "range", min: "0", max: "100", value: "100",
+          "aria-label": "Lautstärke " + (NAMEN[name] || name) });
+        const muteButton = h("button", { type: "button", class: "stems-action", "aria-pressed": "false" }, "Stumm");
+        const soloButton = h("button", { type: "button", class: "stems-action", "aria-pressed": "false" }, "Solo");
+        const spur = { name, pegel: 100, mute: false, solo: soloButton, muteButton };
+        pegel.addEventListener("input", () => { spur.pegel = Number(pegel.value); wert.textContent = pegel.value + " %"; mischen(); });
+        muteButton.addEventListener("click", () => { spur.mute = !spur.mute; mischen(); });
+        soloButton.addEventListener("click", () => { solo = solo === name ? null : name; mischen(); });
+        spurenEl.append(h("div", { class: "stems-track" },
+          h("span", { class: "stems-instrument" }, (SYMBOLE[name] || "♫") + " " + (NAMEN[name] || name)),
+          pegel, wert, soloButton, muteButton));
+        spuren.push(spur);
+      }
+      mixer.hidden = false;
+      player.onEnde = () => { play.textContent = "▶ Spielen"; aktualisieren(); };
+      mischen();
+      takt = setInterval(aktualisieren, 120);
+      aktualisieren();
+      status.textContent = "Bereit. Alle Instrumente starten samplegenau auf derselben Zeitachse.";
+    } catch (err) {
+      if (!beendet && nummer === token) {
+        status.textContent = "Die Stems konnten nicht geladen werden: " + (err.message || err);
+        trennen.hidden = false;
+        trennen.disabled = false;
+        trennen.textContent = "Erneut versuchen";
+      }
+      if (engine === player) stoppen();
+      else player.beenden();
     }
-    const master = spuren[0]?.audio;
-    if (master) {
-      master.addEventListener("ended", pausieren);
-      master.addEventListener("timeupdate", sync);
-      master.addEventListener("loadedmetadata", sync);
-    }
-    mixer.hidden = false;
-    mischen();
-    takt = setInterval(sync, 250);
   }
 
   function zuruecksetzen() {
@@ -141,7 +148,7 @@ export function stemSpiel() {
     status.textContent = daten.meldung || "Status unbekannt.";
     if (daten.zustand === "bereit") {
       trennen.hidden = true;
-      bereit(daten.stems);
+      bereit(daten.stems, nummer);
     } else if (daten.zustand === "laeuft") {
       trennen.disabled = true;
       trennen.textContent = "KI arbeitet …";
@@ -157,7 +164,6 @@ export function stemSpiel() {
     zuruecksetzen();
     if (song.value) pruefen(token);
   }
-
   song.addEventListener("change", neueAuswahl);
   modell.addEventListener("change", neueAuswahl);
   trennen.addEventListener("click", async () => {
@@ -176,24 +182,21 @@ export function stemSpiel() {
     }
   });
   play.addEventListener("click", async () => {
-    if (!spuren.length) return;
-    if (!spuren[0].audio.paused) { pausieren(); return; }
+    if (!engine?.bereit) return;
     document.getElementById("player-audio")?.pause();
     try {
-      await Promise.all(spuren.map((s) => s.audio.play()));
-      sync();
-      play.textContent = "❚❚ Pause";
-    } catch {
+      await engine.schalten();
+      play.textContent = engine.laeuft ? "❚❚ Pause" : "▶ Spielen";
+      aktualisieren();
+    } catch (err) {
       pausieren();
-      status.textContent = "Ein Stem konnte nicht abgespielt werden. Bitte Browserformat und Datei prüfen.";
+      status.textContent = "Audio konnte nicht gestartet werden: " + (err.message || err);
     }
   });
   position.addEventListener("input", () => {
-    const dauer = spuren[0]?.audio.duration;
-    if (!Number.isFinite(dauer) || dauer <= 0) return;
-    const ziel = Number(position.value) / 1000 * dauer;
-    for (const s of spuren) s.audio.currentTime = ziel;
-    sync();
+    if (!engine?.bereit) return;
+    engine.springen(Number(position.value) / 1000 * engine.dauer);
+    aktualisieren();
   });
   alle.addEventListener("click", () => {
     solo = null;
@@ -205,28 +208,14 @@ export function stemSpiel() {
 
   async function katalogLaden() {
     try {
-      const daten = await api.katalog("", 1);
+      let daten = await api.katalog("", 1);
       if (beendet) return;
       if (daten.zustand === "laeuft" && !daten.anzahl_dateien) {
         timer = setTimeout(katalogLaden, 1800);
         return;
       }
-      let liste = [];
-      for (const artist of daten.artists || [])
-        for (const release of artist.releases || [])
-          for (const titel of release.songs || [])
-            for (const datei of titel.dateien || [])
-              liste.push({ pfad: datei.pfad, text: artist.slug + " · " + titel.titel +
-                (datei.fassung ? " (" + datei.fassung + ")" : "") });
-      if (!liste.length) {
-        const alle = await api.katalog();
-        if (beendet) return;
-        for (const artist of alle.artists || [])
-          for (const release of artist.releases || [])
-            for (const titel of release.songs || [])
-              for (const datei of titel.dateien || [])
-                liste.push({ pfad: datei.pfad, text: artist.slug + " · " + titel.titel });
-      }
+      let liste = sammeln(daten);
+      if (!liste.length) { daten = await api.katalog(); if (beendet) return; liste = sammeln(daten); }
       leeren(song);
       song.append(h("option", { value: "" }, "Song auswählen …"));
       for (const eintrag of liste.slice(0, 400)) song.append(h("option", { value: eintrag.pfad }, eintrag.text));
@@ -249,7 +238,7 @@ export function stemSpiel() {
         h("label", {}, "Trennmodell", modell),
         h("label", {}, "Berechnung", geraet),
         trennen, status,
-        h("p", { class: "stems-hint" }, "Keine Cloud-Uploads. Original bleibt unverändert. Standardmäßig läuft die Trennung auf der CPU. Für deine RTX 5080 wähle CUDA (mit kompatibler PyTorch-Installation); während Claude arbeitet, ist CUDA gesperrt. Das 6-Stem-Modell ist bei Gitarre und Klavier experimentell.")),
+        h("p", { class: "stems-hint" }, "Keine Cloud-Uploads. Das Original bleibt unverändert. Standardmäßig läuft die Trennung auf der CPU. Für die RTX 5080 wähle CUDA (mit passender PyTorch-Version); während Claude arbeitet, ist CUDA gesperrt. Das 6-Stem-Modell ist bei Gitarre und Klavier experimentell.")),
       mixer),
     pausieren,
     beenden() {
@@ -258,4 +247,15 @@ export function stemSpiel() {
       stoppen();
     },
   };
+}
+
+function sammeln(daten) {
+  const liste = [];
+  for (const artist of daten.artists || [])
+    for (const release of artist.releases || [])
+      for (const titel of release.songs || [])
+        for (const datei of titel.dateien || [])
+          liste.push({ pfad: datei.pfad, text: artist.slug + " · " + titel.titel +
+            (datei.fassung ? " (" + datei.fassung + ")" : "") });
+  return liste;
 }
