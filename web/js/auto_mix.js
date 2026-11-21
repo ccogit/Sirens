@@ -33,6 +33,7 @@ export class AutoMixer {
     this.bars=8;
     this.tolerance=.19;
     this.slot=0;
+    this.currentRate=1;
     this.current=null;
     this.next=null;
     this.timer=null;
@@ -94,6 +95,7 @@ export class AutoMixer {
     if(this.session!==token) return false;
     this.slot=0;
     this.current={song:picked,info};
+    this.currentRate=1;
     this.history.push(picked);
     this.engine.setCrossfade(0);
     audio.playbackRate=1;
@@ -124,7 +126,7 @@ export class AutoMixer {
     while(versucht.size<pool.length && kandidaten.length<6) {
       const offen=pool.filter(s=>!versucht.has(s.pfad));
       const sample=this.randomness ?
-        waehleNaechsten(offen,this.history.map(s=>s.pfad),infoA.bpm,Math.random,aktuell) :
+        waehleNaechsten(offen,this.history.map(s=>s.pfad),infoA.bpm*this.currentRate,Math.random,aktuell) :
         offen.sort((a,b)=>b.rating-a.rating||a.text.localeCompare(b.text,"de"))[0];
       if(!sample||versucht.has(sample.pfad)) break;
       versucht.add(sample.pfad);
@@ -143,7 +145,7 @@ export class AutoMixer {
           const {song,info}=answer.value;
           reserve||={song,info};
           const cue= findeUebergang(infoA,info,
-            this.engine.decks[this.slot].currentTime+1,this.bars,this.tolerance,zielEnergie);
+            this.engine.decks[this.slot].currentTime+this.currentRate,this.bars,this.tolerance,zielEnergie,this.currentRate);
           if (!cue) continue;
           const taste=cue.score+(this.randomness?(Math.random()-.5)*.09:0);
           if(!beste||taste>beste.taste) beste={song,info,cue,taste};
@@ -155,14 +157,15 @@ export class AutoMixer {
         // besser als Stille, wenn Phrase/Tempo nicht zusammenpassen.
         const {song,info}=reserve;
         const quelle=this.engine.decks[this.slot];
-        const rest=Math.max(1,quelle.duration-quelle.currentTime-1);
-        const dau=Math.min(4*240/infoA.bpm,Math.max(1,rest*.55));
-        const startA=naechsterTakt(quelle.currentTime+Math.min(4,rest*.2),
+        const rest=Math.max(1,(quelle.duration-quelle.currentTime-1)/this.currentRate);
+        const effektiv=infoA.bpm*this.currentRate;
+        const dau=Math.min(4*240/effektiv,Math.max(1,rest*.55));
+        const startA=naechsterTakt(quelle.currentTime+Math.min(4,rest*.2)*this.currentRate,
           {bpm:infoA.bpm,beat0:infoA.bar0||0});
-        const match=tempoAngleichung(info.bpm,infoA.bpm);
+        const match=tempoAngleichung(info.bpm,effektiv);
         const cue={startA:Math.min(startA,Math.max(0,quelle.duration-1.5)),
           startB:info.cues_in?.[0]?.zeit||0,rateB:Math.min(1.33,Math.max(.75,match?.rate||1)),
-          bpm:infoA.bpm,bars:4,dauer:dau,score:0,ausgang:"Notübergang (keine sichere Phrase)",
+          bpm:effektiv,bars:4,dauer:dau,rateA:this.currentRate,score:0,ausgang:"Notübergang (keine sichere Phrase)",
           eingang:"sicherer Einstieg",energieA:0,energieB:0,confidence:0};
         beste={song,info,cue,taste:0};
         this.say("Kein sicherer Match – bereite einen hörbaren Notübergang vor.");
@@ -202,10 +205,10 @@ export class AutoMixer {
       // Kleine Timer-Verspätungen werden durch eine Cue-Korrektur kompensiert.
       const offset=Math.max(0,a.currentTime-pending.cue.startA);
       b.currentTime=Math.min(Math.max(0,b.duration-.2),
-        pending.cue.startB+offset*pending.cue.rateB);
+        pending.cue.startB+offset*pending.cue.rateB/this.currentRate);
       await b.play();
       if(token!==this.session) { b.pause(); return; }
-      this.engine.autoCrossfade(alt,Math.max(0.25,pending.cue.dauer-offset));
+      this.engine.autoCrossfade(alt,Math.max(0.25,pending.cue.dauer-offset/this.currentRate));
       this.cb.transition?.(pending);
       this.say("LIVE-MIX · "+pending.cue.ausgang+" → "+pending.cue.eingang);
     } catch(err) {
@@ -220,11 +223,12 @@ export class AutoMixer {
     if(!this.running||!this.current) return;
     const a=this.engine.decks[this.slot];
     if(this.mix && this.next) {
-      if(a.currentTime >= this.next.cue.startA+this.next.cue.dauer-.06 || a.ended) {
+      if(a.currentTime >= this.next.cue.startA+this.next.cue.dauer*this.currentRate-.06 || a.ended) {
         a.pause();
         this.slot=1-this.slot;
         const neu=this.next;
         this.current={song:neu.song,info:neu.info};
+        this.currentRate=neu.cue.rateB;
         this.next=null;
         this.mix=false;
         this.history.push(neu.song);
@@ -248,9 +252,10 @@ export class AutoMixer {
     if(!this.next||!this.current||this.mix) return;
     const audio=this.engine.decks[this.slot];
     const cue=this.next.cue;
-    cue.startA=naechsterTakt(audio.currentTime+.5,
+    cue.startA=naechsterTakt(audio.currentTime+.5*this.currentRate,
       {bpm:this.current.info.bpm,beat0:this.current.info.bar0||0});
-    if(cue.startA+cue.dauer>=audio.duration) cue.dauer=Math.max(1,audio.duration-cue.startA-.5);
+    if(cue.startA+cue.dauer*this.currentRate>=audio.duration)
+      cue.dauer=Math.max(.5,(audio.duration-cue.startA-.5)/this.currentRate);
     this.cb.plan?.(this.next);
     this.say("Manueller Befehl: Mix auf dem nächsten Takt.");
   }
@@ -264,6 +269,7 @@ export class AutoMixer {
     clearTimeout(this.retry); this.retry=null;
     this.next=null;
     this.current=null;
+    this.currentRate=1;
     for(const audio of this.engine.decks) audio.pause();
     this.engine.setCrossfade(0);
     this.cb.plan?.(null);
