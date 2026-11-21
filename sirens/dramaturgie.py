@@ -55,9 +55,22 @@ def analyse_abschnitte(energie, transienten, brillanz, bpm, bar0, dauer, hz=100)
         if _mittel(e, i, i+2) > 0.75: return "energiegeladene Passage"
         return "stabiler Groove"
 
-    # 4-Takt-Downbeats sind nur angenäherte Phrasengrenzen;
-    # ohne strukturelle Features wird das nicht als sicher dargestellt.
-    kandidaten = list(range(0,n,4))
+    # Ein Downbeat sagt noch nicht, welche vier Takte eine musikalische Phrase
+    # bilden. Von vier möglichen Versätzen bevorzugen wir die Phrasengrenzen,
+    # an denen Energie und Transientendichte besonders häufig wechseln.
+    def neuheit(i):
+        energie_delta = abs(delta(i))
+        impuls_delta = abs(_mittel(p,i-4,i)-_mittel(p,i,i+4))
+        return energie_delta*.78+impuls_delta*.22
+
+    versatz_scores = [
+        _mittel([neuheit(i) for i in range(s+4,n-4,4)],0,10000)
+        for s in range(4)
+    ]
+    bester_versatz = max(range(4), key=versatz_scores.__getitem__)
+    if versatz_scores[bester_versatz] - versatz_scores[0] < 0.035:
+        bester_versatz = 0  # schwache Evidenz: lieber bei Songanfang bleiben
+    kandidaten = list(range(bester_versatz,n,4))
     raus, rein = [], []
     for i in kandidaten:
         zeit = round(erstes + i*takt, 2)
@@ -96,7 +109,7 @@ def analyse_abschnitte(energie, transienten, brillanz, bpm, bar0, dauer, hz=100)
     ]
     kontraste = [abs(delta(i)) for i in kandidaten if i>=4 and i<n-4]
     phrase_confidence = round(min(0.9,max(.12,0.25+sum(kontraste)/max(1,len(kontraste))*.8)),2)
-    return {"timeline":timeline[:90], "cues_in":rein[:8],
+    return {"timeline":timeline[:90], "phrase_offset_bars":bester_versatz, "cues_in":rein[:8],
             "cues_out":raus[:12], "phrase_confidence":phrase_confidence}
 
 
