@@ -98,7 +98,8 @@ def analysieren(datei, ffmpeg="ffmpeg"):
            "-t", str(MAX_SECONDS), "-vn", "-ac", "1", "-ar", "4000",
            "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1"]
     try:
-        lauf = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
+        lauf = subprocess.run(cmd, capture_output=True, timeout=30, check=False,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))  # unter Windows kein Konsolenfenster
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise Ablehnung("beat_unavailable", "Tempoanalyse nicht verfügbar (ffmpeg prüfen).",
                         status=503) from exc
