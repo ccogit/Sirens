@@ -80,7 +80,7 @@ function take(order, pfad, bewerten, fertigMachen) {
   return h("li", { class: `take${b?.favorit ? " favorit" : ""}` },
     h("div", { class: "take-kopf" }, abspielKnopf(pfad), h("strong", {}, name), explorerKnopf(pfad),
       b && !b.uebernommen ? h("span", { class: "klein" }, "noch nicht von Claude übernommen") : null,
-      b && b.uebernommen ? h("span", { class: "klein" }, "von Claude übernommen") : null),
+      null),
     h("div", { class: "reihe noten", role: "group", "aria-label": `Bewertung für ${name}` }, SCORES.map(([score, text]) =>
       h("button", { type: "button", "aria-pressed": String(b?.score === score), title: text,
         "aria-label": `${scoreText(score)}, ${text}`, onclick: () => bewerten(pfad, score, b?.favorit || false, lesen()) },
@@ -92,7 +92,8 @@ function take(order, pfad, bewerten, fertigMachen) {
       h("button", { type: "button", class: begonnen ? "knopf zweit" : "klein-knopf", disabled: !begonnen && !b?.favorit,
         title: begonnen || b?.favorit ? "Mastering, Ableton, Cover, Beschreibung, SoundCloud" : "Erst als Favorit markieren",
         onclick: () => fertigMachen(pfad) }, begonnen ? "Weiter fertig machen" : "Fertig machen"),
-      feld("Kommentar", kommentar)));
+      h("details", { class: "comment-details", "data-auf": "kommentar-" + pfad, open: Boolean(b?.kommentar) },
+        h("summary", {}, b?.kommentar ? "Kommentar bearbeiten" : "Kommentar hinzufügen"), feld("Dein Kommentar", kommentar))));
 }
 
 // Station 5: Takes anhören und bewerten, darunter Folgeaufträge und Abschließen.
@@ -103,11 +104,14 @@ export function ergebnis(order, { bewerten, folge, abschliessen, fertigMachen })
       h("h3", {}, `${t.nr}. ${t.titel || "Song"}`),
       h("ul", { class: "takes" }, t.dateien.map((pfad) => take(order, pfad, bewerten, fertigMachen))))),
     h("div", { class: "weiter" },
-      h("h3", {}, "Und jetzt?"),
-      h("p", { class: "hinweis" }, "Veröffentlichen: je Song einen Favoriten markieren und „Fertig machen“ wählen (Mastering, Cover, Beschreibung, SoundCloud). Von dort kommst du jederzeit hierher zurück und nimmst den nächsten Song dazu. Weiterarbeiten: einen Folgeauftrag anlegen. ", folgeHinweis(order)),
-      h("div", { class: "knopfzeile" },
-        VORLAGEN.map(([vorlage, text]) => h("button", { type: "button", class: "knopf zweit", onclick: () => folge(vorlage) }, text)),
-        order.status === "fertig" ? h("button", { type: "button", class: "knopf", onclick: abschliessen }, "Abschließen") : null)));
+      h("h3", {}, "Dein nächster Move"),
+      h("p", { class: "hinweis" }, "Lieblingsversion gefunden? Markiere sie als Favorit und wähle „Fertig machen“."),
+      order.status === "fertig" ? h("button", { type: "button", class: "knopf", onclick: abschliessen }, "Auftrag abschließen") : null,
+      h("details", { class: "followup-options" },
+        h("summary", {}, "Eine weitere Version erstellen"),
+        h("p", { class: "hinweis" }, folgeHinweis(order)),
+        h("div", { class: "knopfzeile" },
+          VORLAGEN.map(([vorlage, text]) => h("button", { type: "button", class: "knopf zweit", onclick: () => folge(vorlage) }, text))))));
 }
 
 export function angaben(order) {
