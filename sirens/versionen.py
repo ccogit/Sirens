@@ -66,6 +66,8 @@ def entscheiden(service, oid, data):
     if wahl == "archivieren" and data.get("bestaetigt") is not True:
         raise Ablehnung("confirm_required", "Das Archivieren muss bestätigt werden.", "bestaetigt", 409)
 
+    verschoben = []
+
     def fn(order):
         if order["status"] not in ("nachlauf", "fertig", "abgeschlossen"):
             raise Ablehnung("invalid_transition", "Versionen erst nach der Produktion bearbeiten.", "status", 409)
@@ -81,12 +83,23 @@ def entscheiden(service, oid, data):
             eintrag(order, NUTZER, "status", "Vorherige Master-Version bleibt erhalten.")
             return
         archiv = archivieren(service.cfg, service.store, order, pfad)
+        verschoben.append(archiv)
         order.setdefault("archivierte_versionen", []).append(archiv)
         if offen and offen["alt"] == pfad:
             n["version_entscheidung"] = None
         eintrag(order, NUTZER, "status", f"Version archiviert: {PurePosixPath(pfad).name}")
 
-    return service.store.mutate(oid, revision(data), fn)
+    try:
+        return service.store.mutate(oid, revision(data), fn)
+    except Exception:
+        # Konnte die Auftragsdatei nicht geschrieben werden, die Datei zurückstellen.
+        for a in verschoben:
+            alt = service.cfg.music_root.joinpath(*a["pfad"].split("/"))
+            archiv = service.cfg.data_dir / "versionen-archiv" / oid / a["pfad"]
+            if archiv.is_file() and not alt.exists():
+                alt.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(archiv), str(alt))
+        raise
 
 
 def text_aendern(service, oid, data):
