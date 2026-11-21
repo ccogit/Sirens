@@ -178,7 +178,7 @@ export function autoDjAnsicht() {
     start.disabled=true; stop.disabled=false;
     start.textContent="▶ Läuft …";
     try {
-      await mixer.starten(songs,{bars:Number(bars.value),tolerance:Number(tolerance.value)});
+      await mixer.starten(songs,{bars:Number(bars.value),tolerance:Number(tolerance.value),randomness:random.checked});
       laufend=true; nextBeat.disabled=false;
     }catch(err){
       stand.textContent=err.meldung||err.message||String(err);
