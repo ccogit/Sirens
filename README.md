@@ -200,6 +200,33 @@ bleiben erhalten.
 Über den Sonnen-/Mondknopf der Navigation wechselst du zwischen dem hellen Design und dem
 navyfarbenen Dark Mode. Die Einstellung wird lokal im Browser gespeichert.
 
+## Live Lab: interaktiver Zeitvertreib während Claude arbeitet
+
+In der Hauptnavigation führt **✦ Live Lab** zu einem kleinen DJ- und Visual-Studio. Während
+eine Produktion läuft, verlinken auch die Übersicht und die Auftragsansicht dorthin. Claude
+arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
+
+- **Zwei Decks:** Gut bewertete Songs aus dem lokalen Katalog wählen (falls keine vorhanden
+  sind: andere Katalogtitel) oder über den Dateidialog eigene Musikdateien laden.
+  Crossfader und getrennte Geschwindigkeiten ermöglichen einfache Live-Mashups.
+- **Effekte in Echtzeit:** Low-pass-Filter, Sättigung (Drive) und Echo. Die Originaldateien
+  werden nicht verändert und nichts wird ins Internet geladen.
+- **Spielbare Pads:** Kick, Snare, Hi-Hat, Bass und Akkord. Anklicken oder mit
+  **A, S, D, F, G** spielen. Die Klänge werden direkt im Browser synthetisiert.
+- **Audioreaktive Bilder:** Neon-Tunnel (WebGL2), Frequenzspektrum und Oszilloskop.
+  Vor dem ersten Ton läuft eine ausdrücklich markierte Demo-Animation.
+- **Rücksicht auf die Generierung:** WebGL2 bittet den Browser um den leistungsfähigen
+  Grafikprozessor (z. B. RTX 5080). Die Grafik ist auf etwa 30 FPS, maximal 1600 Pixel
+  Breite und 1,5-fache Pixelauflösung begrenzt. Wenn Claude tatsächlich arbeitet,
+  wird auf etwa 15 FPS und 1000 Pixel Breite gedrosselt; im Hintergrundtab pausiert das Zeichnen.
+  Die Wahl der tatsächlichen GPU trifft der Browser bzw. das Betriebssystem. Es wird
+  **kein CUDA-Modell** gestartet, das der Musikgenerierung GPU-Speicher wegnehmen würde.
+
+Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
+Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
+geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben
+unverändert.
+
 ## Grenzen
 
 - Die gestartete Sitzung läuft ohne Fenster und ohne Rückfragen im Chat; Fragen an dich kommen als

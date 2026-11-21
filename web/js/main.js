@@ -6,6 +6,7 @@ import { neuAnsicht } from "./neu.js";
 import { auftragAnsicht } from "./auftrag.js";
 import { masternAnsicht } from "./mastern.js";
 import { songsAnsicht } from "./songs.js";
+import { liveLabAnsicht } from "./live_lab.js";
 
 const ansicht = document.getElementById("ansicht");
 let aufraeumen = null;
@@ -16,7 +17,7 @@ async function zeigen() {
   const teile = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const [bereich, id, unterseite] = teile;
   for (const link of document.querySelectorAll("[data-nav]")) {
-    const aktiv = link.dataset.nav === (bereich === "neu" || bereich === "mastern" || bereich === "songs" ? bereich : "start");
+    const aktiv = link.dataset.nav === (bereich === "neu" || bereich === "mastern" || bereich === "songs" || bereich === "lab" ? bereich : "start");
     if (aktiv) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
   }
   leeren(ansicht);
@@ -24,6 +25,7 @@ async function zeigen() {
   if (bereich === "neu") aufraeumen = neuAnsicht(ansicht, id);
   else if (bereich === "mastern") aufraeumen = masternAnsicht(ansicht);
   else if (bereich === "songs") aufraeumen = songsAnsicht(ansicht);
+  else if (bereich === "lab") aufraeumen = liveLabAnsicht(ansicht);
   else if (bereich === "auftrag" && id) aufraeumen = auftragAnsicht(ansicht, id, unterseite);
   else aufraeumen = startAnsicht(ansicht);
 }
