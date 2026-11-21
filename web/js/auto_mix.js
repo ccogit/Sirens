@@ -1,7 +1,7 @@
 // Auto-DJ transport: Übergänge auf musikalisch geschätzten Phrasen.
 // Browser-Media-Elemente haben Jitter; Timing ist nicht samplegenau.
 import { LiveAudio } from "./live_audio.js";
-import { findeUebergang, naechsterTakt, waehleNaechsten, tempoAngleichung } from "./auto_logic.js";
+import { findeUebergang, naechsterTakt, waehleNaechsten, tempoAngleichung, setEnergieZiel } from "./auto_logic.js";
 
 function wartenAufAudio(audio, timeout=15000) {
   if (audio.readyState >= 1 && Number.isFinite(audio.duration)) return Promise.resolve();
@@ -64,12 +64,13 @@ export class AutoMixer {
     this.cb.history?.(this.history.map((p)=>({...p})));
   }
 
-  async starten(songs,{bars=8,tolerance=.19,randomness=true}={}) {
+  async starten(songs,{bars=8,tolerance=.19,randomness=true,story="welle"}={}) {
     this.stop();
     this.pool=songs.slice();
     this.bars=Number(bars)||8;
     this.tolerance=Number(tolerance)||.19;
     this.randomness=Boolean(randomness);
+    this.story=story;
     if (this.pool.length<2) throw new Error("Bitte mindestens zwei Songs für das Set auswählen.");
     const token=this.session;
     await this.engine.aktivieren();
@@ -114,6 +115,7 @@ export class AutoMixer {
     if (!this.running||this.next||this.preparing||this.session!==token) return;
     this.preparing=true;
     const {song:aktuell,info:infoA}=this.current;
+    const zielEnergie=setEnergieZiel(this.story,this.history.length);
     const jetzt=this.engine.decks[this.slot].currentTime;
     const pool=this.pool.filter(s=>s.pfad!==aktuell.pfad);
     const versucht=new Set();
@@ -141,7 +143,7 @@ export class AutoMixer {
           const {song,info}=answer.value;
           reserve||={song,info};
           const cue= findeUebergang(infoA,info,
-            this.engine.decks[this.slot].currentTime+1,this.bars,this.tolerance);
+            this.engine.decks[this.slot].currentTime+1,this.bars,this.tolerance,zielEnergie);
           if (!cue) continue;
           const taste=cue.score+(this.randomness?(Math.random()-.5)*.09:0);
           if(!beste||taste>beste.taste) beste={song,info,cue,taste};
@@ -178,6 +180,7 @@ export class AutoMixer {
       audio.preservesPitch=true;              // Tempoangleichung möglichst ohne Tonhöhenänderung
       audio.playbackRate=beste.cue.rateB;
       audio.currentTime=beste.cue.startB;
+      beste.zielEnergie=zielEnergie;
       this.next=beste;
       this.cb.plan?.(beste);
       this.say("Nächster Song vorbereitet · Übergang an der musikalischen Phrasengrenze geplant.");
