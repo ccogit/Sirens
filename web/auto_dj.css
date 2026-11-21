@@ -5,8 +5,11 @@
 .auto-dj h2 {font-size:clamp(1.35rem,2.5vw,2rem);letter-spacing:-.035em;margin:.3rem 0 .5rem;}
 .auto-head {padding:.6rem .2rem;}
 .auto-head p:last-child {font-size:.88rem;color:var(--leise);margin:.2rem 0 0;}
-.auto-now {background:radial-gradient(ellipse at 50% 0%,#254d84,#0c1832 70%);
+.auto-now {position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#254d84,#0c1832 70%);
   border:1px solid #375c87;border-radius:20px;padding:clamp(1rem,2.2vw,1.8rem);display:grid;gap:.7rem;}
+.auto-canvas {position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.34;}
+.auto-canvas[hidden] {display:none;}
+.auto-now > :not(.auto-canvas) {position:relative;z-index:1;}
 .auto-now-top {display:flex;justify-content:space-between;align-items:center;gap:1rem;}
 .auto-air {color:#54f7cb;font-size:.68rem;font-weight:900;letter-spacing:.15em;}
 .auto-now-top output {font:700 .8rem ui-monospace,monospace;color:#bdd6f2;}
