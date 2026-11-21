@@ -1,0 +1,17 @@
+/* Spielwiese: Zeitvertreib, solange Claude arbeitet. Die Bühne ist in beiden Farbschemen dunkel wie ein Bildschirm. */
+.spielwiese { display: grid; gap: .6rem; margin-top: 1rem; min-width: 0; }
+.spiel-kopf { display: flex; gap: .3rem 1rem; align-items: baseline; flex-wrap: wrap; }
+.spiel-titel { color: var(--leise); font-size: .9rem; overflow-wrap: anywhere; }
+.spiel-buehne { display: block; width: 100%; height: clamp(9rem, calc(100vh - 46rem), 26rem); border-radius: 18px; background: #0c1226; border: 1px solid var(--linie); cursor: crosshair; touch-action: none; }
+.spiel-uebersicht { display: block; width: 100%; height: 2.6rem; border-radius: 10px; background: #0c1226; border: 1px solid var(--linie); cursor: pointer; }
+.spiel-leiste { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.spiel-halten { font: inherit; font-size: .88rem; font-weight: 650; padding: .55rem .95rem; border-radius: 12px; border: 1px solid var(--linie); background: var(--mulde); color: var(--tinte); cursor: pointer; user-select: none; touch-action: none; }
+.spiel-halten[aria-pressed=true] { background: var(--akzent); color: var(--akzent-tinte); border-color: var(--akzent); }
+.spiel-tempo { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; font-size: .85rem; font-weight: 650; }
+.spiel-tempo input { width: 9rem; accent-color: var(--akzent); }
+.spiel-tempo output { min-width: 3.2rem; font-variant-numeric: tabular-nums; color: var(--leise); }
+.spielwiese .hinweis { margin: 0; font-size: .82rem; }
+@media (max-width: 40rem) {
+  .spiel-tempo { margin-left: 0; width: 100%; }
+  .spiel-tempo input { flex: 1; }
+}

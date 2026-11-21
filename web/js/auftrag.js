@@ -6,6 +6,7 @@ import { LAEUFT, ablaufGesamt, angaben, ergebnis, planAnsicht, songs } from "./a
 import { knoepfeAktualisieren } from "./player.js";
 import { claudeKasten } from "./claude.js";
 import { nachlaufAnsicht } from "./nachlauf.js";
+import { spielAnhalten, spielwiese } from "./spielwiese.js";
 
 const ABBRECHBAR = ["offen", "in_arbeit", "rueckfrage", "plan_wartet", "antwort_da", "fehler"];
 
@@ -93,6 +94,7 @@ export function auftragAnsicht(el, id, unterseite = "") {
         : "Auch Claude hat hier noch etwas zu erledigen.";
     const planLesen = order.plan && order.status !== "plan_wartet"
       ? h("details", { class: "klappe", "data-auf": "plan" }, h("summary", {}, "Der Plan"), planAnsicht(order.plan)) : null;
+    const wartet = LAEUFT.includes(order.status) || lage.dran === "claude";  // nichts zu tun für den Nutzer
     const stationen = ablaufStationen(order);
     const fertig = stationen.filter((st) => st.zustand === "erledigt" || st.zustand === "ausgelassen").length;
     const aktuell = stationen.find((st) => st.zustand === "aktiv");
@@ -113,7 +115,10 @@ export function auftragAnsicht(el, id, unterseite = "") {
           h("p", { class: "eyebrow" }, "ALS NÄCHSTES"),
           h("h2", { class: "next-action" }, lage.naechster_schritt),
           lage.claude_auch_dran ? claudeKasten(order.claude, fuerClaude, () => laden(true)) : null,
-          jetztTun()),
+          // Solange nur gewartet wird: im Fertigmachen über den Schritten, sonst darunter.
+          wartet && order.status === "nachlauf" ? spielwiese() : null,
+          jetztTun(),
+          wartet && order.status !== "nachlauf" ? spielwiese() : null),
         h("aside", { class: "order-sidebar", "aria-label": "Projektübersicht" },
           h("section", { class: "block order-progress", "aria-label": "Fortschritt" },
             h("div", { class: "progress-top" },
@@ -160,5 +165,5 @@ export function auftragAnsicht(el, id, unterseite = "") {
 
   laden();
   const takt = setInterval(() => { if (!document.hidden) laden(); }, 4000);
-  return () => { beendet = true; clearInterval(takt); };
+  return () => { beendet = true; clearInterval(takt); spielAnhalten(); };
 }

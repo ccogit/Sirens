@@ -116,3 +116,16 @@ test("Titel, Fehlerfelder, Bewertungstext", () => {
   assert.equal(L.fehlerFeld(null), "");
   assert.deepEqual([-2, 0, 2].map(L.scoreText), ["−2", "0", "+2"]);
 });
+
+test("Spielwiese: Filter aus der Position, Hüllkurve, Lieblingssongs", () => {
+  assert.deepEqual(L.spielFilter(0.5), { tief: 20000, hoch: 20 });
+  assert.deepEqual([L.spielFilter(0), L.spielFilter(1), L.spielFilter(-3)], [{ tief: 200, hoch: 20 }, { tief: 20000, hoch: 4000 }, { tief: 200, hoch: 20 }]);
+  assert.ok(L.spielFilter(0.2).tief < L.spielFilter(0.4).tief && L.spielFilter(0.6).hoch < L.spielFilter(0.9).hoch);
+  const daten = new Float32Array(64); daten[0] = -0.5; daten[48] = 0.9;
+  assert.deepEqual(L.spitzen(daten, 2).map((v) => Math.round(v * 10) / 10), [0.5, 0.9]);
+  const katalog = { artists: [{ slug: "cco", releases: [{ songs: [
+    { titel: "A", dateien: [{ pfad: "a1.mp3", bewertung: { score: 1 } }, { pfad: "a2.mp3", bewertung: { score: 2 } }, { pfad: "a3.wav", bewertung: { score: 2 } }] },
+    { titel: "B", dateien: [{ pfad: "b1.mp3" }, { pfad: "b2.wav", bewertung: { score: 2 } }] }] }] }] };
+  assert.deepEqual(L.lieblingsDateien(katalog), [{ pfad: "a2.mp3", titel: "A", artist: "cco" }]);
+  assert.deepEqual(L.lieblingsDateien({}), []);
+});

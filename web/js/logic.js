@@ -212,3 +212,40 @@ export function zeitText(iso, jetzt = new Date()) {
   const gleich = d.toDateString() === jetzt.toDateString();
   return gleich ? `heute ${uhr}` : `${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}. ${uhr}`;
 }
+
+// --- Spielwiese (Zeitvertreib, solange Claude arbeitet)
+
+// Waagrechte Position auf der Spielfläche (0…1) → Grenzfrequenzen in Hz. Mitte offen, nach links dumpf, nach rechts dünn.
+export function spielFilter(x) {
+  const t = Math.min(1, Math.max(0, x));
+  if (t < 0.45) return { tief: Math.round(200 * 100 ** (t / 0.45)), hoch: 20 };
+  if (t > 0.55) return { tief: 20000, hoch: Math.round(20 * 200 ** ((t - 0.55) / 0.45)) };
+  return { tief: 20000, hoch: 20 };
+}
+
+// Hüllkurve für die Übersicht über ein ganzes Stück: je Abschnitt der größte Ausschlag (jede 16. Probe genügt fürs Bild).
+export function spitzen(daten, anzahl) {
+  const schritt = daten.length / anzahl;
+  return Array.from({ length: anzahl }, (_, i) => {
+    let max = 0;
+    for (let j = Math.floor(i * schritt), ende = Math.min(daten.length, Math.floor((i + 1) * schritt)); j < ende; j += 16) {
+      const v = Math.abs(daten[j]);
+      if (v > max) max = v;
+    }
+    return max;
+  });
+}
+
+// Gut bewertete Songs aus dem Katalog als flache Liste, je Song die bestbewertete MP3 (leicht zu laden).
+export function lieblingsDateien(katalog) {
+  const liste = [];
+  for (const artist of katalog.artists || []) {
+    for (const release of artist.releases) {
+      for (const song of release.songs) {
+        const mp3 = song.dateien.filter((d) => /\.mp3$/i.test(d.pfad) && d.bewertung);
+        if (mp3.length) liste.push({ pfad: besteDatei({ dateien: mp3 }).pfad, titel: song.titel, artist: artist.slug });
+      }
+    }
+  }
+  return liste;
+}
