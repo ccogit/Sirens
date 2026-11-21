@@ -92,7 +92,6 @@ def _im_nachlauf(order):
 
 class NachlaufAktionen:
     """Entscheidungen des Nutzers im Nachlauf."""
-
     def __init__(self, cfg, store):
         self.cfg, self.store = cfg, store
 
@@ -259,6 +258,7 @@ class NachlaufAktionen:
             if wahl == "datei":
                 if datei not in cover_kandidaten(self.cfg, n):
                     raise Ablehnung("invalid_path", "Dieses Bild gehört nicht zu diesem Song.", "datei")
+                versionen.ersetzt(n, "cover", c["datei"], datei)
                 c.update(stand="fertig", datei=datei, fehler="")
                 s["cover_offen"] = oben
                 eintrag(order, NUTZER, "status", f"Cover gewählt: {PurePosixPath(datei).name}")
@@ -273,6 +273,7 @@ class NachlaufAktionen:
                 if c["versuche"] >= MAX_COVER:
                     raise Ablehnung("limit", f"Mehr als {MAX_COVER} Cover je Song sind nicht vorgesehen.",
                                     "entscheidung", 409)
+                c["vorherige_datei"] = c.get("datei", "")
                 c.update(stand="offen", wunsch=wunsch, fehler="")
                 eintrag(order, NUTZER, "antwort", "Bitte ein neues Cover" + (f": {wunsch}" if wunsch else "."))
             elif c["stand"] != "wartet":
@@ -280,6 +281,7 @@ class NachlaufAktionen:
             else:
                 if not c["datei"]:
                     raise Ablehnung("invalid", "Es gibt noch kein Cover zum Annehmen.", "entscheidung", 409)
+                versionen.ersetzt(n, "cover", c.pop("vorherige_datei", ""), c["datei"])
                 c.update(stand="fertig")
                 s["cover_offen"] = oben
                 eintrag(order, NUTZER, "antwort", "Cover angenommen.")
@@ -382,6 +384,7 @@ def phase_melden(cfg, order, name, pfad=None, text="", tags=(), link="", fehler=
         eintrag(order, CLAUDE, "status", f"Das Cover liegt vor{song}.")
     elif name == "text":
         inhalt = safe_audio_path(cfg.music_root, pfad, "file", TEXT_EXT).read_text(encoding="utf-8-sig")
+        versionen.ersetzt(n, "text", p.pop("vorherige_datei", ""), pfad)
         p.update(stand="fertig", datei=pfad, beschreibung=inhalt.strip()[:20000],
                  tags=[t.strip() for t in tags if t.strip()][:30])
         eintrag(order, CLAUDE, "status", f"Songbeschreibung und Songtext liegen beim Song{song}.")
