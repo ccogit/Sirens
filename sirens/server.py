@@ -24,7 +24,7 @@ TYPEN = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
 BILDER = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 MAX_BODY = 1_000_000
 UEBERGABEN = ("abschicken", "antwort", "plan", "abschliessen", "nachlauf", "master", "ableton", "cover",
-              "soundcloud")
+              "soundcloud", "textedit")
 AUFTRAG = re.compile(r"^/api/auftraege/(SA-\d{8}-\d{3})(?:/([a-z]+))?$")
 
 
@@ -37,7 +37,8 @@ class App:
                          "abschliessen": self.nutzer.close, "abbrechen": self.nutzer.cancel}
         nach = self.nach = nachlauf.NachlaufAktionen(cfg, self.store)
         self.aktionen.update(nachlauf=nach.start, anhoeren=nach.anhoeren, analyse=nach.analyse, studio=nach.studio, master=nach.master, ableton=nach.ableton,
-                             cover=nach.cover, soundcloud=nach.soundcloud)
+                             cover=nach.cover, soundcloud=nach.soundcloud, textedit=nach.text_aendern,
+                             version=nach.version)
         self.starter = ClaudeStarter(cfg)
 
     def aktion(self, name, oid, data):
@@ -52,13 +53,35 @@ class App:
         return {**order, "lage": lage(order), "claude": self.starter.zustand(),
                 "nachlauf_info": nachlauf.info(self.cfg, order) if order["status"] == "nachlauf" else None}
 
+    def _songs(self, order):
+        """Kompakte, direkt bearbeitbare Songzeilen statt vollständiger Auftragshistorie."""
+        ausgaben = []
+        alle = [n for n in (order.get("nachlauf"), *order.get("nachlauf_weitere", [])) if n]
+        bewertet = {b["pfad"]: b for b in order.get("bewertungen", [])}
+        for t in order.get("tracks_stand", []):
+            dateien = t.get("dateien", [])
+            if not dateien:
+                continue
+            pfad = next((p for p in dateien if bewertet.get(p, {}).get("favorit")), dateien[0])
+            n = next((n for n in alle if n["favorit"] in dateien), None)
+            if n:
+                pfad = n["favorit"]
+            ausgaben.append({"pfad": pfad, "titel": t.get("titel") or "Song " + str(t["nr"]),
+                             "cover": (n or {}).get("cover", {}).get("datei", ""),
+                             "soundcloud": (n or {}).get("soundcloud", {}).get("link", ""),
+                             "sync_offen": any((n or {}).get("soundcloud", {}).get(k) for k in
+                                               ("audio_offen", "cover_offen", "text_offen")),
+                             "bearbeitbar": order["status"] in ("fertig", "nachlauf", "abgeschlossen")})
+        return ausgaben
+
     def kurz(self, order):
         frage = next((e["text"] for e in reversed(order["verlauf"]) if e["art"] == "rueckfrage"), "")
         return {"id": order["id"], "status": order["status"], "revision": order["revision"],
                 "created_at": order["created_at"], "updated_at": order["updated_at"],
                 "vorgaenger_id": order["vorgaenger_id"], "wunsch": order["wunsch"],
                 "titel": (order["plan"] or {}).get("titel") or order["wunsch"]["optionen"]["titelwunsch"],
-                "frage": frage if order["status"] == "rueckfrage" else "", "lage": lage(order)}
+                "frage": frage if order["status"] == "rueckfrage" else "", "lage": lage(order),
+                "songs": self._songs(order), "archiviert": len(order.get("archivierte_versionen", []))}
 
     def health(self, port):
         return {"status": "ok", "pid": os.getpid(), "port": port, "music_root": str(self.cfg.music_root),
