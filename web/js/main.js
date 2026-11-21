@@ -30,7 +30,8 @@ async function zeigen() {
 
 const themeSwitch = document.getElementById("theme-switch");
 const theme = (() => { try { return localStorage.getItem("sirens.theme"); } catch { return null; } })();
-if (theme === "dark") document.documentElement.dataset.theme = "dark";
+// Ohne gespeicherte Wahl gilt die Einstellung des Systems.
+if (theme === "dark" || (!theme && window.matchMedia?.("(prefers-color-scheme: dark)").matches)) document.documentElement.dataset.theme = "dark";
 function updateTheme() {
   const dark = document.documentElement.dataset.theme === "dark";
   themeSwitch.textContent = dark ? "☀" : "☾";

@@ -96,7 +96,8 @@ export function auftragAnsicht(el, id, unterseite = "") {
     const stationen = ablaufStationen(order);
     const fertig = stationen.filter((st) => st.zustand === "erledigt" || st.zustand === "ausgelassen").length;
     const aktuell = stationen.find((st) => st.zustand === "aktiv");
-    const prozent = Math.round(fertig / Math.max(stationen.length, 1) * 100);
+    const fuellung = h("span", { class: "progress-fill" });
+    fuellung.style.width = Math.round(fertig / Math.max(stationen.length, 1) * 100) + "%";  // als Attribut würde die CSP es sperren
     leeren(inhalt).append(
       h("div", { class: "backbar" },
         h("a", { href: "#/" }, "← Alle Aufträge"),
@@ -122,12 +123,12 @@ export function auftragAnsicht(el, id, unterseite = "") {
             h("div", { class: "progress-track", role: "progressbar",
               "aria-label": "Erledigte Prozessschritte", "aria-valuemin": "0",
               "aria-valuemax": String(stationen.length), "aria-valuenow": String(fertig) },
-              h("span", { class: "progress-fill", style: "width: " + prozent + "%" })),
+              fuellung),
             h("p", { class: "hinweis" }, "Die Details siehst du nur, wenn du sie brauchst.")),
           h("details", { class: "order-more", "data-auf": "ablauf" },
             h("summary", {}, "Alle Schritte & Meldungen"),
             ablaufGesamt(order, stand.klasse)),
-          planLesen, angaben,
+          planLesen, angaben(order),
           ABBRECHBAR.includes(order.status) ? h("p", { class: "abbrechen" },
             h("button", { type: "button", class: "schlicht", onclick: () => {
               const knopf = inhalt.querySelector(".abbrechen");

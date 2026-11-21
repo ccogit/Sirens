@@ -1,4 +1,7 @@
 """Regression: Song-Revisionen, Archivschutz und SC-Aktualisierung."""
+import json
+import os
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -124,6 +127,33 @@ class Versionen(Fall):
             order = self.tun("soundcloud", order, entscheidung="metadaten", bestaetigt=True)
         self.assertTrue(order["nachlauf"]["soundcloud"]["text_offen"])
         self.assertEqual(order["nachlauf"]["soundcloud"]["text_fehler"], "HTTP 401")
+
+    def test_metadaten_gehen_ueber_das_upload_skript(self):
+        from sirens import soundcloud
+        skript = self.tmp / "sc.py"  # nachgestelltes Upload-Skript: prüft die Übergabe und meldet Erfolg
+        skript.write_text(chr(10).join([
+            "import json, sys", "a = sys.argv",
+            "text = open(a[a.index('--description-file') + 1], encoding='utf-8').read()",
+            "ok = a[a.index('--update-metadata') + 1].endswith('/too-tidy') and text == 'Neu' and a[a.index('--tags') + 1] == 'funk \"electro funk\"'",
+            "print('Access token refreshed.')",
+            "print(json.dumps({'status': 'metadata_updated'} if ok else {'status': 'failed', 'http_status': 422, 'response': a[1:]}))",
+            "sys.exit(0 if ok else 1)"]), encoding="utf-8")
+        with patch.dict(os.environ, {"SIRENS_SOUNDCLOUD_CMD": json.dumps([sys.executable, str(skript)])}):
+            self.assertEqual(soundcloud.metadaten_ersetzen("https://soundcloud.com/cco/too-tidy", "Neu", ["funk", "electro funk"]), "")
+            self.assertIn("422", soundcloud.metadaten_ersetzen("https://soundcloud.com/cco/anders", "Neu", ["funk", "electro funk"]))
+            self.assertIn("leer", soundcloud.metadaten_ersetzen("https://soundcloud.com/cco/too-tidy", "  ", []))
+
+    def test_aelterer_upload_schuetzt_seinen_master(self):
+        order = self.veroeffentlicht(master=True)
+        def alt(order):  # Stand vor dieser Fassung: der Upload kennt seine Datei noch nicht
+            del order["nachlauf"]["soundcloud"]["hochgeladen_datei"]
+        order = self.store.mutate(order["id"], None, alt)
+        order = self.tun("master", order, weg="datei", datei=MASTER)  # denselben Master erneut wählen: nichts ist veraltet
+        self.assertFalse(order["nachlauf"]["soundcloud"]["audio_offen"])
+        order = self.tun("master", order, weg="ohne")
+        self.assertEqual((order["nachlauf"]["soundcloud"]["hochgeladen_datei"], order["nachlauf"]["soundcloud"]["audio_offen"]), (MASTER, True))
+        with self.assertRaises(Ablehnung):  # liegt noch bei SoundCloud
+            self.tun("version", order, entscheidung="archivieren", bestaetigt=True)
 
     def test_ausgelassene_veroeffentlichung_erneut_oeffnen(self):
         order = self.start()

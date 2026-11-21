@@ -42,10 +42,11 @@
   .song-updated { display: none; }
 }
 @media (max-width: 40rem) {
-  .library-row { grid-template-columns: 46px minmax(0,1fr) auto; gap: .75rem; }
-  .song-art { width: 46px; height: 46px; }
-  .song-row-state { grid-column: 2; grid-row: 2; margin-top: -.5rem; }
-  .song-row-actions { grid-column: 3; grid-row: 1 / span 2; }
+  /* Schmal: Titel bekommt die ganze Breite, die Knöpfe stehen in einer eigenen Zeile darunter. */
+  .library-row { grid-template-columns: 46px minmax(0,1fr); gap: .3rem .75rem; }
+  .song-art { width: 46px; height: 46px; grid-row: 1 / span 2; align-self: start; }
+  .song-row-state { grid-column: 2; }
+  .song-row-actions { grid-column: 1 / -1; }
   .song-row-actions .song-edit { padding: .54rem .72rem; }
   .library-toolbar { padding: 1rem; }
   .library-header > a { width: 100%; }
@@ -62,7 +63,7 @@
 .remaster-detail > .hinweis { margin-bottom: .5rem; }
 [aria-label="Mastering"] { scroll-margin-top: 8rem; }
 @media (max-width: 40rem) {
-  .song-row-actions { flex-wrap: wrap; gap: .25rem; justify-content: flex-end; }
+  .song-row-actions { flex-wrap: wrap; gap: .5rem; justify-content: flex-start; }
   .song-row-actions .song-remaster { padding: .46rem .55rem; }
   .song-row-actions .song-edit { padding: .2rem .4rem; }
 }

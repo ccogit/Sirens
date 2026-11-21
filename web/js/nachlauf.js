@@ -197,7 +197,8 @@ function soundcloud(order, { tun, neuLaden, bereit }) {
         h("p", {}, "SoundCloud bietet den Audioaustausch nur über die eigene Oberfläche an. Öffne den bestehenden Song und ersetze dort die Datei, sofern dein Tarif dies erlaubt."),
         h("a", { href: s.link, target: "_blank", rel: "noopener" }, "Zum bestehenden Track"),
         bestaetigen("audio_bestaetigt", "Ich habe die Audiodatei dort ersetzt",
-          "Wurde die Datei im bestehenden SoundCloud-Track wirklich erfolgreich ausgetauscht?")) : null);
+          "Wurde die Datei im bestehenden SoundCloud-Track wirklich erfolgreich ausgetauscht?")) : null,
+      hinweis("Promotion schaltest du bei SoundCloud selbst ein; über die Schnittstelle geht das nicht."));
   }
   if (s.stand === "beauftragt") return phase("SoundCloud", s.stand, hinweis("Claude lädt den Song hoch."));
   if (s.stand === "ausgelassen") return phase("SoundCloud", s.stand,

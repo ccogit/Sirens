@@ -8,6 +8,7 @@ const TAGE = 30;
 
 function songZeile(auftrag, song, aktualisieren) {
   const laeuft = !song.bearbeitbar;
+  const starten = song.bearbeitbar && song.waehlbar;  // sonst erst anhören und einen Favoriten wählen
   const reife = song.sync_offen ? "SoundCloud-Update offen"
     : song.soundcloud ? "Auf SoundCloud" : laeuft ? "In Produktion" : "Lokal";
   const abbildung = song.cover
@@ -18,10 +19,11 @@ function songZeile(auftrag, song, aktualisieren) {
     taste.disabled = true;
     try {
       const frisch = await api.lesen(auftrag.id);
-      if (song.bearbeitbar) {
+      const schonOffen = frisch.status === "nachlauf" && frisch.nachlauf?.favorit === song.pfad;
+      if (starten && !schonOffen) {
         await api.aktion(auftrag.id, "nachlauf", frisch.revision, { pfad: song.pfad });
       }
-      location.hash = "#/auftrag/" + auftrag.id + (bereich === "mastering" ? "/mastering" : "");
+      location.hash = "#/auftrag/" + auftrag.id + (bereich === "mastering" && starten ? "/mastering" : "");
     } catch (fehler) {
       meldung(fehler.meldung, "fehler");
       taste.disabled = false;
@@ -29,8 +31,8 @@ function songZeile(auftrag, song, aktualisieren) {
     }
   }
   const knopf = h("button", { type: "button", class: "knopf zweit song-edit",
-    onclick: (e) => oeffnen(e, "") }, laeuft ? "Auftrag ansehen" : "Bearbeiten");
-  const mastern = !laeuft
+    onclick: (e) => oeffnen(e, "") }, laeuft ? "Auftrag ansehen" : starten ? "Bearbeiten" : "Anhören und wählen");
+  const mastern = starten
     ? h("button", { type: "button", class: "knopf song-remaster",
         title: "Mastering-Studio für diesen Song öffnen",
         onclick: (e) => oeffnen(e, "mastering") }, "♫ Neu mastern")
@@ -39,7 +41,7 @@ function songZeile(auftrag, song, aktualisieren) {
     h("div", { class: "song-art" }, abbildung),
     h("div", { class: "song-identity" },
       h("strong", {}, song.titel),
-      h("span", { class: "klein" }, auftrag.wunsch.artist_slug || "Unbekannt", " · ", kurz(auftrag.titel || "", 42))),
+      h("span", { class: "klein" }, [auftrag.wunsch.artist_slug || "Unbekannt", kurz(auftrag.titel || "", 42)].filter(Boolean).join(" · "))),
     h("div", { class: "song-row-state" },
       h("span", { class: "state-dot" + (song.sync_offen ? " alert" : "") }),
       reife),

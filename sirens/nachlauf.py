@@ -204,25 +204,24 @@ class NachlaufAktionen:
 
         def fn(order):
             n = _im_nachlauf(order)
-            if n["soundcloud"]["stand"] == "beauftragt":
+            s, m = n["soundcloud"], n["mastering"]
+            if s["stand"] == "beauftragt":
                 raise Ablehnung("invalid_transition", "Der SoundCloud-Upload läuft. Bitte danach ändern.", "status", 409)
-            m = n["mastering"]
             vorher = m["datei"]
+            if s["stand"] == "fertig":  # ältere Uploads kennen ihre Datei noch nicht: es war die damalige Endfassung
+                s.setdefault("hochgeladen_datei", endfassung(n))
             if weg == "ohne":
                 m.update(stand="ausgelassen", weg="ohne", datei="")
-                n["version_entscheidung"] = {"alt": vorher, "neu": n["favorit"]} if vorher else None
-                if n["soundcloud"]["stand"] == "fertig":
-                    n["soundcloud"]["audio_offen"] = endfassung(n) != n["soundcloud"].get("hochgeladen_datei", n["favorit"])
                 eintrag(order, NUTZER, "status", "Ohne Mastering weiter.")
-                return
-            eigen = next((e for e in m["entwuerfe"] if e["datei"] == datei), None)
-            if eigen is None and datei not in kandidaten(self.cfg, n):
-                raise Ablehnung("invalid_path", "Diese Datei ist kein Master zu diesem Song.", "datei")
-            m.update(stand="fertig", weg=eigen["weg"] if eigen else "eigene Datei", datei=datei)
-            n["version_entscheidung"] = {"alt": vorher, "neu": datei} if vorher and vorher != datei else None
-            if n["soundcloud"]["stand"] == "fertig":
-                n["soundcloud"]["audio_offen"] = endfassung(n) != n["soundcloud"].get("hochgeladen_datei", n["favorit"])
-            eintrag(order, NUTZER, "status", f"Master gewählt: {PurePosixPath(datei).name}")
+            else:
+                eigen = next((e for e in m["entwuerfe"] if e["datei"] == datei), None)
+                if eigen is None and datei not in kandidaten(self.cfg, n):
+                    raise Ablehnung("invalid_path", "Diese Datei ist kein Master zu diesem Song.", "datei")
+                m.update(stand="fertig", weg=eigen["weg"] if eigen else "eigene Datei", datei=datei)
+                eintrag(order, NUTZER, "status", f"Master gewählt: {PurePosixPath(datei).name}")
+            n["version_entscheidung"] = {"alt": vorher, "neu": endfassung(n)} if vorher and vorher != m["datei"] else None
+            if s["stand"] == "fertig":
+                s["audio_offen"] = endfassung(n) != s["hochgeladen_datei"]
         return self.store.mutate(oid, revision(data), fn)
 
     def version(self, oid, data):

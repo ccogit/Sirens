@@ -71,6 +71,8 @@ class App:
                              "soundcloud": (n or {}).get("soundcloud", {}).get("link", ""),
                              "sync_offen": any((n or {}).get("soundcloud", {}).get(k) for k in
                                                ("audio_offen", "cover_offen", "text_offen")),
+                             # ohne begonnenes Fertigmachen und ohne Favorit wählt erst der Nutzer den Take
+                             "waehlbar": bool(n) or bool(bewertet.get(pfad, {}).get("favorit")),
                              "bearbeitbar": order["status"] in ("fertig", "nachlauf", "abgeschlossen")})
         return ausgaben
 

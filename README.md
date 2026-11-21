@@ -187,8 +187,8 @@ bleiben erhalten.
   Aktuelle Favoriten, Referenzen, Dateien in anderen Aufträgen und die bei SoundCloud hinterlegte
   Audiofassung sind geschützt. Werden sie noch benötigt, lehnt der Dienst das Archivieren ab.
 - **Dateien:** Archivieren verschiebt die Datei aus dem aktiven Musikordner nach
-  \`SIRENS_DATA_DIR/versionen-archiv/<Auftrags-ID>/...\`. Die Datei wird **nicht endgültig gelöscht**.
-  Der Vorgang wird unter \`archivierte_versionen\` in der Auftrags-JSON dokumentiert. Behalten ist
+  `SIRENS_DATA_DIR/versionen-archiv/<Auftrags-ID>/...`. Die Datei wird **nicht endgültig gelöscht**.
+  Der Vorgang wird unter `archivierte_versionen` in der Auftrags-JSON dokumentiert. Behalten ist
   die sichere Standardentscheidung; ohne ausdrückliche Bestätigung wird nichts verschoben.
 - **SoundCloud:** Nach Textänderungen lassen sich Beschreibung und Tags ausdrücklich **auf dem
   vorhandenen Track** aktualisieren. Cover lassen sich ebenfalls auf dem bestehenden Track ersetzen.
