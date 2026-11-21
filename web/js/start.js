@@ -67,7 +67,7 @@ export function startAnsicht(el) {
     letzter = abdruck;
     const g = gruppen(daten.auftraege);
     const erster = g.nutzer[0];
-    const inProduktion = g.claude.filter((a) => a.lage.dran !== "nutzer");
+    const inProduktion = g.claude.filter((a) => a.lage.dran !== "nutzer" && a.lage.dran !== "laeuft");
     const weitere = g.nutzer.slice(1);
     leeren(inhalt).append(
       h("header", { class: "dashboard-header" },
@@ -114,7 +114,7 @@ export function startAnsicht(el) {
         ? h("details", { class: "archive-panel", open: erledigtOffen, ontoggle: (e) => { erledigtOffen = e.target.open; } },
             h("summary", {}, h("span", {}, "Archiv"), h("span", { class: "mini-count" }, String(g.erledigt.length))),
             h("ul", { class: "karten archive-grid" }, g.erledigt.map(karte)))
-        : null);
+        : "");
   }
 
   laden();
