@@ -21,6 +21,10 @@ export class StemAudio {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) throw new Error("Dein Browser unterstützt Web Audio nicht.");
     const ctx = this.ctx = new AudioCtx();
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = .77;
+    this.analyser.connect(ctx.destination);
     for (let i = 0; i < urls.length; i++) {
       if (this.beendet) return;
       fortschritt(i + 1, urls.length);
@@ -33,7 +37,7 @@ export class StemAudio {
       this.buffers.push(buffer);
       const gain = ctx.createGain();
       gain.gain.value = 1;
-      gain.connect(ctx.destination);
+      gain.connect(this.analyser);
       this.gains.push(gain);
     }
     if (!this.buffers.length) throw new Error("Keine Audiospuren gefunden.");
@@ -118,6 +122,7 @@ export class StemAudio {
     this._stopQuellen();
     this.buffers = [];
     this.gains = [];
+    this.analyser = null;
     const ctx = this.ctx;
     this.ctx = null;
     if (ctx) ctx.close().catch(() => {});
