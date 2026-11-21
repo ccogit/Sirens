@@ -128,7 +128,7 @@ export function visualisieren(canvas, hud, getAnalyser, getModus, isProducing = 
   function zeichnen(now) {
     if (!aktiv) return;
     frame = requestAnimationFrame(zeichnen);
-    if (document.hidden || now - letzter < (reduced ? 100 : isProducing() ? 66 : 33)) return;
+    if (document.hidden || canvas.closest(".lab-toy")?.hidden || now - letzter < (reduced ? 100 : isProducing() ? 66 : 33)) return;
     letzter = now;
     const t = (now-gestartet)/1000;
     daten(t);
