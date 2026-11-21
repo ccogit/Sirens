@@ -35,6 +35,7 @@ export const api = {
   explorer: (pfad) => ruf("POST", "/api/explorer", { pfad }),
   claude: () => ruf("GET", "/api/claude"),
   claudeStarten: () => ruf("POST", "/api/claude/start", {}),
+  beat: (pfad) => ruf("GET", `/api/beat?pfad=${encodeURIComponent(pfad)}`),
   bildUrl: (pfad) => `/api/bild?pfad=${encodeURIComponent(pfad)}`,
   audioUrl: (pfad) => `/api/audio?pfad=${encodeURIComponent(pfad)}`,
   kickStart: (ziel, spender) => ruf("POST", "/api/kicktausch", { ziel, spender }),

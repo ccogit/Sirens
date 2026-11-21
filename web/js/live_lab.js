@@ -4,6 +4,7 @@ import { h, meldung } from "./dom.js";
 import { LiveAudio } from "./live_audio.js";
 import { visualisieren } from "./live_visual.js";
 import { spielAnhalten, spielwiese } from "./spielwiese.js";
+import { autoDjAnsicht } from "./auto_dj.js";
 import { kickTausch } from "./kicktausch.js";
 
 function minuten(t) {
@@ -150,11 +151,12 @@ export function liveLabAnsicht(el) {
     onclick: () => { mitAudio(() => engine.pad(art)); }
   }, h("span", {}, label), h("kbd", {}, key)));
 
+  const autoToy = autoDjAnsicht(() => produktionLaeuft);
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "kick"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
+  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "auto", "kick"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
   const kick = kickTausch();
   const kisten = {};
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["kick", "🥁 Kick-Tausch"]].map(([key, label]) =>
+  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
   function waehlen(key) {
     spielzeug = key;
@@ -164,6 +166,7 @@ export function liveLabAnsicht(el) {
     if (key !== "pult") for (const audio of engine.decks) audio.pause();
     if (key !== "wiese") spielAnhalten();
     if (key !== "kick") kick.anhalten();
+    if (key === "auto") autoToy.activate(); else { autoToy.deactivate(); autoToy.stop(); }
   }
 
   el.append(h("div", { class: "lab-page" },
@@ -175,6 +178,7 @@ export function liveLabAnsicht(el) {
       h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
     h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
     kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
+    kisten.auto = h("div", { class: "lab-toy" }, autoToy.el),
     kisten.kick = h("div", { class: "lab-toy" }, kick.el),
     kisten.pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
@@ -261,6 +265,7 @@ export function liveLabAnsicht(el) {
     window.removeEventListener("keydown", removeKeyboard);
     stopVisual();
     spielAnhalten();
+    autoToy.destroy();
     kick.anhalten();
     engine.beenden();
   };

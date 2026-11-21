@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .catalog import Katalog, bekannte_bewertungen, richtungswoerter
+from .beat import BeatCache
 from .config import LOOPBACK, umgebung
 from . import ablauf, nachlauf
 from .contracts import BILD_EXT, Ablehnung, safe_audio_path
@@ -41,6 +42,7 @@ class App:
                              cover=nach.cover, soundcloud=nach.soundcloud, textedit=nach.text_aendern,
                              version=nach.version)
         self.starter = ClaudeStarter(cfg)
+        self.beats = BeatCache(cfg)
         self.kick = KickTausch(cfg, umgebung())
 
     def aktion(self, name, oid, data):
@@ -184,6 +186,8 @@ class Handler(BaseHTTPRequestHandler):
                 min_score = None
             return self._json(200, app.katalog.baum(bekannte_bewertungen(app.cfg, app.store),
                                                     query.get("q", ""), min_score))
+        if pfad == "/api/beat":
+            return self._json(200, app.beats.holen(query.get("pfad")))
         if pfad == "/api/audio":
             return self._audio(query.get("pfad"))
         if pfad == "/api/bild":
