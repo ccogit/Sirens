@@ -75,7 +75,7 @@ export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.
 }
 
 
-export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19) {
+export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19, zielEnergie=null) {
   if (!(von?.bpm>0) || !(nach?.bpm>0)) return null;
   const t=tempoAngleichung(nach.bpm,von.bpm);
   if (!t || Math.abs(1-t.rate)>erlaubteAbweichung) return null;
@@ -87,8 +87,9 @@ export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichun
         b.zeit+dauer/t.rate>=nach.duration-0.5) continue;
     const energiematch=1-Math.abs(a.energie-b.energie);
     const ruhe=1-(a.energie+b.energie)/2;
-    const score=.31*a.score+.32*b.score+.18*energiematch+.10*ruhe+
-      .09*Math.max(0,1-t.abweichung*6);
+    const dramaturgie=zielEnergie==null?0:Math.max(0,1-Math.abs(b.energie-zielEnergie));
+    const score=.28*a.score+.29*b.score+.15*energiematch+.10*ruhe+
+      .08*Math.max(0,1-t.abweichung*6)+.10*dramaturgie;
     if(!beste||beste.score<score) beste={
       startA:a.zeit,startB:b.zeit,rateB:t.rate,normalB:t.normalized,
       bpm:von.bpm,bars:taktzahl,dauer,score,
@@ -109,4 +110,13 @@ export function klassifizierung(info) {
   const energy=seg.reduce((sum,s)=>sum+s.energie,0)/Math.max(1,seg.length);
   tags.push(energy>=.68?"druckvoll":energy<.35?"zurückhaltend":"dynamisch");
   return tags;
+}
+
+
+export function setEnergieZiel(regie, nummer) {
+  const n=Math.max(0,Math.floor(nummer));
+  if(regie==="aufbau") return Math.min(.84,.32+(n%9)*.065);
+  if(regie==="chill") return .28;
+  if(regie==="peak") return .82;
+  return .54+.26*Math.sin((n-1.3)*Math.PI/4); // Wellen: langsam aufbauen, wieder lösen
 }
