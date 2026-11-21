@@ -108,7 +108,24 @@ def analysieren(datei, ffmpeg="ffmpeg"):
         onsets, energie, brillanz = _merkmale(lauf.stdout)
         # Ein rhythmischer Ausschnitt reicht für das Tempo. Die volle Länge
         # wird dagegen für Intro, Breakdown, Drop und Outro benötigt.
-        grid = beatgrid(onsets[:BEAT_WINDOW * HZ])
+        # Auch nach langen ruhigen Intros einen Abschnitt mit stabilem
+        # Rhythmus suchen. Fenster überlappen; die höchste Konfidenz gewinnt.
+        analysefenster = []
+        for versatz in (0, 45, 90, 150, 210):
+            anfang = versatz * HZ
+            teil = onsets[anfang:anfang + BEAT_WINDOW * HZ]
+            if len(teil) < 8 * HZ:
+                continue
+            try:
+                auswertung = beatgrid(teil)
+            except ValueError:
+                continue
+            auswertung["beat0"] = round((auswertung["beat0"] + versatz)
+                % (60 / auswertung["bpm"]), 3)
+            analysefenster.append(auswertung)
+        if not analysefenster:
+            raise ValueError("Kein ausreichend regelmäßiger Rhythmus erkennbar.")
+        grid = max(analysefenster,key=lambda v:v["confidence"])
         dauer = len(onsets) / HZ
         bar0 = _bar0(onsets, grid["beat0"], grid["bpm"])
         grid["bar0"] = bar0
