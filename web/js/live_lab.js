@@ -4,6 +4,7 @@ import { h, meldung } from "./dom.js";
 import { LiveAudio } from "./live_audio.js";
 import { visualisieren } from "./live_visual.js";
 import { spielAnhalten, spielwiese } from "./spielwiese.js";
+import { autoDjAnsicht } from "./auto_dj.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -149,17 +150,27 @@ export function liveLabAnsicht(el) {
     onclick: () => { mitAudio(() => engine.pad(art)); }
   }, h("span", {}, label), h("kbd", {}, key)));
 
+  const autoToy = autoDjAnsicht();
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { return localStorage.getItem("sirens.spielzeug") === "wiese" ? "wiese" : "pult"; } catch { return "pult"; } })();
+  let spielzeug = (() => { try { return ["wiese","pult","auto"].includes(localStorage.getItem("sirens.spielzeug")) ? localStorage.getItem("sirens.spielzeug") : "pult"; } catch { return "pult"; } })();
   const kisten = {};
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"]].map(([key, label]) =>
+  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
   function waehlen(key) {
     spielzeug = key;
     try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
     for (const b of spielzeugKnoepfe) b.setAttribute("aria-pressed", String(b.dataset.toy === key));
     for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
-    if (key === "wiese") { for (const audio of engine.decks) audio.pause(); } else spielAnhalten();
+    if (key === "wiese") {
+      for (const audio of engine.decks) audio.pause();
+      autoToy.stop();
+    } else if (key === "auto") {
+      for (const audio of engine.decks) audio.pause();
+      spielAnhalten();
+    } else {
+      spielAnhalten();
+      autoToy.stop();
+    }
   }
 
   el.append(h("div", { class: "lab-page" },
@@ -171,6 +182,7 @@ export function liveLabAnsicht(el) {
       h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
     h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
     kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
+    kisten.auto = h("div", { class: "lab-toy" }, autoToy.el),
     kisten.pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
       canvas, hud,
@@ -256,6 +268,7 @@ export function liveLabAnsicht(el) {
     window.removeEventListener("keydown", removeKeyboard);
     stopVisual();
     spielAnhalten();
+    autoToy.destroy();
     engine.beenden();
   };
 }
