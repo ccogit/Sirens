@@ -5,6 +5,7 @@ Kein ML-Modell, keine Datenbank und keine Änderung an Songdateien.
 """
 from array import array
 import math
+import os
 import subprocess
 import sys
 import threading
@@ -87,7 +88,10 @@ def analysieren(datei, ffmpeg="ffmpeg"):
     if lauf.returncode != 0:
         raise Ablehnung("beat_decode", "Die Audiodatei konnte nicht analysiert werden.", status=422)
     try:
-        return beatgrid(_onsets(lauf.stdout))
+        onsets = _onsets(lauf.stdout)
+        grid = beatgrid(onsets)
+        grid["energy"] = round(min(1.0, max(0.0, sum(onsets) / max(len(onsets), 1) / 2100)), 2)
+        return grid
     except ValueError as exc:
         raise Ablehnung("beat_missing", str(exc), status=422) from exc
 
@@ -108,7 +112,7 @@ class BeatCache:
         with self.lock:
             if schluessel in self.daten:
                 return dict(self.daten[schluessel])
-        info = analysieren(datei, self.cfg.ffmpeg)
+        info = analysieren(datei, os.environ.get("SIRENS_FFMPEG") or "ffmpeg")
         with self.lock:
             if len(self.daten) >= 128:
                 self.daten.pop(next(iter(self.daten)))
