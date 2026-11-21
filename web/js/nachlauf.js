@@ -227,25 +227,31 @@ function soundcloud(order, { tun, neuLaden, bereit }) {
 }
 
 function versionFrage(order, { tun, neuLaden }) {
-  const v = order.nachlauf.version_entscheidung;
-  if (!v) return null;
-  const frage = h("div", { class: "knopfzeile" });
-  const archivieren = h("button", { type: "button", class: "knopf zweit", onclick: () => {
-    leeren(frage).append(h("p", { class: "hinweis" },
-      "Die bisherige Datei wird aus dem Musikordner in das sichere Sirens-Archiv verschoben. Sie wird nicht gelöscht. Fortfahren?"),
-      h("button", { type: "button", class: "knopf", onclick: () => tun("version",
-        { entscheidung: "archivieren", bestaetigt: true }) }, "Ja, alte Fassung archivieren"),
-      h("button", { type: "button", class: "schlicht", onclick: neuLaden }, "Abbrechen"));
-  } }, "Vorherige Version archivieren");
-  frage.append(
-    h("button", { type: "button", class: "knopf zweit",
-      onclick: () => tun("version", { entscheidung: "behalten" }) }, "Behalten"),
-    archivieren);
-  return h("section", { class: "version-prompt breit" },
-    h("strong", {}, "Was soll mit der vorherigen Master-Version passieren?"),
-    h("p", {}, "Bisher: " + dateiName(v.alt) + " · Aktuell: " + dateiName(v.neu)),
-    frage, h("p", { class: "version-archive-note" },
-      "Verwendete Originale und noch auf SoundCloud hinterlegte Dateien werden nicht archiviert."));
+  const offen = [
+    ["version_entscheidung", "Master"],
+    ["cover_entscheidung", "Cover"],
+    ["text_entscheidung", "Text"]
+  ].filter(([key]) => Boolean(order.nachlauf[key]));
+  if (!offen.length) return null;
+  return h("div", { class: "version-questions breit" }, offen.map(([key, art]) => {
+    const v = order.nachlauf[key];
+    const frage = h("div", { class: "knopfzeile" });
+    frage.append(
+      h("button", { type: "button", class: "knopf zweit",
+        onclick: () => tun("version", { entscheidung: "behalten", pfad: v.alt }) }, "Behalten"),
+      h("button", { type: "button", class: "knopf zweit", onclick: () => {
+        leeren(frage).append(h("p", { class: "hinweis" },
+          "Die alte Datei wird aus dem aktiven Songordner ins Sirens-Archiv verschoben, nicht endgültig gelöscht. Fortfahren?"),
+          h("button", { type: "button", class: "knopf", onclick: () => tun("version",
+            { entscheidung: "archivieren", pfad: v.alt, bestaetigt: true }) }, "Ja, archivieren"),
+          h("button", { type: "button", class: "schlicht", onclick: neuLaden }, "Abbrechen"));
+      } }, "Alte Fassung archivieren"));
+    return h("section", { class: "version-prompt" },
+      h("strong", {}, "Neue " + art + "-Fassung – alte Version behalten?"),
+      h("p", {}, "Bisher: " + dateiName(v.alt) + " · Aktuell: " + dateiName(v.neu)),
+      frage, h("p", { class: "version-archive-note" },
+        "Quellaufnahmen und noch verwendete Veröffentlichungen sind geschützt."));
+  }));
 }
 
 const fertigVon = (n) => ["mastering", "cover", "text", "soundcloud"].filter((p) => ERLEDIGT.includes(n[p].stand)).length;
