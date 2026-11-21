@@ -106,7 +106,7 @@ export function startAnsicht(el) {
               h("span", { class: "status-indicator" + (daten.claude?.laeuft ? " online" : "") }),
               daten.claude?.laeuft ? "Arbeitet gerade" : g.claude.length ? "Bereit für den nächsten Lauf" : "Im Standby"),
             g.claude.length ? claudeKasten(daten.claude, "", () => { letzter = ""; laden(); })
-              : h("p", { class: "status-help" }, "Sobald ein Auftrag an Claude übergeht, erscheint hier sein Status."))),
+              : h("p", { class: "status-help" }, "Sobald ein Auftrag an Claude übergeht, erscheint hier sein Status.")),
           h("section", { class: "quiet-tip" },
             h("span", { "aria-hidden": "true", class: "tip-icon" }, "♫"),
             h("p", {}, "Von der ersten Idee bis zum fertigen Master – du entscheidest, wann es weitergeht.")))),
