@@ -4,6 +4,7 @@ import { h, meldung } from "./dom.js";
 import { LiveAudio } from "./live_audio.js";
 import { visualisieren } from "./live_visual.js";
 import { spielAnhalten, spielwiese } from "./spielwiese.js";
+import { stemSpiel } from "./stems.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -150,16 +151,19 @@ export function liveLabAnsicht(el) {
   }, h("span", {}, label), h("kbd", {}, key)));
 
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { return localStorage.getItem("sirens.spielzeug") === "wiese" ? "wiese" : "pult"; } catch { return "pult"; } })();
+  let spielzeug = (() => { try { return ["pult", "wiese", "stems"].includes(localStorage.getItem("sirens.spielzeug")) ? localStorage.getItem("sirens.spielzeug") : "pult"; } catch { return "pult"; } })();
+  const stems = stemSpiel();
   const kisten = {};
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"]].map(([key, label]) =>
+  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["stems", "🎚 KI Stem Studio"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
   function waehlen(key) {
     spielzeug = key;
     try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
     for (const b of spielzeugKnoepfe) b.setAttribute("aria-pressed", String(b.dataset.toy === key));
     for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
-    if (key === "wiese") { for (const audio of engine.decks) audio.pause(); } else spielAnhalten();
+    if (key === "wiese") { for (const audio of engine.decks) audio.pause(); stems.pausieren(); }
+    else if (key === "stems") { for (const audio of engine.decks) audio.pause(); spielAnhalten(); }
+    else { spielAnhalten(); stems.pausieren(); }
   }
 
   el.append(h("div", { class: "lab-page" },
@@ -167,10 +171,11 @@ export function liveLabAnsicht(el) {
       h("div", {},
         h("p", { class: "lab-eyebrow" }, "SIRENS · INTERACTIVE MUSIC SPACE"),
         h("h1", {}, "Die Wartezeit wird zum Auftritt."),
-        h("p", {}, "Zwei Decks. Echtzeit-Effekte. Sound-Pads. Ein audioreaktiver Neon-Kosmos.")),
+        h("p", {}, "Zwei Decks, Effekte, Sound-Pads und KI-getrennte Instrumente zum Live-Mixen.")),
       h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
     h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
     kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
+    kisten.stems = h("div", { class: "lab-toy" }, stems.el),
     kisten.pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
       canvas, hud,
@@ -256,6 +261,7 @@ export function liveLabAnsicht(el) {
     window.removeEventListener("keydown", removeKeyboard);
     stopVisual();
     spielAnhalten();
+    stems.beenden();
     engine.beenden();
   };
 }
