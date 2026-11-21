@@ -46,3 +46,43 @@
   .stems-track output { grid-column: 2 / 3; }
   .stems-mix-head { align-items: start; flex-direction: column; }
 }
+
+/* Warp Stage: eigenständige GPU-Show mit schwebenden Cinematic-HUDs. */
+.stems-visual { min-width: 0; border-radius: 22px; overflow: hidden;
+  background: linear-gradient(145deg,#070f25,#112449); border: 1px solid #416588;
+  box-shadow: 0 22px 65px rgba(2,8,31,.23); color: #e8f7ff; }
+.stems-visual-title { display:flex; align-items: center; justify-content:space-between;
+  flex-wrap:wrap; gap:1rem; padding: 1.15rem 1.35rem; }
+.stems-visual-title h2 { font-size:clamp(1.15rem,2vw,1.6rem); margin:.1rem 0; color:#f6fcff; }
+.stems-kicker { color:#6ff5e5; letter-spacing:.19em; font-size:.69rem; font-weight:900; }
+.stems-fullscreen { border:1px solid #5e7fae; border-radius:10px; padding:.55rem 1rem;
+  cursor:pointer; color:#deedff; background:#1d365b; font-weight:800; }
+.stems-visual-wrap { position:relative; height:clamp(320px,48vw,610px); overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,#1c2b63,#040919 75%); isolation:isolate; }
+.stems-visual-canvas { display:block; height:100%; width:100%; object-fit:cover; }
+.stems-visual-canvas:fullscreen { width:100vw; height:100vh; object-fit:fill; background:#05091a; }
+.stems-visual-hud { position:absolute; pointer-events:none; bottom:1.1rem; left:1.1rem; right:1.1rem;
+  display:flex; justify-content:space-between; gap:.55rem; flex-wrap:wrap; align-items:center; }
+.stems-visual-live { font-weight:900; font-size:.72rem; letter-spacing:.11em; color:#7affdf;
+  padding:.45rem .72rem; background:rgba(3,12,29,.75); border:1px solid #256b78; border-radius:100px; }
+.stems-perf { padding:.45rem .72rem; font:700 .72rem ui-monospace,Consolas,monospace;
+  background:rgba(3,12,29,.75); border:1px solid #304765; border-radius:100px; color:#daefff; }
+.stems-scenes { display:flex; flex-wrap:wrap; gap:.65rem; padding:1.2rem 1.3rem .5rem; }
+.stems-scene { padding:.65rem .85rem; border:1px solid #385e8c; background:#102747;
+  color:#bcdcf5; border-radius:10px; cursor:pointer; font-weight:750; font-size:.81rem; }
+.stems-scene[aria-pressed="true"] { background:#aceee2; border-color:#aceee2; color:#0b2a3e; }
+.stems-gpu-controls { display:grid; grid-template-columns:minmax(170px,1fr) minmax(170px,1fr);
+  gap:1rem; padding:.8rem 1.3rem; }
+.stems-gpu-controls label { display:grid; gap:.4rem; font-size:.82rem; color:#cbdff6; font-weight:750; }
+.stems-gpu-controls label span { display:flex; gap:.7rem; align-items:center; }
+.stems-gpu-controls select { width:100%; min-width:0; padding:.65rem; border-radius:9px;
+  background:#142b4c; color:#f1f9ff; border:1px solid #4c6d9e; font:inherit; }
+.stems-gpu-controls input[type="range"] { width:100%; min-width:0; accent-color:#6af4db; }
+.stems-gpu-controls output { white-space:nowrap; color:#72ebdc; }
+.stems-visual > .stems-hint { padding:.1rem 1.3rem 1.1rem; }
+@media (max-width: 42rem) {
+  .stems-visual-wrap { height:350px; }
+  .stems-visual-hud { left:.6rem;right:.6rem;bottom:.6rem; }
+  .stems-perf { font-size:.62rem; }
+  .stems-gpu-controls { grid-template-columns:1fr; }
+}
