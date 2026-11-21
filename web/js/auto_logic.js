@@ -75,16 +75,17 @@ export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.
 }
 
 
-export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19, zielEnergie=null) {
+export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19, zielEnergie=null, aktuelleRate=1) {
   if (!(von?.bpm>0) || !(nach?.bpm>0)) return null;
-  const t=tempoAngleichung(nach.bpm,von.bpm);
+  const effektivesBpm=von.bpm*aktuelleRate;
+  const t=tempoAngleichung(nach.bpm,effektivesBpm);
   if (!t || Math.abs(1-t.rate)>erlaubteAbweichung) return null;
-  const dauer=taktzahl*240/von.bpm;
+  const dauer=taktzahl*240/effektivesBpm;
   let beste=null;
   for (const a of von.cues_out||[]) for (const b of nach.cues_in||[]) {
-    if (a.zeit<jetzt+Math.max(2,dauer*.7) ||
-        a.zeit+dauer>=von.duration-0.25 ||
-        b.zeit+dauer/t.rate>=nach.duration-0.5) continue;
+    if (a.zeit<jetzt+Math.max(2,dauer*aktuelleRate*.7) ||
+        a.zeit+dauer*aktuelleRate>=von.duration-0.25 ||
+        b.zeit+dauer*t.rate>=nach.duration-0.5) continue;
     const energiematch=1-Math.abs(a.energie-b.energie);
     const ruhe=1-(a.energie+b.energie)/2;
     const dramaturgie=zielEnergie==null?0:Math.max(0,1-Math.abs(b.energie-zielEnergie));
@@ -92,7 +93,7 @@ export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichun
       .08*Math.max(0,1-t.abweichung*6)+.10*dramaturgie;
     if(!beste||beste.score<score) beste={
       startA:a.zeit,startB:b.zeit,rateB:t.rate,normalB:t.normalized,
-      bpm:von.bpm,bars:taktzahl,dauer,score,
+      bpm:effektivesBpm,bars:taktzahl,dauer,rateA:aktuelleRate,score,
       ausgang:a.grund,eingang:b.grund,energieA:a.energie,energieB:b.energie,
       confidence:Math.min(von.confidence||0,nach.confidence||0,
         von.phrase_confidence||0,nach.phrase_confidence||0)
