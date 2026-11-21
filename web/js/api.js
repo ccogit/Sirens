@@ -40,4 +40,6 @@ export const api = {
   stemStatus: (pfad, modell) => ruf("GET", `/api/stems?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}`),
   stemStart: (pfad, modell, device = "cpu") => ruf("POST", "/api/stems", { pfad, modell, device }),
   stemAudioUrl: (pfad, modell, stem) => `/api/stems/audio?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}&stem=${encodeURIComponent(stem)}`,
+  stemNoten: (pfad, modell, stem) => ruf("GET", `/api/stems/notes?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}&stem=${encodeURIComponent(stem)}`),
+  stemNotenStart: (pfad, modell, stem) => ruf("POST", "/api/stems/notes", { pfad, modell, stem }),
 };
