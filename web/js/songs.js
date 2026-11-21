@@ -56,7 +56,8 @@ export function songsAnsicht(el) {
       const stichtag = Date.now() - TAGE * 86400_000;
       const zeilen = daten.auftraege.flatMap(a =>
         (a.songs || []).map(song => ({ auftrag: a, song })));
-      const aktuell = zeilen.filter(x => x.song.bearbeitbar || Date.parse(x.auftrag.updated_at) >= stichtag);
+      const aktuell = zeilen.filter(x => ["in_arbeit", "gesendet", "nachlauf", "fertig"].includes(x.auftrag.status)
+        || Date.parse(x.auftrag.updated_at) >= stichtag);
       const sichtbar = alle ? zeilen : aktuell;
       leeren(inhalt).append(
         h("header", { class: "library-header" },
