@@ -191,7 +191,7 @@ Zwei Ansichten zum Umschalten:
 
 ### Kick-Tausch
 
-Drittes Spielzeug im Live Lab: ein gut bewerteter Song bekommt die Kick eines anderen. Sirens trennt dafür beide Songs
+Spielzeug im Live Lab: ein gut bewerteter Song bekommt die Kick eines anderen. Sirens trennt dafür beide Songs
 in Schlagzeug und Rest (je Song einmal, etwa eine Minute; danach aus dem Zwischenspeicher) und rechnet dann den Tausch.
 Es wird nicht nur der Takt getroffen, sondern die Entwicklung des Zielsongs übernommen:
 
