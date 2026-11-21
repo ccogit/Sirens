@@ -20,6 +20,9 @@ export function stemSpiel() {
   const modell = h("select", { "aria-label": "KI-Trennmodell" },
     h("option", { value: "htdemucs" }, "4 Stems · Standard"),
     h("option", { value: "htdemucs_6s" }, "6 Stems · auch Gitarre & Klavier (experimentell)"));
+  const geraet = h("select", { "aria-label": "Rechenmodus" },
+    h("option", { value: "cpu" }, "CPU · GPU freihalten"),
+    h("option", { value: "cuda" }, "RTX 5080 · CUDA"));
   const status = h("p", { class: "stems-status", role: "status", "aria-live": "polite" },
     "Song aus dem Katalog wählen.");
   const trennen = h("button", { class: "stems-primary", type: "button", disabled: true }, "KI-Trennung starten");
@@ -163,7 +166,7 @@ export function stemSpiel() {
     trennen.disabled = true;
     status.textContent = "Starte lokale KI-Trennung …";
     try {
-      const daten = await api.stemStart(song.value, modell.value);
+      const daten = await api.stemStart(song.value, modell.value, geraet.value);
       if (!beendet && nummer === token) anzeigen(daten, nummer);
     } catch (err) {
       if (!beendet && nummer === token) {
@@ -244,8 +247,9 @@ export function stemSpiel() {
       h("section", { class: "stems-setup" },
         h("label", {}, "Song aus deinem Katalog", song),
         h("label", {}, "Trennmodell", modell),
+        h("label", {}, "Berechnung", geraet),
         trennen, status,
-        h("p", { class: "stems-hint" }, "Keine Cloud-Uploads. Original bleibt unverändert. Die Trennung dauert je nach Rechner einige Minuten und verwendet standardmäßig nur die CPU. Das 6-Stem-Modell ist bei Gitarre und Klavier experimentell.")),
+        h("p", { class: "stems-hint" }, "Keine Cloud-Uploads. Original bleibt unverändert. Standardmäßig läuft die Trennung auf der CPU. Für deine RTX 5080 wähle CUDA (mit kompatibler PyTorch-Installation); während Claude arbeitet, ist CUDA gesperrt. Das 6-Stem-Modell ist bei Gitarre und Klavier experimentell.")),
       mixer),
     pausieren,
     beenden() {
