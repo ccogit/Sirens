@@ -15,6 +15,7 @@ from .contracts import BILD_EXT, Ablehnung, safe_audio_path
 from .service import NutzerAktionen
 from .starter import SATZ, ClaudeStarter
 from .stems import StemDienst
+from .stem_notes import StemNoten
 from .store import Store
 from .workflow import lage
 
@@ -42,6 +43,7 @@ class App:
                              version=nach.version)
         self.starter = ClaudeStarter(cfg)
         self.stems = StemDienst(cfg)
+        self.stem_noten = StemNoten(self.stems)
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""
@@ -182,6 +184,8 @@ class Handler(BaseHTTPRequestHandler):
                                                     query.get("q", ""), min_score))
         if pfad == "/api/stems":
             return self._json(200, app.stems.zustand(query.get("pfad"), query.get("modell", "htdemucs")))
+        if pfad == "/api/stems/notes":
+            return self._json(200, app.stem_noten.zustand(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem")))
         if pfad == "/api/stems/audio":
             datei = app.stems.audiodatei(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem"))
             return self._audio_datei(datei)
@@ -205,6 +209,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _schreiben(self, pfad, data):
         app = self.app
+        if self.command == "POST" and pfad == "/api/stems/notes":
+            if not isinstance(data, dict):
+                raise Ablehnung("invalid", "Die Notenanfrage muss ein Objekt sein.")
+            stand = app.stem_noten.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("stem"))
+            return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
         if self.command == "POST" and pfad == "/api/stems":
             if not isinstance(data, dict):
                 raise Ablehnung("invalid", "Die Stem-Anfrage muss ein Objekt sein.")
