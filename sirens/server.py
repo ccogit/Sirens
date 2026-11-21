@@ -208,7 +208,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.command == "POST" and pfad == "/api/stems":
             if not isinstance(data, dict):
                 raise Ablehnung("invalid", "Die Stem-Anfrage muss ein Objekt sein.")
-            stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"))
+            if data.get("device", "cpu") == "cuda" and app.starter.zustand()["laeuft"]:
+                raise Ablehnung("busy_gpu", "Claude produziert gerade. Bitte CPU wählen oder später CUDA starten.", "device", 409)
+            stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("device", "cpu"))
             return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
         if self.command == "POST" and pfad == "/api/catalog/refresh":
             app.katalog.scan_im_hintergrund()
