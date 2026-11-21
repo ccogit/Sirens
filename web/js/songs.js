@@ -13,20 +13,28 @@ function songZeile(auftrag, song, aktualisieren) {
   const abbildung = song.cover
     ? h("img", { src: api.bildUrl(song.cover), alt: "", loading: "lazy" })
     : h("span", { class: "song-placeholder", "aria-hidden": "true" }, "♫");
-  const knopf = h("button", { type: "button", class: "knopf zweit song-edit", onclick: async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = "Öffnet …";
+  async function oeffnen(e, bereich) {
+    const taste = e.currentTarget;
+    taste.disabled = true;
     try {
       const frisch = await api.lesen(auftrag.id);
       if (song.bearbeitbar) {
         await api.aktion(auftrag.id, "nachlauf", frisch.revision, { pfad: song.pfad });
       }
-      location.hash = "#/auftrag/" + auftrag.id;
+      location.hash = "#/auftrag/" + auftrag.id + (bereich === "mastering" ? "/mastering" : "");
     } catch (fehler) {
       meldung(fehler.meldung, "fehler");
+      taste.disabled = false;
       aktualisieren();
     }
-  } }, laeuft ? "Auftrag ansehen" : "Bearbeiten →");
+  }
+  const knopf = h("button", { type: "button", class: "knopf zweit song-edit",
+    onclick: (e) => oeffnen(e, "") }, laeuft ? "Auftrag ansehen" : "Bearbeiten");
+  const mastern = !laeuft
+    ? h("button", { type: "button", class: "knopf song-remaster",
+        title: "Mastering-Studio für diesen Song öffnen",
+        onclick: (e) => oeffnen(e, "mastering") }, "♫ Neu mastern")
+    : null;
   return h("li", { class: "library-row" },
     h("div", { class: "song-art" }, abbildung),
     h("div", { class: "song-identity" },
@@ -36,7 +44,7 @@ function songZeile(auftrag, song, aktualisieren) {
       h("span", { class: "state-dot" + (song.sync_offen ? " alert" : "") }),
       reife),
     h("span", { class: "song-updated klein" }, zeitText(auftrag.updated_at)),
-    h("div", { class: "song-row-actions" }, abspielKnopf(song.pfad), knopf));
+    h("div", { class: "song-row-actions" }, abspielKnopf(song.pfad), mastern, knopf));
 }
 
 export function songsAnsicht(el) {
