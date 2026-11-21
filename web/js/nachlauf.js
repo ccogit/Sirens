@@ -71,7 +71,7 @@ function mastering(order, { tun, neuLaden }) {
   if (!ERLEDIGT.includes(m.stand)) return phase("Mastering", "wartet", wahl);
   return phase("Mastering", m.stand,
     m.datei ? h("p", { class: "take-kopf" }, abspielKnopf(m.datei), h("span", {}, `${dateiName(m.datei)} (${m.weg})`), explorerKnopf(m.datei)) : h("p", {}, "Ohne Mastering."),
-    ["beauftragt", "fertig"].includes(n.soundcloud.stand) ? null
+    n.soundcloud.stand === "beauftragt" ? null
       : h("details", { "data-auf": "master-aendern" }, h("summary", {}, "Master ändern"), wahl));
 }
 
@@ -131,30 +131,66 @@ function cover(order, { tun, neuLaden, bereit }) {
   return phase("Cover", c.stand, bild, aendern("Cover ändern"));
 }
 
-function text(order, bereit) {
+function text(order, { tun, bereit }) {
   const t = order.nachlauf.text;
+  const wunsch = h("input", { type: "text", "data-key": "beschreibung-wunsch",
+    placeholder: "z. B. prägnanter, andere Tags, kürzerer Songtext" });
+  const aendern = ERLEDIGT.includes(t.stand) && bereit
+    ? h("details", { class: "followup-options", "data-auf": "text-aendern" },
+        h("summary", {}, "Beschreibung oder Songtext ändern"),
+        feld("Was soll Claude ändern?", wunsch),
+        h("button", { type: "button", class: "knopf zweit",
+          onclick: () => tun("textedit", { wunsch: wunsch.value.trim() }) }, "Neue Fassung anfordern"))
+    : null;
   return phase("Songbeschreibung und Songtext", t.stand === "offen" && bereit ? "beauftragt" : t.stand,
     t.stand === "fertig" ? [
-      h("p", { class: "klein" }, `Liegt beim Song: ${dateiName(t.datei)}`),
+      h("p", { class: "klein" }, "Aktuelle Textfassung: " + dateiName(t.datei)),
       t.tags.length ? h("p", { class: "chips" }, t.tags.map((tag) => h("span", { class: "chip" }, tag))) : null,
-      h("details", { "data-auf": "beschreibung" }, h("summary", {}, "Beschreibung und Songtext lesen"), h("pre", { class: "songtext" }, t.beschreibung))]
-      : hinweis(t.stand === "ausgelassen" ? "Nicht erstellt." : bereit ? "Claude schreibt sie zusammen mit dem Cover." : "Kommt nach dem Mastering."));
+      h("details", { "data-auf": "beschreibung" }, h("summary", {}, "Beschreibung und Songtext lesen"),
+        h("pre", { class: "songtext" }, t.beschreibung))]
+      : hinweis(t.stand === "ausgelassen" ? "Noch keine Textfassung."
+        : t.wunsch ? "Claude erstellt eine neue Fassung: " + t.wunsch
+          : bereit ? "Claude erstellt die Beschreibung." : "Kommt nach dem Mastering."),
+    aendern);
 }
 
 function soundcloud(order, { tun, neuLaden, bereit }) {
   const s = order.nachlauf.soundcloud;
   if (s.stand === "fertig") {
-    // Nach einem Cover-Wechsel liegt bei SoundCloud noch das alte Bild; ersetzt wird erst auf diesen Klick.
-    const ersetzen = h("button", { type: "button", class: "knopf", onclick: async () => {
+    const ersetzen = h("button", { type: "button", class: "knopf zweit", onclick: async () => {
       ersetzen.disabled = true; ersetzen.textContent = "Ersetzt …";
       await tun("soundcloud", { entscheidung: "cover" });
-    } }, "Cover bei SoundCloud ersetzen");
-    return phase("SoundCloud", s.cover_offen ? "wartet" : s.stand,
-      h("p", {}, h("a", { href: s.link, target: "_blank", rel: "noopener" }, s.link)),
-      s.cover_offen ? [h("p", {}, "Bei SoundCloud liegt noch das bisherige Cover."),
-        s.cover_fehler ? h("p", { class: "fehler" }, `Das Ersetzen ist gescheitert: ${s.cover_fehler}`) : null,
-        h("div", { class: "knopfzeile" }, ersetzen)] : null,
-      hinweis("Promotion schaltest du bei SoundCloud selbst ein (in der Track-Liste auf „Promote“). Über die Schnittstelle von SoundCloud geht das nicht."));
+    } }, "Cover auf SoundCloud aktualisieren");
+    const bestaetigen = (entscheidung, titel, warnung) => {
+      const zeile = h("div", { class: "knopfzeile" });
+      const knopf = h("button", { type: "button", class: "knopf zweit", onclick: () => {
+        leeren(zeile).append(
+          h("span", { class: "hinweis" }, warnung),
+          h("button", { type: "button", class: "knopf", onclick: () => tun("soundcloud",
+            { entscheidung, bestaetigt: true }) }, "Ja, bestätigen"),
+          h("button", { type: "button", class: "schlicht", onclick: neuLaden }, "Abbrechen"));
+      } }, titel);
+      zeile.append(knopf);
+      return zeile;
+    };
+    return phase("SoundCloud", s.cover_offen || s.audio_offen || s.text_offen ? "wartet" : s.stand,
+      h("p", {}, h("a", { href: s.link, target: "_blank", rel: "noopener" }, "Veröffentlichten Song öffnen ↗")),
+      s.cover_offen ? h("div", { class: "sync-notice" },
+        h("strong", {}, "Cover auf SoundCloud veraltet"),
+        s.cover_fehler ? h("p", { class: "fehler" }, s.cover_fehler) : null, ersetzen) : null,
+      s.text_offen ? h("div", { class: "sync-notice" },
+        h("strong", {}, "Beschreibung/Tags lokal geändert"),
+        s.text_fehler ? h("p", { class: "fehler" }, s.text_fehler) : null,
+        order.nachlauf.text.stand === "fertig"
+          ? bestaetigen("metadaten", "Bestehenden SC-Track aktualisieren",
+              "Beschreibung und Tags des vorhandenen Tracks ersetzen – keinen neuen Song hochladen?")
+          : hinweis("Erst die neue Textfassung abwarten.")) : null,
+      s.audio_offen ? h("div", { class: "sync-notice" },
+        h("strong", {}, "Audio auf SoundCloud noch nicht ausgetauscht"),
+        h("p", {}, "SoundCloud bietet den Audioaustausch nur über die eigene Oberfläche an. Öffne den bestehenden Song und ersetze dort die Datei, sofern dein Tarif dies erlaubt."),
+        h("a", { href: s.link, target: "_blank", rel: "noopener" }, "Zum bestehenden Track"),
+        bestaetigen("audio_bestaetigt", "Ich habe die Audiodatei dort ersetzt",
+          "Wurde die Datei im bestehenden SoundCloud-Track wirklich erfolgreich ausgetauscht?")) : null);
   }
   if (s.stand === "beauftragt") return phase("SoundCloud", s.stand, hinweis("Claude lädt den Song hoch."));
   if (s.stand === "ausgelassen") return phase("SoundCloud", s.stand, h("p", {}, "Kein Upload."));
@@ -185,6 +221,28 @@ function soundcloud(order, { tun, neuLaden, bereit }) {
           h("button", { type: "button", class: "schlicht", onclick: neuLaden }, "Abbrechen"));
       } }, "Bei SoundCloud hochladen …"),
       h("button", { type: "button", class: "schlicht", onclick: () => tun("soundcloud", { entscheidung: "ohne" }) }, "Nicht hochladen")));
+}
+
+function versionFrage(order, { tun, neuLaden }) {
+  const v = order.nachlauf.version_entscheidung;
+  if (!v) return null;
+  const frage = h("div", { class: "knopfzeile" });
+  const archivieren = h("button", { type: "button", class: "knopf zweit", onclick: () => {
+    leeren(frage).append(h("p", { class: "hinweis" },
+      "Die bisherige Datei wird aus dem Musikordner in das sichere Sirens-Archiv verschoben. Sie wird nicht gelöscht. Fortfahren?"),
+      h("button", { type: "button", class: "knopf", onclick: () => tun("version",
+        { entscheidung: "archivieren", bestaetigt: true }) }, "Ja, alte Fassung archivieren"),
+      h("button", { type: "button", class: "schlicht", onclick: neuLaden }, "Abbrechen"));
+  } }, "Vorherige Version archivieren");
+  frage.append(
+    h("button", { type: "button", class: "knopf zweit",
+      onclick: () => tun("version", { entscheidung: "behalten" }) }, "Behalten"),
+    archivieren);
+  return h("section", { class: "version-prompt breit" },
+    h("strong", {}, "Was soll mit der vorherigen Master-Version passieren?"),
+    h("p", {}, "Bisher: " + dateiName(v.alt) + " · Aktuell: " + dateiName(v.neu)),
+    frage, h("p", { class: "version-archive-note" },
+      "Verwendete Originale und noch auf SoundCloud hinterlegte Dateien werden nicht archiviert."));
 }
 
 const fertigVon = (n) => ["mastering", "cover", "text", "soundcloud"].filter((p) => ERLEDIGT.includes(n[p].stand)).length;
@@ -222,8 +280,9 @@ export function nachlaufAnsicht(order, helfer) {
   return h("div", { class: "nachlauf" },
     songLeiste(order, helfer),
     h("p", { class: "take-kopf" }, abspielKnopf(n.favorit), h("strong", {}, (n.vorhanden || n.nur_mastern) ? "Song:" : "Favorit:"), h("span", {}, dateiName(n.favorit)), explorerKnopf(n.favorit)),
+    versionFrage(order, helfer),
     gruppe("Schritte bis zur Veröffentlichung", "der Reihe nach; jeder wird erledigt oder bewusst ausgelassen",
-      master, cover(order, { ...helfer, bereit: masterDa }), text(order, masterDa), soundcloud(order, { ...helfer, bereit: allesDa })),
+      master, cover(order, { ...helfer, bereit: masterDa }), text(order, { ...helfer, bereit: masterDa }), soundcloud(order, { ...helfer, bereit: allesDa })),
     gruppe("Freiwillig", "jederzeit möglich, hält nichts auf", export_),
     h("div", { class: "knopfzeile" }, h("button", { type: "button", class: `knopf${allesDa && ERLEDIGT.includes(n.soundcloud.stand) ? "" : " zweit"}`, onclick: () => helfer.tun("abschliessen") }, "Auftrag abschließen")));
 }
