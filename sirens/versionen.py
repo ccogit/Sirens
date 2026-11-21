@@ -145,3 +145,15 @@ def soundcloud_aktualisieren(service, oid, data):
         if not fehler:
             eintrag(order, NUTZER, "status", "Beschreibung auf dem bestehenden SoundCloud-Track aktualisiert.")
     return service.store.mutate(oid, None, fn)
+
+
+def soundcloud_wieder_oeffnen(service, oid, data):
+    def fn(order):
+        if order["status"] != "nachlauf":
+            raise Ablehnung("invalid_transition", "Bitte zuerst den Song öffnen.", "status", 409)
+        n = order["nachlauf"]
+        if n["soundcloud"]["stand"] != "ausgelassen":
+            raise Ablehnung("invalid_transition", "Es gibt keine ausgelassene Veröffentlichung.", "status", 409)
+        n["soundcloud"]["stand"] = "offen"
+        eintrag(order, NUTZER, "status", "SoundCloud-Veröffentlichung wieder geöffnet.")
+    return service.store.mutate(oid, revision(data), fn)
