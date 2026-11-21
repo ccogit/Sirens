@@ -71,6 +71,7 @@ export class AutoMixer {
     if (this.pool.length<2) throw new Error("Bitte mindestens zwei Songs für das Set auswählen.");
     const token=this.session;
     await this.engine.aktivieren();
+    if(this.session!==token) return false;
     this.say("Analysiere die ersten Tracks und suche eine passende Startposition …");
     let picked=null, info=null;
     const versucht=new Set();
@@ -84,9 +85,10 @@ export class AutoMixer {
       catch { /* defekte oder unrhythmische Datei überspringen */ }
       if (this.session!==token) return;
     }
-    if (!picked || this.session!==token) throw new Error("Keine analysierbaren Songs gefunden. ffmpeg und Musikdateien prüfen.");
+    if(this.session!==token) return false;
+    if(!picked) throw new Error("Keine analysierbaren Songs gefunden. ffmpeg und Musikdateien prüfen.");
     const audio=await this.laden(0,picked);
-    if(this.session!==token) return;
+    if(this.session!==token) return false;
     this.slot=0;
     this.current={song:picked,info};
     this.history.push(picked);
@@ -96,13 +98,14 @@ export class AutoMixer {
     // Der erste Song startet am Anfang: der Hörer erlebt den Aufbau.
     audio.currentTime=0;
     await audio.play();
-    if(this.session!==token) { audio.pause(); return; }
+    if(this.session!==token) { audio.pause(); return false; }
     this.running=true;
     this.reportSong(picked,info);
     this.cb.plan?.(null);
     this.say("Set läuft · ich suche den dramaturgisch passenden nächsten Song …");
     this.timer=setInterval(()=>this.takt(),35);
     this.vorbereiten(token);
+    return true;
   }
 
   async vorbereiten(token=this.session) {
