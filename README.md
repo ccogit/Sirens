@@ -41,6 +41,7 @@ Adresse: <http://127.0.0.1:8093/>. Im Vordergrund läuft der Dienst mit
 | `SIRENS_MUSIC_ROOT` | `E:\AMM\generated-music` | Musikordner; die Seite liest ihn und schreibt nur neue Master-Dateien des Studios |
 | `SIRENS_FFMPEG` | leer | Pfad zu ffmpeg; leer = `ffmpeg` aus dem `PATH` |
 | `SIRENS_STEMS_PYTHON` | leer | Optionaler Python-Interpreter einer getrennten Demucs-Umgebung; leer = Python des Sirens-Dienstes |
+| `SIRENS_STEMS_PITCH_PYTHON` | leer | Optionaler Python-Interpreter für Basic Pitch (getrennte CPU-Umgebung empfohlen) |
 | `SIRENS_DATA_DIR` | `E:\AMM\song-auftraege` | Auftragsablage, außerhalb des Repos |
 | `SIRENS_PORT` | `8093` | Port |
 | `SIRENS_CLAUDE` | `an` | `aus` schaltet den selbständigen Start von Claude Code ab |
@@ -268,6 +269,55 @@ solo, stumm oder mit eigenem Pegel gemischt werden. Das experimentelle Modell
 - Beim Abspielen werden die WAV-Stems nacheinander vollständig in den Browser geladen
   und anschließend gemeinsam über Web Audio wiedergegeben. Für längere Stücke
   benötigen Browser und Demucs entsprechend Arbeitsspeicher.
+
+### Warp Stage: 3D-Show für die RTX 5080
+
+Im Stem Studio läuft zusätzlich eine **audioreaktive GPU-Bühne** mit drei Welten:
+**Neon-Kathedrale**, **Hypercube** und **Quantum Nebula**. Ein prozeduraler
+WebGL2-Raymarching-Shader erzeugt 3D-Tunnel, Fraktalstrukturen, leuchtende Portale,
+Nebel und Lichteffekte; Bass, Mitten, Höhen und Beat-Impulse beeinflussen Geometrie,
+Bewegung und Farben. Ohne laufenden Song steht eine klar beschriftete **Demo** bereit.
+
+Drei GPU-Profile: **Eco** (15 FPS, 34 Schritte), **Live** (45 FPS, 76 Schritte),
+**RTX Ultra** (60 FPS, 160 Schritte bis 3840 × 2160 Pixel). Im Ultra-Modus
+lässt sich die **Renderdichte 50–150 %** einstellen; die Maximalauflösung
+wird trotzdem begrenzt. Per Knopf geht die Bühne ins **Vollbild**. Die Bildrate
+ist ein Sollwert, keine Garantie: sie hängt vom Browser, der Bildschirmauflösung,
+dem Grafiktreiber und der tatsächlich gewählten GPU ab. Der Browser kann die
+RTX nicht direkt durch die Web-Anwendung erzwungen zuweisen.
+
+**Während Claude produziert, rendert die Bühne automatisch im Eco-Profil**.
+In inaktiven Ansichten und Hintergrundtabs werden keine neuen Shader-Bilder
+gezeichnet. Das schont Grafikleistung, VRAM und laufende Musikproduktionen.
+Bei fehlendem WebGL2 gibt es eine reduzierte Canvas-2D-Animation.
+Bei aktivierter Systemoption für reduzierte Bewegung gilt ebenfalls Eco.
+
+### Instrumente austauschen (optional: Basic Pitch)
+
+Im darunterliegenden **Instrument-Labor** kann ein Stem eine andere Klangfarbe
+erhalten: etwa Bass als Synth Lead, Gesang als Crystal Bells oder Gitarre
+als Cyber Strings. Die optionale KI **Spotify Basic Pitch** erkennt zunächst
+Tonhöhen und Notenereignisse in der getrennten Audiospur. Beim Abspielen
+synthetisiert Web Audio diese Noten auf derselben Song-Zeitachse in fünf
+Klangfarben (Neon Lead, Crystal Bells, Electric Keys, Cyber Strings, Sub Bass).
+Original-Stem und Ersatzinstrument lassen sich jederzeit umschalten.
+Die Erkennung funktioniert besonders gut bei klaren, melodischen Einzelstimmen;
+sie ersetzt keine professionelle Instrumenten- oder Transienten-Resynthese.
+
+Für die optionale Notenerkennung eine eigene Python-Umgebung einrichten:
+
+```powershell
+py -3.11 -m venv .venv-pitch
+.\.venv-pitch\Scripts\python.exe -m pip install --upgrade pip
+.\.venv-pitch\Scripts\python.exe -m pip install basic-pitch
+$env:SIRENS_STEMS_PITCH_PYTHON = (Resolve-Path ".\.venv-pitch\Scripts\python.exe").Path
+```
+
+Wie bei Demucs werden nur bei Klick auf **„KI-Noten erkennen“** Berechnungen
+gestartet. Die Notendateien liegen im lokalen Stem-Cache. Basic Pitch
+kann Modellgewichte aus dem Internet nachladen; Songs werden nicht zu
+einem externen Anbieter hochgeladen.
+
 
 ### Installation mit RTX 5080 / 16 GB VRAM / 32 GB RAM (Windows, PowerShell)
 
