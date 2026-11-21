@@ -152,7 +152,7 @@ export function liveLabAnsicht(el) {
 
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
   let spielzeug = (() => { try { return ["pult", "wiese", "stems"].includes(localStorage.getItem("sirens.spielzeug")) ? localStorage.getItem("sirens.spielzeug") : "pult"; } catch { return "pult"; } })();
-  const stems = stemSpiel();
+  const stems = stemSpiel(() => produktionLaeuft);
   const kisten = {};
   const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["stems", "🎚 KI Stem Studio"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
