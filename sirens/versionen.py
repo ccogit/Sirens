@@ -179,3 +179,9 @@ def soundcloud_wieder_oeffnen(service, oid, data):
         n["soundcloud"]["stand"] = "offen"
         eintrag(order, NUTZER, "status", "SoundCloud-Veröffentlichung wieder geöffnet.")
     return service.store.mutate(oid, revision(data), fn)
+
+
+def ersetzt(n, art, alt, neu):
+    """Bei einer neuen Datei die alte zur bewussten Versionsentscheidung anbieten."""
+    if alt and alt != neu:
+        n[art + "_entscheidung"] = {"alt": alt, "neu": neu}
