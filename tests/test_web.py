@@ -21,7 +21,8 @@ class Seite(unittest.TestCase):
 
     def test_dateien_unter_400_zeilen(self):
         for datei in ROOT.rglob("*"):
-            if datei.suffix in (".py", ".js", ".mjs", ".css", ".html", ".md", ".ps1", ".json") and "__pycache__" not in datei.parts:
+            eigen = not any(teil.startswith(".") for teil in datei.relative_to(ROOT).parts)  # nicht .venv-stems, .git, .idea …
+            if eigen and datei.suffix in (".py", ".js", ".mjs", ".css", ".html", ".md", ".ps1", ".json") and "__pycache__" not in datei.parts:
                 zeilen = len(datei.read_text(encoding="utf-8").splitlines())
                 self.assertLess(zeilen, 400, datei.name)
 
