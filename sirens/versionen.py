@@ -6,7 +6,7 @@ nicht löschen. Originale, verwendete Fassungen und Dateien anderer Aufträge si
 import shutil
 from pathlib import PurePosixPath
 
-from .contracts import Ablehnung, _text, safe_audio_path
+from .contracts import AUDIO_EXT, BILD_EXT, TEXT_EXT, Ablehnung, _text, safe_audio_path
 from .service import eintrag, nur, revision
 from .workflow import NUTZER, ERLEDIGT, nachlaeufe
 
@@ -21,7 +21,8 @@ def _geschuetzt(store, order, pfad):
                 pfad in t.get("dateien", []) for t in fremd.get("tracks_stand", [])):
             return "Ein anderer Auftrag verwendet diese Datei."
         for n in nachlaeufe(aktuell):
-            if n["favorit"] == pfad or n["mastering"]["datei"] == pfad:
+            if (n["favorit"] == pfad or n["mastering"]["datei"] == pfad
+                    or n["cover"]["datei"] == pfad or n["text"]["datei"] == pfad):
                 return "Die Datei ist die aktuelle Produktionsfassung."
             if n["soundcloud"].get("stand") == "fertig" and n["soundcloud"].get("hochgeladen_datei", n["favorit"]) == pfad:
                 return "Die Fassung ist noch bei SoundCloud hinterlegt."
@@ -34,15 +35,16 @@ def archivieren(cfg, store, order, pfad):
     moeglich = {p for t in order.get("tracks_stand", []) for p in t.get("dateien", [])}
     for item in nachlaeufe(order):
         moeglich.update(e["datei"] for e in item["mastering"]["entwuerfe"])
-        offen = item.get("version_entscheidung")
-        if offen:
-            moeglich.add(offen["alt"])
+        for key in ("version_entscheidung", "cover_entscheidung", "text_entscheidung"):
+            offen = item.get(key)
+            if offen:
+                moeglich.add(offen["alt"])
     if pfad not in moeglich:
         raise Ablehnung("invalid_path", "Diese Version gehört nicht zur Produktion.", "pfad")
     grund = _geschuetzt(store, order, pfad)
     if grund:
         raise Ablehnung("in_use", grund + " Bitte behalten oder erst den Austausch abschließen.", "pfad", 409)
-    quelle = safe_audio_path(cfg.music_root, pfad, "pfad")
+    quelle = safe_audio_path(cfg.music_root, pfad, "pfad", AUDIO_EXT + BILD_EXT + TEXT_EXT)
     if not quelle.is_file():
         raise Ablehnung("missing_file", "Die vorherige Version ist nicht mehr vorhanden.", "pfad")
     ziel = cfg.data_dir / "versionen-archiv" / order["id"] / PurePosixPath(pfad)
@@ -72,21 +74,27 @@ def entscheiden(service, oid, data):
         if order["status"] not in ("nachlauf", "fertig", "abgeschlossen"):
             raise Ablehnung("invalid_transition", "Versionen erst nach der Produktion bearbeiten.", "status", 409)
         n = order.get("nachlauf")
-        offen = (n or {}).get("version_entscheidung")
+        keys = ("version_entscheidung", "cover_entscheidung", "text_entscheidung")
+        offen = next((n[k] for k in keys if n and n.get(k) and
+                      (not data.get("pfad") or n[k]["alt"] == data["pfad"])), None)
         pfad = data.get("pfad") or (offen or {}).get("alt")
         if not isinstance(pfad, str) or not pfad:
             raise Ablehnung("required", "Bitte die bisherige Version wählen.", "pfad")
         if wahl == "behalten":
             if not offen or pfad != offen["alt"]:
                 raise Ablehnung("invalid_transition", "Für diese Version liegt keine Entscheidung vor.", "pfad", 409)
-            n["version_entscheidung"] = None
-            eintrag(order, NUTZER, "status", "Vorherige Master-Version bleibt erhalten.")
+            for key in keys:
+                if n.get(key) and n[key]["alt"] == pfad:
+                    n[key] = None
+            eintrag(order, NUTZER, "status", "Vorherige Version bleibt erhalten.")
             return
         archiv = archivieren(service.cfg, service.store, order, pfad)
         verschoben.append(archiv)
         order.setdefault("archivierte_versionen", []).append(archiv)
         if offen and offen["alt"] == pfad:
-            n["version_entscheidung"] = None
+            for key in keys:
+                if n.get(key) and n[key]["alt"] == pfad:
+                    n[key] = None
         eintrag(order, NUTZER, "status", f"Version archiviert: {PurePosixPath(pfad).name}")
 
     try:
@@ -116,6 +124,7 @@ def text_aendern(service, oid, data):
         t = n["text"]
         if t["stand"] not in ERLEDIGT:
             raise Ablehnung("invalid_transition", "Eine Textänderung ist gerade nicht möglich.", "status", 409)
+        t["vorherige_datei"] = t.get("datei", "")
         t.update(stand="offen", wunsch=wunsch)
         if n["soundcloud"]["stand"] == "fertig":
             n["soundcloud"]["text_offen"] = True
