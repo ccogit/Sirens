@@ -61,7 +61,9 @@ class StemDienst:
                 return {**grund, **job}
         return {**grund, "zustand": "offen", "meldung": "Noch nicht getrennt."}
 
-    def starten(self, pfad, modell="htdemucs"):
+    def starten(self, pfad, modell="htdemucs", device="cpu"):
+        if device not in ("cpu", "cuda") or not isinstance(device, str):
+            raise Ablehnung("invalid", "Für Stem-Trennung sind nur CPU oder CUDA erlaubt.", "device")
         quelle, cache = self._eingabe(pfad, modell)
         if self._bereit(cache, modell):
             return self.zustand(pfad, modell)
@@ -73,19 +75,16 @@ class StemDienst:
                 self._jobs[cache.name] = {
                     "zustand": "laeuft", "meldung": "KI trennt den Song lokal. Das kann einige Minuten dauern."
                 }
-                threading.Thread(target=self._trennen, args=(quelle, cache, modell), daemon=True).start()
+                threading.Thread(target=self._trennen, args=(quelle, cache, modell, device), daemon=True).start()
         return self.zustand(pfad, modell)
 
-    def _trennen(self, quelle, cache, modell):
+    def _trennen(self, quelle, cache, modell, geraet):
         fehler = None
         try:
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.mkdir(parents=True, exist_ok=True)
             # Ein eigenes Python-Environment mit torch/demucs kann ausdrücklich vorgegeben werden.
             python = os.environ.get("SIRENS_STEMS_PYTHON") or sys.executable
-            geraet = os.environ.get("SIRENS_STEMS_DEVICE", "cpu").lower()
-            if geraet not in ("cpu", "cuda", "mps"):
-                geraet = "cpu"
             with tempfile.TemporaryDirectory(prefix="stem-", dir=cache.parent) as temp:
                 ausgabe = Path(temp) / "output"
                 befehl = [python, "-m", "demucs", "-n", modell, "--device", geraet, "-o",
