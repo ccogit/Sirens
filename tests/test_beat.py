@@ -58,7 +58,9 @@ class Dramaturgie(unittest.TestCase):
         self.assertGreater(len(result["timeline"]),10)
         self.assertGreater(len(result["cues_in"]),0)
         self.assertGreater(len(result["cues_out"]),0)
-        self.assertTrue(all(int(c["zeit"]) % 8 == 0 for c in result["cues_out"]))
+        offset=result["phrase_offset_bars"]
+        self.assertIn(offset, range(4))
+        self.assertTrue(all((round(c["zeit"] / 2)-offset) % 4 == 0 for c in result["cues_out"]))
         self.assertTrue(any("Break" in row["phase"] or "Aufbau" in row["phase"]
                             for row in result["timeline"]))
         self.assertTrue(all(0 <= row["energie"] <= 1 for row in result["timeline"]))
