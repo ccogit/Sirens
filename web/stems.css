@@ -1,0 +1,48 @@
+/* KI-Stem-Studio im Live Lab: eigener Mixer, responsive und tastaturbedienbar. */
+.stems-page { display: grid; gap: 1rem; }
+.stems-intro, .stems-setup, .stems-mixer {
+  background: linear-gradient(145deg, #101c37, #142448);
+  border: 1px solid rgba(116,176,246,.24); border-radius: 20px;
+  padding: clamp(1rem, 2.5vw, 1.6rem); color: #dcecff;
+}
+.stems-intro h2, .stems-mixer h2 { color: #f4f8ff; margin: .25rem 0 .6rem; }
+.stems-intro p { margin: .3rem 0; max-width: 75ch; }
+.stems-intro .lab-eyebrow { color: #72e7d6; font-size: .75rem; font-weight: 800; letter-spacing: .15em; }
+.stems-setup { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 1rem; }
+.stems-setup label { display: grid; min-width: 0; gap: .4rem; font-size: .83rem; font-weight: 750; color: #c8d9f2; }
+.stems-setup select { width: 100%; min-width: 0; padding: .72rem; border: 1px solid #6080af;
+  border-radius: 10px; background: #10223e; color: #f4f8ff; font: inherit; }
+.stems-primary { border: 1px solid #72d8d0; background: #2b898b; color: #fff;
+  padding: .75rem 1rem; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.stems-primary:disabled { cursor: not-allowed; opacity: .55; }
+.stems-status, .stems-hint { grid-column: 1 / -1; margin: 0; }
+.stems-status { color: #78ead8; font-weight: 720; }
+.stems-hint { font-size: .79rem; color: #a2b7d5; }
+.stems-mixer[hidden] { display: none; }
+.stems-transport { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.stems-clock { font-variant-numeric: tabular-nums; font-size: .88rem; color: #c1dcff; }
+.stems-mixer > input[type="range"] { width: 100%; margin-bottom: 1.2rem; }
+.stems-mix-head { display: flex; justify-content: space-between; gap: .8rem; align-items: center; margin-bottom: 1rem; }
+.stems-tracks { display: grid; gap: .7rem; }
+.stems-track { display: grid; grid-template-columns: minmax(125px, 1fr) minmax(110px, 2fr) 4rem auto auto;
+  gap: .7rem; align-items: center; padding: .75rem; border-radius: 12px; background: #1c3151;
+  border: 1px solid #3c597a; }
+.stems-instrument { font-weight: 750; }
+.stems-track input[type="range"] { width: 100%; accent-color: #6be9d8; }
+.stems-track output { text-align: end; font-size: .83rem; color: #a6e8e4; font-variant-numeric: tabular-nums; }
+.stems-action { padding: .48rem .7rem; border: 1px solid #6c8cb4; border-radius: 9px;
+  background: #203d61; color: #eaf4ff; cursor: pointer; font-weight: 720; }
+.stems-action[aria-pressed="true"] { background: #b9f0e8; border-color: #b9f0e8; color: #15344c; }
+.stems-page :focus-visible { outline: 3px solid #85f3e6; outline-offset: 3px; }
+@media (max-width: 62rem) {
+  .stems-setup { grid-template-columns: 1fr 1fr; }
+  .stems-setup > .stems-primary { grid-column: 1 / -1; }
+}
+@media (max-width: 42rem) {
+  .stems-setup { grid-template-columns: minmax(0,1fr); }
+  .stems-track { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: .6rem; }
+  .stems-instrument { grid-column: 1 / -1; }
+  .stems-track input[type="range"] { grid-column: 1 / 2; }
+  .stems-track output { grid-column: 2 / 3; }
+  .stems-mix-head { align-items: start; flex-direction: column; }
+}
