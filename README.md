@@ -268,6 +268,9 @@ und plant passende Übergänge. Mindestens zwei Songs sind nötig.
 - **Kontrolle:** Echtzeit-Energieverlauf, Cue-Zeiten und Sicherheitsschätzung
   der Struktur-/BPM-Erkennung. Fehlt ein sicherer Match, ist ein
   nach Möglichkeit hörbarer **Notübergang** explizit gekennzeichnet.
+- **Energie-Regie:** Für das gesamte Set kann man Energie-Wellen, fortlaufenden
+  Aufbau, Chill oder Peak-Time vorgeben; die gewählten Einstiegscues berücksichtigen
+  dann zusätzlich das Zielniveau des jeweils nächsten Songs.
 
 **Ressourcen und Grenzen:** Für die Analyse muss ffmpeg im PATH sein (oder
 SIRENS_FFMPEG gesetzt werden). Es laufen höchstens zwei gleichzeitige
