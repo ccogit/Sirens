@@ -74,7 +74,7 @@ class Dramaturgie(unittest.TestCase):
         self.assertLess(abs(cue["rate_b"]-1),0.1)
         self.assertIn("ausgang",cue)
         self.assertIn("eingang",cue)
-        self.assertIsNone(paar_uebergang(a,{**b,"bpm":220},8,20))
+        self.assertIsNone(paar_uebergang(a,{**b,"bpm":45},8,20))
 
 
 if __name__ == "__main__":
