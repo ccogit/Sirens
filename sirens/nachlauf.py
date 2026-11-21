@@ -309,32 +309,8 @@ class NachlaufAktionen:
         wahl, sicht, promo = data.get("entscheidung"), data.get("sichtbarkeit", "privat"), data.get("promotion", False)
         if wahl == "cover":
             return self._cover_ersetzen(oid, revision(data))
-        if wahl == "metadaten":
-            if data.get("bestaetigt") is not True:
-                raise Ablehnung("confirm_required", "SoundCloud-Änderungen bitte bestätigen.", "bestaetigt", 409)
-            order = self.store.load(oid)
-            n = _im_nachlauf(order)
-            if revision(data) != order["revision"]:
-                raise Ablehnung("revision_conflict", "Der Auftrag wurde inzwischen geändert.", "revision", 409)
-            if n["soundcloud"]["stand"] != "fertig" or n["text"]["stand"] != "fertig":
-                raise Ablehnung("invalid_transition", "Für SoundCloud muss die neue Beschreibung fertig sein.", "status", 409)
-            fehler = sc.metadaten_ersetzen(n["soundcloud"]["link"], n["text"]["beschreibung"], n["text"]["tags"])
-            def fn(order):
-                aktu = _im_nachlauf(order)["soundcloud"]
-                aktu.update(text_offen=bool(fehler), text_fehler=fehler)
-                if not fehler:
-                    eintrag(order, NUTZER, "status", "Beschreibung auf dem bestehenden SoundCloud-Track aktualisiert.")
-            return self.store.mutate(oid, None, fn)
-        if wahl == "audio_bestaetigt":
-            if data.get("bestaetigt") is not True:
-                raise Ablehnung("confirm_required", "Bitte den manuellen Austausch auf SoundCloud bestätigen.", "bestaetigt", 409)
-            def fn(order):
-                n = _im_nachlauf(order)
-                if n["soundcloud"]["stand"] != "fertig" or not n["soundcloud"].get("audio_offen"):
-                    raise Ablehnung("invalid_transition", "Keine ausstehende Audio-Aktualisierung.", "status", 409)
-                n["soundcloud"].update(audio_offen=False, hochgeladen_datei=endfassung(n))
-                eintrag(order, NUTZER, "status", "Audio-Austausch auf SoundCloud vom Nutzer bestätigt.")
-            return self.store.mutate(oid, revision(data), fn)
+        if wahl in ("metadaten", "audio_bestaetigt"):
+            return versionen.soundcloud_aktualisieren(self, oid, data)
         if wahl not in ("hochladen", "ohne"):
             raise Ablehnung("invalid", "„entscheidung“ muss hochladen, ohne oder cover sein.", "entscheidung")
         if wahl == "hochladen" and data.get("bestaetigt") is not True:  # Nutzer, 14.11.2026: Upload nur nach Bestätigung
