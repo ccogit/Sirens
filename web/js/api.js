@@ -35,6 +35,7 @@ export const api = {
   explorer: (pfad) => ruf("POST", "/api/explorer", { pfad }),
   claude: () => ruf("GET", "/api/claude"),
   claudeStarten: () => ruf("POST", "/api/claude/start", {}),
+  beat: (pfad) => ruf("GET", `/api/beat?pfad=${encodeURIComponent(pfad)}`),
   bildUrl: (pfad) => `/api/bild?pfad=${encodeURIComponent(pfad)}`,
   audioUrl: (pfad) => `/api/audio?pfad=${encodeURIComponent(pfad)}`,
   stemStatus: (pfad, modell) => ruf("GET", `/api/stems?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}`),
@@ -42,4 +43,7 @@ export const api = {
   stemAudioUrl: (pfad, modell, stem) => `/api/stems/audio?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}&stem=${encodeURIComponent(stem)}`,
   stemNoten: (pfad, modell, stem) => ruf("GET", `/api/stems/notes?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}&stem=${encodeURIComponent(stem)}`),
   stemNotenStart: (pfad, modell, stem) => ruf("POST", "/api/stems/notes", { pfad, modell, stem }),
+  kickStart: (ziel, spender) => ruf("POST", "/api/kicktausch", { ziel, spender }),
+  kickStand: (id) => ruf("GET", `/api/kicktausch?id=${encodeURIComponent(id)}`),
+  kickUrl: (id) => `/api/kicktausch/audio?id=${encodeURIComponent(id)}`,
 };

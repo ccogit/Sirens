@@ -2,7 +2,7 @@
 .kopf, main { max-width: none; }
 /* Weniger Höhe verbrauchen, damit ein Auftrag ohne Scrollen auf den Bildschirm passt */
 main { padding-top: clamp(1rem, 1.6vw, 1.6rem); padding-bottom: 1.2rem; }
-body { padding-bottom: 0; min-height: 0; }
+body { padding-bottom: 0; min-height: 100vh; display: flow-root; }  /* flow-root: der Rand der Kopfzeile verlängert die Seite nicht */
 body:has(#player:not([hidden])) { padding-bottom: 4.6rem; }  /* Platz nur, wenn der Player unten wirklich steht */
 .backbar { margin-bottom: .5rem; }
 .auftrag-kopf { margin-bottom: .9rem; }

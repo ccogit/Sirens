@@ -24,10 +24,10 @@ function karte(a) {
 
 // Der Weg zu den Spielzeugen (Live Lab): hüpfende Buchstaben, tanzende Balken, ein Rand, der sich dreht.
 function spielKnopf() {
-  return h("a", { class: "spiel-knopf", href: "#/lab", "aria-label": "Spielen: DJ-Pult, Beat-Pads, Emblem und Wellen" },
+  return h("a", { class: "spiel-knopf", href: "#/lab", "aria-label": "Spielen: DJ-Pult, Beat-Pads, Emblem, Auto-DJ und Kick-Tausch" },
     h("span", { class: "spiel-knopf-takt", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map(() => h("i", {}))),
     h("span", { class: "spiel-knopf-wort", "aria-hidden": "true" }, [..."SPIELEN"].map((buchstabe) => h("b", {}, buchstabe))),
-    h("small", { "aria-hidden": "true" }, "DJ-Pult, Beat-Pads, Emblem, Wellen"));
+    h("small", { "aria-hidden": "true" }, "DJ-Pult, Emblem, Auto-DJ, Kick-Tausch"));
 }
 
 function zaehler(zahl, text, farbe) {

@@ -40,8 +40,8 @@ Adresse: <http://127.0.0.1:8093/>. Im Vordergrund läuft der Dienst mit
 | `SOUNDCLOUD_…` (in `.env` in diesem Ordner) | – | Zugang für den Upload: `SOUNDCLOUD_CLIENT_ID` und `SOUNDCLOUD_CLIENT_SECRET` eintragen (Vorlage: `.env.example`), dann einmal im Projektordner `py -3.11 scripts/soundcloud_auth.py`; fehlt das Zugangstoken, sagt die Seite es im Schritt SoundCloud |
 | `SIRENS_MUSIC_ROOT` | `E:\AMM\generated-music` | Musikordner; die Seite liest ihn und schreibt nur neue Master-Dateien des Studios |
 | `SIRENS_FFMPEG` | leer | Pfad zu ffmpeg; leer = `ffmpeg` aus dem `PATH` |
-| `SIRENS_STEMS_PYTHON` | leer | Optionaler Python-Interpreter einer getrennten Demucs-Umgebung; leer = Python des Sirens-Dienstes |
-| `SIRENS_STEMS_PITCH_PYTHON` | leer | Optionaler Python-Interpreter für Basic Pitch (getrennte CPU-Umgebung empfohlen) |
+| `SIRENS_STEMS_PYTHON` | leer | Eigene Demucs-Python-Umgebung für KI-Stem-Trennung (CPU/CUDA) |
+| `SIRENS_STEMS_PITCH_PYTHON` | leer | Eigene Basic-Pitch-Python-Umgebung für optionale Notenerkennung |
 | `SIRENS_DATA_DIR` | `E:\AMM\song-auftraege` | Auftragsablage, außerhalb des Repos |
 | `SIRENS_PORT` | `8093` | Port |
 | `SIRENS_CLAUDE` | `an` | `aus` schaltet den selbständigen Start von Claude Code ab |
@@ -191,6 +191,23 @@ Zwei Ansichten zum Umschalten:
   stellt zurück. Die Achsen kommen aus den Katalogbewertungen (`achsen` je Datei, siehe `catalog-ratings`); fehlen sie,
   schätzt die Seite Energie, Dunkel, Wärme, Tanzbar und Tempo aus dem Klang, der Rest steht auf Mitte.
 
+### Kick-Tausch
+
+Spielzeug im Live Lab: ein gut bewerteter Song bekommt die Kick eines anderen. Sirens trennt dafür beide Songs
+in Schlagzeug und Rest (je Song einmal, etwa eine Minute; danach aus dem Zwischenspeicher) und rechnet dann den Tausch.
+Es wird nicht nur der Takt getroffen, sondern die Entwicklung des Zielsongs übernommen:
+
+- Jeder Schlag sitzt dort, wo die bisherige Kick saß: Groove, Fills, Pausen und Breaks bleiben.
+- Jeder Schlag ist so stark wie der ersetzte: leise Stellen bleiben leise, Steigerungen bleiben.
+- Der Spender liefert bis zu drei Kick-Klänge (leise bis laut); die Wahl folgt der Stärke im Zielsong.
+- Die fremde Kick wird auf den Grundton der bisherigen gestimmt (höchstens fünf Halbtöne), damit sie zum Bass passt.
+- Der Bass bleibt unberührt, weil nur der Tiefton der Schlagzeugspur ersetzt wird.
+
+Danach lassen sich „Mit neuer Kick“ und „Original“ an derselben Stelle im Wechsel hören. Ergebnisse und getrennte Spuren
+liegen in der Ablage unter `spielzeug/` (je Song rund 30–50 MB), nie im Musikordner. Die Trennung macht ein fremdes
+Werkzeug: `SIRENS_STEMS_CMD` in der `.env` (siehe `.env.example`) oder ein installiertes demucs; die Rechnung braucht
+numpy, scipy und soundfile. Fehlt etwas davon, sagt das Spielzeug es.
+
 ## Songs weiterbearbeiten und Versionen aufräumen
 
 Unter **Songs** stehen alle Songs in Bearbeitung und die in den letzten 30 Tagen aktualisierten Produktionen als
@@ -240,122 +257,63 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Breite und 1,5-fache Pixelauflösung begrenzt. Wenn Claude tatsächlich arbeitet,
   wird auf etwa 15 FPS und 1000 Pixel Breite gedrosselt; im Hintergrundtab pausiert das Zeichnen.
   Die Wahl der tatsächlichen GPU trifft der Browser bzw. das Betriebssystem. Es wird
-  Im DJ-Pult startet kein CUDA-KI-Modell. Nur die ausdrücklich gewählte Stem-Trennung
-  darf CUDA verwenden; bei laufender Claude-Produktion wird der Start blockiert.
+  Im DJ-Pult startet kein CUDA-KI-Modell; nur eine ausdrücklich gewählte Stem-Trennung
+  kann CUDA benutzen (nicht während Claude produziert).
 
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
 geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben
 unverändert.
 
-## Stem Studio: Instrumente mit KI live mischen
+## Auto-DJ: ein endloses, takt- und dramaturgiesynchrones Set
 
-Unter **✦ Live Lab → 🎚 KI Stem Studio** gibt es ein drittes Spiel:
-Ein Song aus dem lokalen Sirens-Katalog wird einmalig von **Demucs** in einzelne
-Instrumentenspuren (Stems) getrennt. Danach startet der Web-Audio-Mixer alle Spuren
-**samplegenau auf demselben Zeitgeber**. Gesang, Schlagzeug, Bass und „Other“ können
-solo, stumm oder mit eigenem Pegel gemischt werden. Das experimentelle Modell
-`htdemucs_6s` ergänzt Gitarre und Klavier (die Trennqualität kann hier schwanken).
+Im **Live Lab** das Spielzeug **♾ Auto-DJ & Endlos-Set** öffnen. Nach dem Klick
+„Endlos-Set starten“ beginnt Sirens mit einem Song, sucht selbst den nächsten
+und plant passende Übergänge. Mindestens zwei Songs sind nötig.
 
-- `htdemucs`: vier Spuren – Gesang, Drums, Bass und Other.
-- `htdemucs_6s`: sechs Spuren – zusätzlich Piano und Guitar.
-- Beim ersten Aufruf lädt Demucs die Modellgewichte herunter; **Audiodateien
-  werden nicht hochgeladen**. Alle separierten WAV-Dateien liegen unter
-  `SIRENS_DATA_DIR/stems/<cache-schluessel>/`; die Quelldatei wird nicht verändert.
-- Nachfolgende Aufrufe verwenden den Cache, solange Pfad, Größe und Änderungszeit
-  der Quelldatei unverändert sind. Der Cache kann bei Bedarf manuell gelöscht werden.
-- Die KI-Inferenz erfolgt **nur nach Klick auf „KI-Trennung starten“**, nie automatisch.
-  Es läuft höchstens ein KI-Trennauftrag gleichzeitig (Zeitlimit 60 Minuten);
-  ein Fehler wird sichtbar gemeldet und im jeweiligen `demucs.log` protokolliert.
-- Beim Abspielen werden die WAV-Stems nacheinander vollständig in den Browser geladen
-  und anschließend gemeinsam über Web Audio wiedergegeben. Für längere Stücke
-  benötigen Browser und Demucs entsprechend Arbeitsspeicher.
+- **Listen:** Favoriten (+1/+2), gesamter Katalog oder selbst angekreuzte Songs.
+  Stichwörter aus Künstler-, Release- oder Dateinamen sind keine sicher erkannten Genres.
+- **Gewichteter Zufall:** Bewertung, vermutete Stilnähe, zuletzt gespielte Songs und
+  Tempoverträglichkeit beeinflussen die Auswahl. Der Zufallsmodus kann deaktiviert werden.
+- **Tempo und Takt:** Der lokale ffmpeg-Dienst analysiert mehrere Ausschnitte,
+  schätzt BPM, Beat und den 4/4-Taktbeginn und speichert unveränderte Ergebnisse
+  nach Dateigröße und Änderungszeit im RAM.
+- **Dramaturgie:** Energie, Transienten und Brillanz über bis zu sechs Minuten
+  identifizieren mutmaßliche Breaks, Build-ups, stabile und ruhige Passagen.
+  Ein- und Ausstiegs-Cues werden paarweise nach Phrasenlage, Energieentwicklung
+  und Tempo-Kompatibilität bewertet.
+- **Übergänge:** Songs vorladen, auf geschätzten Taktanfang setzen, Tempo
+  automatisch anpassen (Browser-Tonhöhenerhalt), Equal-Power-Crossfade über
+  4, 8 oder 16 Takte. „Am nächsten Takt mixen“ erzwingt einen früheren Übergang.
+- **Kontrolle:** Echtzeit-Energieverlauf, Cue-Zeiten und Sicherheitsschätzung
+  der Struktur-/BPM-Erkennung. Fehlt ein sicherer Match, ist ein
+  nach Möglichkeit hörbarer **Notübergang** explizit gekennzeichnet.
+- **Energie-Regie:** Für das gesamte Set kann man Energie-Wellen, fortlaufenden
+  Aufbau, Chill oder Peak-Time vorgeben; die gewählten Einstiegscues berücksichtigen
+  dann zusätzlich das Zielniveau des jeweils nächsten Songs.
 
-### Warp Stage: 3D-Show für die RTX 5080
+**Ressourcen und Grenzen:** Für die Analyse muss ffmpeg im PATH sein (oder
+SIRENS_FFMPEG gesetzt werden). Es laufen höchstens zwei gleichzeitige
+Analyseanfragen; Originale und Auftragsdaten bleiben unverändert. Der Auto-DJ
+verwendet weder Cloud-APIs noch zusätzliche CUDA-Modelle. Die RTX 5080 bleibt
+für die Visualisierung und Musikerzeugung frei.
 
-Im Stem Studio läuft zusätzlich eine **audioreaktive GPU-Bühne** mit drei Welten:
-**Neon-Kathedrale**, **Hypercube** und **Quantum Nebula**. Ein prozeduraler
-WebGL2-Raymarching-Shader erzeugt 3D-Tunnel, Fraktalstrukturen, leuchtende Portale,
-Nebel und Lichteffekte; Bass, Mitten, Höhen und Beat-Impulse beeinflussen Geometrie,
-Bewegung und Farben. Ohne laufenden Song steht eine klar beschriftete **Demo** bereit.
+Der Downbeat und die Phrasen sind **Schätzungen**, keine garantierte musikalische
+Segmentierung. Genres werden nicht aus dem Audio klassifiziert; Dynamik-Tags
+hingegen basieren auf Audiodaten. HTMLAudioElement lässt sich nicht
+samplegenau synchronisieren; leichte Timingabweichungen sind möglich.
+Songs über sechs Minuten werden bis Minute sechs analysiert.
+Das Endlos-Set benötigt eine geöffnete Browser-Seite und darf bei
+Hintergrundtab-Drosselung ungenauer laufen. Der Stopp oder ein Wechsel
+des Spielzeugs beendet die Wiedergabe.
 
-Drei GPU-Profile: **Eco** (15 FPS, 34 Schritte), **Live** (45 FPS, 76 Schritte),
-**RTX Ultra** (60 FPS, 160 Schritte bis 3840 × 2160 Pixel). Im Ultra-Modus
-lässt sich die **Renderdichte 50–150 %** einstellen; die Maximalauflösung
-wird trotzdem begrenzt. Per Knopf geht die Bühne ins **Vollbild**. Die Bildrate
-ist ein Sollwert, keine Garantie: sie hängt vom Browser, der Bildschirmauflösung,
-dem Grafiktreiber und der tatsächlich gewählten GPU ab. Der Browser kann die
-RTX nicht direkt durch die Web-Anwendung erzwungen zuweisen.
+## KI Stem Studio & RTX Warp Stage
 
-**Während Claude produziert, rendert die Bühne automatisch im Eco-Profil**.
-In inaktiven Ansichten und Hintergrundtabs werden keine neuen Shader-Bilder
-gezeichnet. Das schont Grafikleistung, VRAM und laufende Musikproduktionen.
-Bei fehlendem WebGL2 gibt es eine reduzierte Canvas-2D-Animation.
-Bei aktivierter Systemoption für reduzierte Bewegung gilt ebenfalls Eco.
-
-### Instrumente austauschen (optional: Basic Pitch)
-
-Im darunterliegenden **Instrument-Labor** kann ein Stem eine andere Klangfarbe
-erhalten: etwa Bass als Synth Lead, Gesang als Crystal Bells oder Gitarre
-als Cyber Strings. Die optionale KI **Spotify Basic Pitch** erkennt zunächst
-Tonhöhen und Notenereignisse in der getrennten Audiospur. Beim Abspielen
-synthetisiert Web Audio diese Noten auf derselben Song-Zeitachse in fünf
-Klangfarben (Neon Lead, Crystal Bells, Electric Keys, Cyber Strings, Sub Bass).
-Original-Stem und Ersatzinstrument lassen sich jederzeit umschalten.
-Die Erkennung funktioniert besonders gut bei klaren, melodischen Einzelstimmen;
-sie ersetzt keine professionelle Instrumenten- oder Transienten-Resynthese.
-
-Für die optionale Notenerkennung eine eigene Python-Umgebung einrichten:
-
-```powershell
-py -3.11 -m venv .venv-pitch
-.\.venv-pitch\Scripts\python.exe -m pip install --upgrade pip
-.\.venv-pitch\Scripts\python.exe -m pip install basic-pitch
-$env:SIRENS_STEMS_PITCH_PYTHON = (Resolve-Path ".\.venv-pitch\Scripts\python.exe").Path
-```
-
-Wie bei Demucs werden nur bei Klick auf **„KI-Noten erkennen“** Berechnungen
-gestartet. Die Notendateien liegen im lokalen Stem-Cache. Basic Pitch
-kann Modellgewichte aus dem Internet nachladen; Songs werden nicht zu
-einem externen Anbieter hochgeladen.
-
-
-### Installation mit RTX 5080 / 16 GB VRAM / 32 GB RAM (Windows, PowerShell)
-
-Empfohlen ist eine **eigene Python-3.11-Umgebung**, damit die bestehende
-Musikproduktion und ihr PyTorch nicht verändert werden:
-
-```powershell
-py -3.11 -m venv .venv-stems
-.\.venv-stems\Scripts\python.exe -m pip install --upgrade pip
-.\.venv-stems\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-.\.venv-stems\Scripts\python.exe -m pip install demucs
-.\.venv-stems\Scripts\python.exe -c "import torch; print(torch.__version__, torch.version.cuda); print(torch.cuda.is_available(), torch.cuda.get_device_capability() if torch.cuda.is_available() else None)"
-```
-
-Für die RTX 5080 (Blackwell, `sm_120`) ist ein passendes CUDA-fähiges
-PyTorch-Build erforderlich (beispielsweise CUDA-12.8-Wheels oder neuer).
-Bei `torch.cuda.is_available() == False` bzw. fehlender `sm_120`-Unterstützung
-die PyTorch-Installation korrigieren oder den CPU-Modus verwenden.
-Siehe die offizielle [PyTorch-Installationsseite](https://pytorch.org/get-started/locally/)
-und [Demucs](https://github.com/facebookresearch/demucs).
-
-Damit Sirens die gesonderte Umgebung benutzt, beim Start in derselben
-PowerShell-Sitzung setzen (Pfad ggf. absolut angeben):
-
-```powershell
-$env:SIRENS_STEMS_PYTHON = (Resolve-Path ".\.venv-stems\Scripts\python.exe").Path
-.\start.ps1
-```
-
-Im Stem Studio ist **CPU** als ressourcenschonende Voreinstellung gewählt.
-Für CUDA die Auswahl **„RTX 5080 · CUDA“** treffen. Wenn eine Claude-Produktion
-läuft, nimmt Sirens keine neue CUDA-Stem-Trennung an, um GPU-Speicherkonflikte
-zu vermeiden. CPU-Trennung bleibt möglich. Eine bereits gestartete Trennung
-lässt sich nicht unterbrechen; der eigentliche Browser-Mixer benötigt keine GPU-KI.
-
-Hinweis: Demucs ist MIT-lizenziert. Die Nutzung und Weiterverwertung getrennter
-Songs richtet sich weiterhin nach den Rechten an der jeweiligen Aufnahme.
+Im **Live Lab** steht das zusätzliche Spiel **🎚 KI Stem Studio & Warp Stage** zur Verfügung.
+Es kombiniert lokale Demucs-Stem-Trennung, einen samplegenauen Mehrspurmixer,
+optional wechselbare Instrumentenklänge über Basic Pitch und drei audioreaktive
+Raymarching-3D-Welten für die RTX 5080. Die vollständige Einrichtung und
+Performance-Steuerung steht in [docs/stem-studio.md](docs/stem-studio.md).
 
 ## Grenzen
 

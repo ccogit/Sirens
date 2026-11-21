@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as L from "../web/js/logic.js";
 import { katalogEintraege } from "../web/js/live_lab.js";
+import * as DJ from "../web/js/auto_logic.js";
 
 const lage = (dran, extra = {}) => ({ dran, claude_auch_dran: dran === "claude", station: 1, offene_bewertungen: 0, ...extra });
 
@@ -164,4 +165,68 @@ test("Emblem: Achsen aus Profil und Schätzung, Tempo aus dem Klang, Farben aus 
   assert.ok(mitte.haupt[1] < mitte.haupt[0] && mitte.haupt[1] < mitte.haupt[2]);  // Mitte = Violett, nie Grün
   const hell = (f) => f.haupt.reduce((a, b) => a + b);
   assert.ok(hell(L.emblemFarben(L.achsenWerte({ darkness: 10 }))) < hell(L.emblemFarben(L.achsenWerte({ darkness: 0 }))));
+});
+
+
+test("Auto-DJ wählt aus Favoriten und entfernt doppelte Versionen", () => {
+  const data={artists:[{slug:"Artist",releases:[{slug:"Set",songs:[
+    {titel:"A",dateien:[
+      {pfad:"Artist/Set/A-1.mp3",bewertung:{score:1},fassung:"Original"},
+      {pfad:"Artist/Set/A-2.wav",bewertung:{score:2},fassung:"Master"}]},
+    {titel:"B",dateien:[{pfad:"Artist/Set/B.mp3",bewertung:{score:0}}]}
+  ]}]}]};
+  const songs=DJ.katalogSongs(data);
+  assert.equal(songs.length,2);
+  assert.equal(songs[0].rating,2);
+  assert.equal(songs[0].pfad,"Artist/Set/A-2.wav");
+  assert.deepEqual(DJ.katalogSongs({}),[]);
+});
+
+test("Auto-DJ synchronisiert Taktraster und beurteilt Phrasenpaare", () => {
+  assert.equal(DJ.naechsterTakt(19.8,{beat0:0,bpm:120}),20);
+  assert.ok(DJ.tempoAngleichung(125,120).kompatibel);
+  const a={bpm:120,duration:180,confidence:.8,phrase_confidence:.6,
+    cues_out:[{zeit:100,score:.82,energie:.3,grund:"Break"}]};
+  const b={bpm:125,duration:180,confidence:.8,phrase_confidence:.7,
+    cues_in:[{zeit:8,score:.9,energie:.4,grund:"Aufbau"}]};
+  const cue=DJ.findeUebergang(a,b,30,8);
+  assert.ok(cue);
+  assert.equal(cue.startA,100);
+  assert.equal(cue.startB,8);
+  assert.ok(Math.abs(cue.rateB-.96)<.01);
+  assert.ok(cue.dauer>15);
+  assert.equal(DJ.findeUebergang(a,{...b,bpm:45},30,8),null);
+});
+
+test("Auto-DJ klassifiziert geschätzte Dynamik und vermeidet direkte Wiederholungen", () => {
+  const tags=DJ.klassifizierung({bpm:124,timeline:[
+    {phase:"Aufbau / Energieanstieg",energie:.9},
+    {phase:"Break / Energieabfall",energie:.2}]});
+  assert.ok(tags.includes("Breaks"));
+  assert.ok(tags.includes("Build-ups"));
+  const songs=[{pfad:"a",rating:1},{pfad:"b",rating:2},{pfad:"c",rating:0}];
+  assert.notEqual(DJ.waehleNaechsten(songs,["a"],120,()=>0).pfad,"a");
+});
+
+
+test("Auto-DJ komponiert Energieverläufe über mehrere Songs",()=>{
+  const initial=DJ.setEnergieZiel("aufbau",0);
+  const spaeter=DJ.setEnergieZiel("aufbau",5);
+  assert.ok(spaeter>initial);
+  assert.ok(DJ.setEnergieZiel("chill",4)<DJ.setEnergieZiel("peak",4));
+  const welle=Array.from({length:8},(_,i)=>DJ.setEnergieZiel("welle",i));
+  assert.ok(Math.max(...welle)-Math.min(...welle)>.35);
+});
+
+
+test("Auto-DJ: Tempoübernahme über mehrere Tracks hält reale Taktlängen konstant",()=>{
+  const a={bpm:120,duration:180,confidence:.8,phrase_confidence:.7,
+    cues_out:[{zeit:100,score:.7,energie:.4,grund:"Break"}]};
+  const b={bpm:125,duration:180,confidence:.8,phrase_confidence:.7,
+    cues_in:[{zeit:8,score:.7,energie:.4,grund:"Build"}]};
+  const cue=DJ.findeUebergang(a,b,25,8,.19,.6,1.08);
+  assert.ok(cue);
+  assert.ok(Math.abs(cue.bpm-129.6)<.01);
+  assert.ok(Math.abs(cue.rateB-129.6/125)<.01);
+  assert.ok(Math.abs(cue.dauer*1.08-16)<.01);
 });

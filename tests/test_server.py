@@ -163,6 +163,19 @@ class Dienst(ServerFall):
                            ("cco\\lab-notes\\Too Tidy - Version 1.mp3", 400), ("cco/lab-notes/fehlt.mp3", 404), ("", 400)):
             self.assertEqual(self.http("GET", "/api/audio?pfad=" + quote(pfad))[0], code, pfad)
 
+    def test_beat_analyse_sicher_und_zwischengespeichert(self):
+        from unittest.mock import patch
+        from urllib.parse import quote
+        route = "/api/beat?pfad=" + quote(TIDY1)
+        with patch("sirens.beat.analysieren", return_value={"bpm": 120.0, "bar0": 0.0,
+                                                            "cues_in": [], "cues_out": []}) as analyse:
+            status, erste, _ = self.http("GET", route)
+            zweiter = self.http("GET", route)[1]
+            self.assertEqual((status, erste["bpm"], zweiter), (200, 120.0, erste))
+            analyse.assert_called_once()
+        self.assertEqual(self.http("GET", "/api/beat?pfad=../fremd.mp3")[0], 400)
+        self.assertEqual(self.http("GET", "/api/beat?pfad=cco/fehlt.mp3")[0], 404)
+
     def test_schreibschutz_und_herkunft(self):
         gut = {"weg": "beschreibung", "artist_slug": "cco", "wunsch": "x"}
         fremd = self.http("POST", "/api/auftraege", gut, {"Origin": "http://boese.example"})

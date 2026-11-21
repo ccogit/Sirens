@@ -9,10 +9,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .catalog import Katalog, bekannte_bewertungen, richtungswoerter
-from .config import LOOPBACK
+from .beat import BeatCache
+from .config import LOOPBACK, umgebung
 from . import ablauf, nachlauf
 from .contracts import BILD_EXT, Ablehnung, safe_audio_path
 from .service import NutzerAktionen
+from .kicktausch import KickTausch
 from .starter import SATZ, ClaudeStarter
 from .stems import StemDienst
 from .stem_notes import StemNoten
@@ -42,6 +44,8 @@ class App:
                              cover=nach.cover, soundcloud=nach.soundcloud, textedit=nach.text_aendern,
                              version=nach.version)
         self.starter = ClaudeStarter(cfg)
+        self.beats = BeatCache(cfg)
+        self.kick = KickTausch(cfg, umgebung())
         self.stems = StemDienst(cfg)
         self.stem_noten = StemNoten(self.stems)
 
@@ -168,7 +172,11 @@ class Handler(BaseHTTPRequestHandler):
         if pfad == "/api/health":
             return self._json(200, app.health(self.server.server_port))
         if pfad == "/api/einstellungen":
-            return self._json(200, {"satz": SATZ, "richtungswoerter": richtungswoerter(app.cfg)})
+            return self._json(200, {"satz": SATZ, "richtungswoerter": richtungswoerter(app.cfg), "kicktausch": app.kick.bereit()})
+        if pfad == "/api/kicktausch":
+            return self._json(200, app.kick.zustand(query.get("id")))
+        if pfad == "/api/kicktausch/audio":
+            return self._senden(app.kick.datei(query.get("id")))
         if pfad == "/api/claude":
             return self._json(200, app.starter.zustand())
         if pfad == "/api/catalog":
@@ -182,13 +190,15 @@ class Handler(BaseHTTPRequestHandler):
                 min_score = None
             return self._json(200, app.katalog.baum(bekannte_bewertungen(app.cfg, app.store),
                                                     query.get("q", ""), min_score))
+        if pfad == "/api/beat":
+            return self._json(200, app.beats.holen(query.get("pfad")))
         if pfad == "/api/stems":
             return self._json(200, app.stems.zustand(query.get("pfad"), query.get("modell", "htdemucs")))
         if pfad == "/api/stems/notes":
             return self._json(200, app.stem_noten.zustand(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem")))
         if pfad == "/api/stems/audio":
             datei = app.stems.audiodatei(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem"))
-            return self._audio_datei(datei)
+            return self._senden(datei)
         if pfad == "/api/audio":
             return self._audio(query.get("pfad"))
         if pfad == "/api/bild":
@@ -233,6 +243,8 @@ class Handler(BaseHTTPRequestHandler):
             if lage(order)["claude_auch_dran"]:
                 app.starter.starten(f"{order['id']}: vorhandener Song")
             return self._json(201, app.voll(order))
+        if self.command == "POST" and pfad == "/api/kicktausch":
+            return self._json(202, app.kick.start(data))
         if self.command == "POST" and pfad == "/api/explorer":
             return self._json(200, nachlauf.im_explorer(app.cfg, (data if isinstance(data, dict) else {}).get("pfad")))
         if self.command == "POST" and pfad == "/api/auftraege":
@@ -274,11 +286,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _audio(self, pfad):
         datei = safe_audio_path(self.app.cfg.music_root, pfad)
-        return self._audio_datei(datei)
-
-    def _audio_datei(self, datei):
         if not datei.is_file():
             raise Ablehnung("not_found", "Die Datei gibt es nicht.", "pfad", 404)
+        self._senden(datei)
+
+    def _senden(self, datei):
+        """Audiodatei ausliefern, auch in Teilen (Range), damit der Browser springen kann."""
         groesse = datei.stat().st_size
         start, ende, status = 0, groesse - 1, 200
         bereich = self.headers.get("Range")
