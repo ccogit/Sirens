@@ -74,6 +74,7 @@ export function auftragAnsicht(el, id) {
         },
         abschliessen: () => tun("abschliessen"),
         fertigMachen: (pfad) => tun("nachlauf", { pfad }),
+        archivieren: (pfad) => tun("version", { entscheidung: "archivieren", pfad, bestaetigt: true }),
       });
     }
     if (s === "nachlauf") return nachlaufAnsicht(order, { tun, neuLaden: () => laden(true) });
