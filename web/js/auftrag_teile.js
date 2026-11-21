@@ -70,13 +70,27 @@ export function ablaufGesamt(order, klasse) {
     })));
 }
 
-function take(order, pfad, bewerten, fertigMachen) {
+function take(order, pfad, bewerten, fertigMachen, archivieren) {
   const b = order.bewertungen.find((x) => x.pfad === pfad);
   const begonnen = [order.nachlauf, ...(order.nachlauf_weitere || [])].some((n) => n && n.favorit === pfad);
   const name = takeName(pfad);
   const kommentar = h("input", { type: "text", "data-key": `k-${pfad}`, value: b?.kommentar || "", placeholder: "freiwillig",
     onchange: (e) => { if (b) bewerten(pfad, b.score, b.favorit, e.target.value); } });
   const lesen = () => kommentar.value;
+  const archivAktion = h("div", { class: "song-archive-action" });
+  const nachlauf = [order.nachlauf, ...(order.nachlauf_weitere || [])].filter(Boolean);
+  const gesichert = nachlauf.some((n) => n.favorit === pfad || n.mastering.datei === pfad);
+  if (!gesichert && !b?.favorit) {
+    archivAktion.append(h("button", { type: "button", class: "schlicht",
+      onclick: () => {
+        archivAktion.replaceChildren(
+          h("span", { class: "hinweis" }, "Diese Take-Datei aus dem aktiven Musikordner ins Sirens-Archiv verschieben?"),
+          h("button", { type: "button", class: "knopf zweit",
+            onclick: () => archivieren(pfad) }, "Ja, archivieren"),
+          h("button", { type: "button", class: "schlicht",
+            onclick: () => archivAktion.replaceChildren() }, "Abbrechen"));
+      } }, "Take aussortieren"));
+  }
   return h("li", { class: `take${b?.favorit ? " favorit" : ""}` },
     h("div", { class: "take-kopf" }, abspielKnopf(pfad), h("strong", {}, name), explorerKnopf(pfad),
       b && !b.uebernommen ? h("span", { class: "klein" }, "noch nicht von Claude übernommen") : null,
@@ -93,16 +107,17 @@ function take(order, pfad, bewerten, fertigMachen) {
         title: begonnen || b?.favorit ? "Mastering, Ableton, Cover, Beschreibung, SoundCloud" : "Erst als Favorit markieren",
         onclick: () => fertigMachen(pfad) }, begonnen ? "Weiter fertig machen" : "Fertig machen"),
       h("details", { class: "comment-details", "data-auf": "kommentar-" + pfad, open: Boolean(b?.kommentar) },
-        h("summary", {}, b?.kommentar ? "Kommentar bearbeiten" : "Kommentar hinzufügen"), feld("Dein Kommentar", kommentar))));
+        h("summary", {}, b?.kommentar ? "Kommentar bearbeiten" : "Kommentar hinzufügen"), feld("Dein Kommentar", kommentar)),
+      archivAktion));
 }
 
 // Station 5: Takes anhören und bewerten, darunter Folgeaufträge und Abschließen.
-export function ergebnis(order, { bewerten, folge, abschliessen, fertigMachen }) {
+export function ergebnis(order, { bewerten, folge, abschliessen, fertigMachen, archivieren }) {
   const songs = order.tracks_stand.filter((t) => (t.dateien || []).length);
   return h("div", {},
     songs.map((t) => h("section", { class: "song", "aria-label": `Song ${t.nr}` },
       h("h3", {}, `${t.nr}. ${t.titel || "Song"}`),
-      h("ul", { class: "takes" }, t.dateien.map((pfad) => take(order, pfad, bewerten, fertigMachen))))),
+      h("ul", { class: "takes" }, t.dateien.map((pfad) => take(order, pfad, bewerten, fertigMachen, archivieren))))),
     h("div", { class: "weiter" },
       h("h3", {}, "Dein nächster Move"),
       h("p", { class: "hinweis" }, "Lieblingsversion gefunden? Markiere sie als Favorit und wähle „Fertig machen“."),
