@@ -26,7 +26,7 @@ function messwerte(e) {
   return `${e.lufs.toFixed(1)} LUFS · Spitze ${e.spitze.toFixed(1)} dBTP · Dynamik ${e.spanne.toFixed(1)} LU`;
 }
 
-function mastering(order, { tun, neuLaden }) {
+function mastering(order, { tun, neuLaden, masteringOffen = false }) {
   const n = order.nachlauf;
   const info = order.nachlauf_info;
   const m = n.mastering;
@@ -71,8 +71,15 @@ function mastering(order, { tun, neuLaden }) {
   if (!ERLEDIGT.includes(m.stand)) return phase("Mastering", "wartet", wahl);
   return phase("Mastering", m.stand,
     m.datei ? h("p", { class: "take-kopf" }, abspielKnopf(m.datei), h("span", {}, `${dateiName(m.datei)} (${m.weg})`), explorerKnopf(m.datei)) : h("p", {}, "Ohne Mastering."),
-    n.soundcloud.stand === "beauftragt" ? null
-      : h("details", { "data-auf": "master-aendern" }, h("summary", {}, "Master ändern"), wahl));
+    n.soundcloud.stand === "beauftragt"
+      ? hinweis("Während eines laufenden SoundCloud-Uploads ist neues Mastering gesperrt.")
+      : h("details", { class: "remaster-detail", "data-auf": "master-aendern", open: masteringOffen },
+          h("summary", {}, "♫ Neu mastern"),
+          h("p", { class: "hinweis" },
+            "Erstelle zuerst einen neuen Master-Entwurf. Die bisherige Fassung bleibt erhalten, bis du eine neue auswählst."),
+          n.soundcloud.stand === "fertig" ? h("p", { class: "hinweis" },
+            "Bei SoundCloud musst du eine neue Audiodatei anschließend im bestehenden Track manuell ersetzen.") : null,
+          wahl));
 }
 
 function ableton(order, { tun }) {
