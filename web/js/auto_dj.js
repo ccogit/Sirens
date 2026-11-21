@@ -178,7 +178,9 @@ export function autoDjAnsicht() {
     start.disabled=true; stop.disabled=false;
     start.textContent="▶ Läuft …";
     try {
-      await mixer.starten(songs,{bars:Number(bars.value),tolerance:Number(tolerance.value),randomness:random.checked});
+      const started=await mixer.starten(songs,{bars:Number(bars.value),
+        tolerance:Number(tolerance.value),randomness:random.checked});
+      if(!started||beendet)return;
       laufend=true; nextBeat.disabled=false;
     }catch(err){
       stand.textContent=err.meldung||err.message||String(err);
@@ -193,7 +195,11 @@ export function autoDjAnsicht() {
   });
   nextBeat.addEventListener("click",()=>mixer.naechsterTakt());
   katalogLaden();
-  return {el:toy, stop:()=>{if(laufend)stop.click();}, destroy:()=>{
+  return {el:toy, stop:()=>{
+    mixer.stop();laufend=false;
+    start.disabled=false;stop.disabled=true;nextBeat.disabled=true;
+    start.textContent="▶ Endlos-Set starten";
+  }, destroy:()=>{
     beendet=true;clearTimeout(katalogTimer);mixer.destroy();
   }};
 }
