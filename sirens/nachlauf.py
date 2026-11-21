@@ -8,6 +8,8 @@ import os
 import subprocess
 from pathlib import PurePosixPath
 
+from . import versionen
+
 from . import analyse, soundcloud as sc, studio
 from .contracts import AUDIO_EXT, BILD_EXT, TEXT_EXT, Ablehnung, _text, parse_pfad, safe_audio_path, validate_wunsch
 from .service import dateien, eintrag, nur, revision
@@ -24,7 +26,7 @@ def neu(favorit):
             "cover": {"stand": "offen", "datei": "", "versuche": 0, "wunsch": "", "fehler": ""},
             "text": {"stand": "offen", "datei": "", "beschreibung": "", "tags": []},
             "soundcloud": {"stand": "offen", "sichtbarkeit": "privat", "promotion": False, "link": "", "fehler": "",
-                           "cover_offen": False, "cover_fehler": ""}}
+                           "cover_offen": False, "cover_fehler": "", "text_offen": False, "audio_offen": False}}
 
 
 def im_explorer(cfg, pfad):
@@ -203,18 +205,72 @@ class NachlaufAktionen:
 
         def fn(order):
             n = _im_nachlauf(order)
-            if n["soundcloud"]["stand"] in ("beauftragt", "fertig"):
-                raise Ablehnung("invalid_transition", "Der Song ist schon für SoundCloud freigegeben.", "status", 409)
+            if n["soundcloud"]["stand"] == "beauftragt":
+                raise Ablehnung("invalid_transition", "Der SoundCloud-Upload läuft. Bitte danach ändern.", "status", 409)
             m = n["mastering"]
+            vorher = m["datei"]
             if weg == "ohne":
                 m.update(stand="ausgelassen", weg="ohne", datei="")
+                n["version_entscheidung"] = {"alt": vorher, "neu": n["favorit"]} if vorher else None
+                if n["soundcloud"]["stand"] == "fertig":
+                    n["soundcloud"]["audio_offen"] = endfassung(n) != n["soundcloud"].get("hochgeladen_datei", n["favorit"])
                 eintrag(order, NUTZER, "status", "Ohne Mastering weiter.")
                 return
             eigen = next((e for e in m["entwuerfe"] if e["datei"] == datei), None)
             if eigen is None and datei not in kandidaten(self.cfg, n):
                 raise Ablehnung("invalid_path", "Diese Datei ist kein Master zu diesem Song.", "datei")
             m.update(stand="fertig", weg=eigen["weg"] if eigen else "eigene Datei", datei=datei)
+            n["version_entscheidung"] = {"alt": vorher, "neu": datei} if vorher and vorher != datei else None
+            if n["soundcloud"]["stand"] == "fertig":
+                n["soundcloud"]["audio_offen"] = endfassung(n) != n["soundcloud"].get("hochgeladen_datei", n["favorit"])
             eintrag(order, NUTZER, "status", f"Master gewählt: {PurePosixPath(datei).name}")
+        return self.store.mutate(oid, revision(data), fn)
+
+    def version(self, oid, data):
+        """Alte Fassung behalten oder nach Bestätigung sicher aus dem Musikordner archivieren."""
+        nur(data, ("revision", "entscheidung", "pfad", "bestaetigt"))
+        entscheidung = data.get("entscheidung")
+        if entscheidung not in ("behalten", "archivieren"):
+            raise Ablehnung("invalid", "Bitte Behalten oder Archivieren wählen.", "entscheidung")
+        if entscheidung == "archivieren" and data.get("bestaetigt") is not True:
+            raise Ablehnung("confirm_required", "Das Archivieren muss bestätigt werden.", "bestaetigt", 409)
+        def fn(order):
+            if order["status"] not in ("nachlauf", "fertig", "abgeschlossen"):
+                raise Ablehnung("invalid_transition", "Versionen erst nach der Produktion bearbeiten.", "status", 409)
+            n = order.get("nachlauf")
+            offen = (n or {}).get("version_entscheidung")
+            pfad = data.get("pfad") or (offen or {}).get("alt")
+            if not isinstance(pfad, str) or not pfad:
+                raise Ablehnung("required", "Bitte die bisherige Version wählen.", "pfad")
+            if entscheidung == "behalten":
+                if not offen or pfad != offen["alt"]:
+                    raise Ablehnung("invalid_transition", "Für diese Version liegt keine Entscheidung vor.", "pfad", 409)
+                n["version_entscheidung"] = None
+                eintrag(order, NUTZER, "status", "Vorherige Master-Version bleibt erhalten.")
+                return
+            archiv = versionen.archivieren(self.cfg, self.store, order, pfad)
+            order.setdefault("archivierte_versionen", []).append(archiv)
+            if offen and offen["alt"] == pfad:
+                n["version_entscheidung"] = None
+            eintrag(order, NUTZER, "status", f"Version archiviert: {PurePosixPath(pfad).name}")
+        return self.store.mutate(oid, revision(data), fn)
+
+    def text_aendern(self, oid, data):
+        """Beschreibung/Text nach Fertigstellung auf Wunsch von Claude erneuern lassen."""
+        nur(data, ("revision", "wunsch"))
+        wunsch = _text(data.get("wunsch"), "wunsch")
+        def fn(order):
+            n = _im_nachlauf(order)
+            if n["soundcloud"]["stand"] == "beauftragt":
+                raise Ablehnung("invalid_transition", "Bitte den laufenden Upload abwarten.", "status", 409)
+            t = n["text"]
+            if t["stand"] not in ERLEDIGT:
+                raise Ablehnung("invalid_transition", "Eine Textänderung ist gerade nicht möglich.", "status", 409)
+            t.update(stand="offen", wunsch=wunsch)
+            if n["soundcloud"]["stand"] == "fertig":
+                n["soundcloud"]["text_offen"] = True
+            eintrag(order, NUTZER, "antwort", "Songbeschreibung und Songtext aktualisieren"
+                    + (f": {wunsch}" if wunsch else "."))
         return self.store.mutate(oid, revision(data), fn)
 
     def ableton(self, oid, data):
@@ -294,6 +350,32 @@ class NachlaufAktionen:
         wahl, sicht, promo = data.get("entscheidung"), data.get("sichtbarkeit", "privat"), data.get("promotion", False)
         if wahl == "cover":
             return self._cover_ersetzen(oid, revision(data))
+        if wahl == "metadaten":
+            if data.get("bestaetigt") is not True:
+                raise Ablehnung("confirm_required", "SoundCloud-Änderungen bitte bestätigen.", "bestaetigt", 409)
+            order = self.store.load(oid)
+            n = _im_nachlauf(order)
+            if revision(data) != order["revision"]:
+                raise Ablehnung("revision_conflict", "Der Auftrag wurde inzwischen geändert.", "revision", 409)
+            if n["soundcloud"]["stand"] != "fertig" or n["text"]["stand"] != "fertig":
+                raise Ablehnung("invalid_transition", "Für SoundCloud muss die neue Beschreibung fertig sein.", "status", 409)
+            fehler = sc.metadaten_ersetzen(n["soundcloud"]["link"], n["text"]["beschreibung"], n["text"]["tags"])
+            def fn(order):
+                aktu = _im_nachlauf(order)["soundcloud"]
+                aktu.update(text_offen=bool(fehler), text_fehler=fehler)
+                if not fehler:
+                    eintrag(order, NUTZER, "status", "Beschreibung auf dem bestehenden SoundCloud-Track aktualisiert.")
+            return self.store.mutate(oid, None, fn)
+        if wahl == "audio_bestaetigt":
+            if data.get("bestaetigt") is not True:
+                raise Ablehnung("confirm_required", "Bitte den manuellen Austausch auf SoundCloud bestätigen.", "bestaetigt", 409)
+            def fn(order):
+                n = _im_nachlauf(order)
+                if n["soundcloud"]["stand"] != "fertig" or not n["soundcloud"].get("audio_offen"):
+                    raise Ablehnung("invalid_transition", "Keine ausstehende Audio-Aktualisierung.", "status", 409)
+                n["soundcloud"].update(audio_offen=False, hochgeladen_datei=endfassung(n))
+                eintrag(order, NUTZER, "status", "Audio-Austausch auf SoundCloud vom Nutzer bestätigt.")
+            return self.store.mutate(oid, revision(data), fn)
         if wahl not in ("hochladen", "ohne"):
             raise Ablehnung("invalid", "„entscheidung“ muss hochladen, ohne oder cover sein.", "entscheidung")
         if wahl == "hochladen" and data.get("bestaetigt") is not True:  # Nutzer, 14.11.2026: Upload nur nach Bestätigung
@@ -372,5 +454,5 @@ def phase_melden(cfg, order, name, pfad=None, text="", tags=(), link="", fehler=
     else:
         if not link.startswith("https://"):
             raise Ablehnung("invalid", "Der Link muss mit https:// beginnen.", "link")
-        p.update(stand="fertig", link=link, fehler="")
+        p.update(stand="fertig", link=link, fehler="", hochgeladen_datei=endfassung(n), audio_offen=False, text_offen=False)
         eintrag(order, CLAUDE, "status", f"Bei SoundCloud hochgeladen: {link}")
