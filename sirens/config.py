@@ -27,6 +27,20 @@ class Config:
         return self.data_dir / "richtungswoerter.json"
 
 
+def umgebung(env=None, datei=None):
+    """Einstellungen: die `.env` im Ordner von Sirens, überlagert von der Umgebung des Prozesses."""
+    werte = {}
+    try:
+        for zeile in (datei or Path(__file__).resolve().parents[1] / ".env").read_text(encoding="utf-8-sig").splitlines():
+            if "=" in zeile and not zeile.lstrip().startswith("#"):
+                name, wert = zeile.split("=", 1)
+                werte[name.strip()] = wert.strip()
+    except OSError:
+        pass
+    werte.update(os.environ if env is None else env)
+    return werte
+
+
 def load(env=None):
     env = os.environ if env is None else env
 

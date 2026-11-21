@@ -37,4 +37,7 @@ export const api = {
   claudeStarten: () => ruf("POST", "/api/claude/start", {}),
   bildUrl: (pfad) => `/api/bild?pfad=${encodeURIComponent(pfad)}`,
   audioUrl: (pfad) => `/api/audio?pfad=${encodeURIComponent(pfad)}`,
+  kickStart: (ziel, spender) => ruf("POST", "/api/kicktausch", { ziel, spender }),
+  kickStand: (id) => ruf("GET", `/api/kicktausch?id=${encodeURIComponent(id)}`),
+  kickUrl: (id) => `/api/kicktausch/audio?id=${encodeURIComponent(id)}`,
 };

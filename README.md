@@ -189,6 +189,23 @@ Zwei Ansichten zum Umschalten:
   stellt zurück. Die Achsen kommen aus den Katalogbewertungen (`achsen` je Datei, siehe `catalog-ratings`); fehlen sie,
   schätzt die Seite Energie, Dunkel, Wärme, Tanzbar und Tempo aus dem Klang, der Rest steht auf Mitte.
 
+### Kick-Tausch
+
+Drittes Spielzeug im Live Lab: ein gut bewerteter Song bekommt die Kick eines anderen. Sirens trennt dafür beide Songs
+in Schlagzeug und Rest (je Song einmal, etwa eine Minute; danach aus dem Zwischenspeicher) und rechnet dann den Tausch.
+Es wird nicht nur der Takt getroffen, sondern die Entwicklung des Zielsongs übernommen:
+
+- Jeder Schlag sitzt dort, wo die bisherige Kick saß: Groove, Fills, Pausen und Breaks bleiben.
+- Jeder Schlag ist so stark wie der ersetzte: leise Stellen bleiben leise, Steigerungen bleiben.
+- Der Spender liefert bis zu drei Kick-Klänge (leise bis laut); die Wahl folgt der Stärke im Zielsong.
+- Die fremde Kick wird auf den Grundton der bisherigen gestimmt (höchstens fünf Halbtöne), damit sie zum Bass passt.
+- Der Bass bleibt unberührt, weil nur der Tiefton der Schlagzeugspur ersetzt wird.
+
+Danach lassen sich „Mit neuer Kick“ und „Original“ an derselben Stelle im Wechsel hören. Ergebnisse und getrennte Spuren
+liegen in der Ablage unter `spielzeug/` (je Song rund 30–50 MB), nie im Musikordner. Die Trennung macht ein fremdes
+Werkzeug: `SIRENS_STEMS_CMD` in der `.env` (siehe `.env.example`) oder ein installiertes demucs; die Rechnung braucht
+numpy, scipy und soundfile. Fehlt etwas davon, sagt das Spielzeug es.
+
 ## Songs weiterbearbeiten und Versionen aufräumen
 
 Unter **Songs** stehen alle Songs in Bearbeitung und die in den letzten 30 Tagen aktualisierten Produktionen als

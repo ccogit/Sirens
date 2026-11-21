@@ -9,10 +9,11 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .catalog import Katalog, bekannte_bewertungen, richtungswoerter
-from .config import LOOPBACK
+from .config import LOOPBACK, umgebung
 from . import ablauf, nachlauf
 from .contracts import BILD_EXT, Ablehnung, safe_audio_path
 from .service import NutzerAktionen
+from .kicktausch import KickTausch
 from .starter import SATZ, ClaudeStarter
 from .store import Store
 from .workflow import lage
@@ -40,6 +41,7 @@ class App:
                              cover=nach.cover, soundcloud=nach.soundcloud, textedit=nach.text_aendern,
                              version=nach.version)
         self.starter = ClaudeStarter(cfg)
+        self.kick = KickTausch(cfg, umgebung())
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""
@@ -164,7 +166,11 @@ class Handler(BaseHTTPRequestHandler):
         if pfad == "/api/health":
             return self._json(200, app.health(self.server.server_port))
         if pfad == "/api/einstellungen":
-            return self._json(200, {"satz": SATZ, "richtungswoerter": richtungswoerter(app.cfg)})
+            return self._json(200, {"satz": SATZ, "richtungswoerter": richtungswoerter(app.cfg), "kicktausch": app.kick.bereit()})
+        if pfad == "/api/kicktausch":
+            return self._json(200, app.kick.zustand(query.get("id")))
+        if pfad == "/api/kicktausch/audio":
+            return self._senden(app.kick.datei(query.get("id")))
         if pfad == "/api/claude":
             return self._json(200, app.starter.zustand())
         if pfad == "/api/catalog":
@@ -210,6 +216,8 @@ class Handler(BaseHTTPRequestHandler):
             if lage(order)["claude_auch_dran"]:
                 app.starter.starten(f"{order['id']}: vorhandener Song")
             return self._json(201, app.voll(order))
+        if self.command == "POST" and pfad == "/api/kicktausch":
+            return self._json(202, app.kick.start(data))
         if self.command == "POST" and pfad == "/api/explorer":
             return self._json(200, nachlauf.im_explorer(app.cfg, (data if isinstance(data, dict) else {}).get("pfad")))
         if self.command == "POST" and pfad == "/api/auftraege":
@@ -253,6 +261,10 @@ class Handler(BaseHTTPRequestHandler):
         datei = safe_audio_path(self.app.cfg.music_root, pfad)
         if not datei.is_file():
             raise Ablehnung("not_found", "Die Datei gibt es nicht.", "pfad", 404)
+        self._senden(datei)
+
+    def _senden(self, datei):
+        """Audiodatei ausliefern, auch in Teilen (Range), damit der Browser springen kann."""
         groesse = datei.stat().st_size
         start, ende, status = 0, groesse - 1, 200
         bereich = self.headers.get("Range")
