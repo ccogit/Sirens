@@ -14,7 +14,7 @@ async function zeigen() {
   if (aufraeumen) await aufraeumen();
   aufraeumen = null;
   const teile = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  const [bereich, id] = teile;
+  const [bereich, id, unterseite] = teile;
   for (const link of document.querySelectorAll("[data-nav]")) {
     const aktiv = link.dataset.nav === (bereich === "neu" || bereich === "mastern" || bereich === "songs" ? bereich : "start");
     if (aktiv) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
@@ -24,7 +24,7 @@ async function zeigen() {
   if (bereich === "neu") aufraeumen = neuAnsicht(ansicht, id);
   else if (bereich === "mastern") aufraeumen = masternAnsicht(ansicht);
   else if (bereich === "songs") aufraeumen = songsAnsicht(ansicht);
-  else if (bereich === "auftrag" && id) aufraeumen = auftragAnsicht(ansicht, id);
+  else if (bereich === "auftrag" && id) aufraeumen = auftragAnsicht(ansicht, id, unterseite);
   else aufraeumen = startAnsicht(ansicht);
 }
 
