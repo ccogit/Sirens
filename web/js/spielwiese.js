@@ -1,7 +1,11 @@
 // Spielwiese: Zeitvertreib, solange Claude arbeitet. Ein gut bewerteter Song läuft und lässt sich in Echtzeit verbiegen.
+// Zwei Ansichten zum Umschalten: „Wellen“ (drei Bänder) und „Emblem“ (Grafikkarte; die zwölf Achsen des Songs
+// bestimmen Form und Farbe und lassen sich am Achsenrad verziehen).
 import { api } from "./api.js";
-import { h } from "./dom.js";
-import { lieblingsDateien, spitzen } from "./logic.js";
+import { h, knopfReihe } from "./dom.js";
+import { achsenWerte, emblemFarben, klangProfil, lieblingsDateien, spitzen } from "./logic.js";
+import { achsenRad } from "./spiel_achsen.js";
+import { emblemBild } from "./spiel_gl.js";
 import { tonwerk } from "./spiel_ton.js";
 import { baender, bildZustand, buehneMalen, uebersichtMalen } from "./spiel_bild.js";
 
@@ -34,15 +38,38 @@ function bauen() {
   let laufend = false;
   let laedt = false;
   let bilder = 0;
+  let ansicht = (() => { try { return localStorage.getItem("sirens.spielansicht") === "emblem" ? "emblem" : "wellen"; } catch { return "wellen"; } })();
+  let gl = null;                       // Emblem auf der Grafikkarte; entsteht beim ersten Umschalten
+  let eigen = achsenWerte(null);       // Profil des Songs (zwölf Achsen, 0–10)
+  let werte = [...eigen];              // was gerade gezeigt wird; am Rad verziehbar
+  let bpm = 120;
 
   const titel = h("span", { class: "spiel-titel" }, "Spiel mit einem deiner gut bewerteten Songs.");
   const buehne = h("canvas", { class: "spiel-buehne", role: "img", "aria-label": "Wellenbild des laufenden Songs; Ziehen verändert den Klang" });
+  const emblem = h("canvas", { class: "spiel-buehne", role: "img", "aria-label": "Emblem des laufenden Songs; Ziehen verändert den Klang" });
+  const rad = achsenRad((nr, wert) => { werte[nr] = wert; });
+  const eigenes = h("button", { type: "button", class: "spiel-halten", title: "Alle Achsen zurück auf das Profil des Songs",
+    onclick: () => { werte = [...eigen]; } }, "Profil des Songs");
+  const herkunft = h("span", {});
+  const flaeche = h("div", { class: "spiel-flaeche" }, buehne, emblem, rad.el);
   const uebersicht = h("canvas", { class: "spiel-uebersicht", title: "Klicken springt an diese Stelle", "aria-hidden": "true" });
   const haupt = h("button", { type: "button", class: "knopf" }, "Lieblingssong spielen");
   const anderer = h("button", { type: "button", class: "knopf zweit", hidden: true }, "Anderer Song");
   const tempoWert = h("output", {}, "100 %");
   const tempo = h("input", { type: "range", min: 50, max: 150, step: 1, value: 100, "aria-label": "Tempo in Prozent", title: "Doppelklick setzt zurück" });
-  const meldung = h("p", { class: "hinweis", role: "status" }, "Auf der Fläche ziehen: nach links wird es dumpf, nach rechts dünn, nach oben kommt Echo.");
+  const meldung = h("p", { class: "hinweis", role: "status" }, "Auf der Fläche ziehen: nach links wird es dumpf, nach rechts dünn, nach oben kommt Echo. ", herkunft);
+
+  function zeigen(neu) {
+    if (neu === "emblem" && !gl) gl = emblemBild(emblem);
+    ansicht = neu === "emblem" && gl ? "emblem" : "wellen";
+    try { localStorage.setItem("sirens.spielansicht", ansicht); } catch { /* ohne Speicher */ }
+    flaeche.classList.toggle("emblem", ansicht === "emblem");
+    buehne.hidden = ansicht === "emblem";
+    for (const teil of [emblem, rad.el, eigenes, herkunft]) teil.hidden = ansicht !== "emblem";
+    if (neu === "emblem" && !gl) meldung.append(" Das Emblem braucht WebGL 2; dieser Browser bietet es nicht.");
+    schalter.setzen(ansicht);
+  }
+  const schalter = knopfReihe("Ansicht", [["wellen", "Wellen"], ["emblem", "Emblem"]], ansicht, zeigen, "klein");
 
   const beschriften = () => { haupt.textContent = laedt ? "Lädt …" : !ton.bereit ? "Lieblingssong spielen" : ton.laeuft ? "Pause" : "Weiter"; haupt.disabled = laedt; };
 
@@ -57,6 +84,14 @@ function bauen() {
       titel.textContent = `${aktuell.titel} – wird geladen`;
       await ton.laden(api.audioUrl(aktuell.pfad));
       huelle = spitzen(ton.daten, 240);
+      // Form und Farbe des Emblems: das Profil des Songs; was fehlt, wird aus dem Klang geschätzt.
+      const klang = klangProfil(ton.daten, ton.rate);
+      eigen = achsenWerte(aktuell.achsen, klang);
+      werte = [...eigen];
+      bpm = klang.bpm;
+      herkunft.textContent = aktuell.achsen
+        ? `Am Rad die Achsen verziehen. Form und Farbe kommen aus deinem Profil des Songs, das Tempo (${bpm} BPM) aus dem Klang.`
+        : `Am Rad die Achsen verziehen. Für diesen Song gibt es noch kein Profil: Energie, Dunkel, Wärme, Tanzbar und Tempo (${bpm} BPM) sind aus dem Klang geschätzt, der Rest steht auf Mitte.`;
       titel.textContent = `${aktuell.titel} · ${aktuell.artist}`;
       anderer.hidden = false;
       document.getElementById("player-audio")?.pause(); // es läuft immer nur eines
@@ -81,27 +116,30 @@ function bauen() {
 
   // Spielfläche: ziehen filtert und bringt Echo; loslassen stellt alles zurück.
   const ort = (e) => {
-    const r = buehne.getBoundingClientRect();
+    const r = e.currentTarget.getBoundingClientRect();
     return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height)) };
   };
-  buehne.addEventListener("pointerdown", (e) => {
-    try { buehne.setPointerCapture(e.pointerId); } catch { /* ohne Zeigerbindung */ }
-    zeiger = ort(e); ton.flaeche(zeiger.x, zeiger.y);
-  });
-  buehne.addEventListener("pointermove", (e) => { if (zeiger) { zeiger = ort(e); ton.flaeche(zeiger.x, zeiger.y); } });
-  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) buehne.addEventListener(name, () => { zeiger = null; ton.flaeche(null, null); });
+  for (const leinwand of [buehne, emblem]) {
+    leinwand.addEventListener("pointerdown", (e) => {
+      try { leinwand.setPointerCapture(e.pointerId); } catch { /* ohne Zeigerbindung */ }
+      zeiger = ort(e); ton.flaeche(zeiger.x, zeiger.y);
+    });
+    leinwand.addEventListener("pointermove", (e) => { if (zeiger) { zeiger = ort(e); ton.flaeche(zeiger.x, zeiger.y); } });
+    for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) leinwand.addEventListener(name, () => { zeiger = null; ton.flaeche(null, null); });
+  }
   uebersicht.addEventListener("click", (e) => {
     const r = uebersicht.getBoundingClientRect();
     if (ton.bereit) ton.springen(((e.clientX - r.left) / r.width) * ton.dauer);
   });
 
   const el = h("section", { class: "spielwiese", "aria-label": "Zeitvertreib" },
-    h("div", { class: "spiel-kopf" }, h("strong", {}, "Solange Claude arbeitet"), titel),
-    buehne, uebersicht,
-    h("div", { class: "spiel-leiste" }, haupt, anderer,
+    h("div", { class: "spiel-kopf" }, h("strong", {}, "Solange Claude arbeitet"), titel, schalter),
+    flaeche, uebersicht,
+    h("div", { class: "spiel-leiste" }, haupt, anderer, eigenes,
       halteKnopf("Stottern", (an) => ton.stottern(an)), halteKnopf("Rückwärts", (an) => ton.rueckwaerts(an)), halteKnopf("Bremse", (an) => ton.bremsen(an)),
       h("label", { class: "spiel-tempo" }, "Tempo", tempo, tempoWert)),
     meldung);
+  zeigen(ansicht);
 
   const ruhig = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   function passend(leinwand) { // Leinwand an ihre sichtbare Größe anpassen
@@ -122,7 +160,10 @@ function bauen() {
     bilder += 1;
     // Ohne Ton genügt jedes zweite Bild; wer wenig Bewegung wünscht, bekommt ohne Ton ein stehendes Bild.
     if (ton.laeuft || zeiger || bilder === 1 || (!ruhig && bilder % 2 === 0)) {
-      buehneMalen(passend(buehne), buehne.width, buehne.height, zeit / 1000, zustand, kraft, ton.laeuft ? welle : null, zeiger);
+      if (ansicht === "emblem") {
+        gl.malen({ zeit: zeit / 1000, achsen: werte, bpm, dur: false, kraft, spektrum: ton.laeuft ? frequenzen : null, zeiger });
+        rad.malen(werte, eigen, emblemFarben(werte));
+      } else buehneMalen(passend(buehne), buehne.width, buehne.height, zeit / 1000, zustand, kraft, ton.laeuft ? welle : null, zeiger);
     }
     uebersichtMalen(passend(uebersicht), uebersicht.width, uebersicht.height, huelle, ton.dauer ? ton.stelle / ton.dauer : 0);
     if (zuEnde) naechster(); // nach dem Stück gleich das nächste

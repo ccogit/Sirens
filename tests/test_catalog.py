@@ -4,6 +4,7 @@ import unittest
 
 from hilfe import FUGUE, OMEN, TIDY1, TIDY2, Fall
 
+from sirens.contracts import Ablehnung
 from sirens.catalog import RICHTUNGSWOERTER, Katalog, bekannte_bewertungen, richtungswoerter
 
 
@@ -59,6 +60,17 @@ class KatalogTest(Fall):
         self.assertEqual(sorted(pfade(self.katalog.baum(bew, min_score=1))), sorted([TIDY1, FUGUE]))
         self.assertEqual(pfade(self.katalog.baum(bew, min_score=2)), [TIDY1])
         self.assertEqual(len(pfade(self.katalog.baum(bew, min_score=-2))), 4)
+
+    def test_achsen_des_songs_kommen_bis_zur_seite(self):
+        achsen = {"energy": 7, "warmth": 3.5, "psychedelia": 9}
+        self.claude.catalog_ratings({TIDY1: {"score": 1, "label": "gut", "achsen": achsen}})
+        self.assertEqual(bekannte_bewertungen(self.cfg, self.store)[TIDY1]["achsen"], achsen)
+        order = self.fertiger_auftrag()  # eine höhere Bewertung aus einem Auftrag verdrängt die Achsen nicht
+        self.nutzer.rate(order["id"], {"revision": order["revision"], "pfad": TIDY1, "score": 2, "favorit": False, "kommentar": ""})
+        self.assertEqual((bekannte_bewertungen(self.cfg, self.store)[TIDY1]["score"], bekannte_bewertungen(self.cfg, self.store)[TIDY1]["achsen"]), (2, achsen))
+        for falsch in ({"tempo": 5}, {"energy": 11}, {"energy": "viel"}, [1, 2]):
+            with self.assertRaises(Ablehnung):
+                self.claude.catalog_ratings({TIDY1: {"score": 1, "label": "", "achsen": falsch}})
 
     def test_katalogbewertungen_ungueltig(self):
         from sirens.contracts import Ablehnung

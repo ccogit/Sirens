@@ -232,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'self'; media-src 'self'; object-src 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'self'; media-src 'self' blob:; object-src 'none'")
         self.end_headers()
         self.wfile.write(body)
 

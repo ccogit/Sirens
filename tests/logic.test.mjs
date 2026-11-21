@@ -127,7 +127,7 @@ test("Spielwiese: Filter aus der Position, Hüllkurve, Lieblingssongs", () => {
   const katalog = { artists: [{ slug: "cco", releases: [{ songs: [
     { titel: "A", dateien: [{ pfad: "a1.mp3", bewertung: { score: 1 } }, { pfad: "a2.mp3", bewertung: { score: 2 } }, { pfad: "a3.wav", bewertung: { score: 2 } }] },
     { titel: "B", dateien: [{ pfad: "b1.mp3" }, { pfad: "b2.wav", bewertung: { score: 2 } }] }] }] }] };
-  assert.deepEqual(L.lieblingsDateien(katalog), [{ pfad: "a2.mp3", titel: "A", artist: "cco" }]);
+  assert.deepEqual(L.lieblingsDateien(katalog), [{ pfad: "a2.mp3", titel: "A", artist: "cco", achsen: null }]);
   assert.deepEqual(L.lieblingsDateien({}), []);
 });
 
@@ -144,4 +144,24 @@ test("Live Lab liest nur vorhandene Audio-Dateien aus dem Katalogbaum", () => {
   ]);
   assert.deepEqual(katalogEintraege({ artists: [] }), []);
   assert.deepEqual(katalogEintraege({}), []);
+});
+
+test("Emblem: Achsen aus Profil und Schätzung, Tempo aus dem Klang, Farben aus Wärme und Dunkelheit", () => {
+  assert.equal(L.ACHSEN.length, 12);
+  const werte = L.achsenWerte({ energy: 8, warmth: 12 }, { energy: 2, darkness: 3 });
+  assert.deepEqual([werte[0], werte[3], werte[4], werte[5]], [8, 10, 3, 5]);  // Profil vor Schätzung vor Mitte, begrenzt auf 0–10
+  const rate = 8000; const klick = new Float32Array(rate * 20);
+  for (let s = 0; s < 40; s += 1) for (let i = 0; i < 400; i += 1) klick[s * rate / 2 + i] = Math.sin(i / 3) * (1 - i / 400);  // Schlag alle 0,5 s
+  const profil = L.klangProfil(klick, rate);
+  assert.ok(Math.abs(profil.bpm - 120) <= 2, `bpm ${profil.bpm}`);
+  assert.ok(profil.danceability > 5 && profil.energy >= 0 && profil.energy <= 10);
+  const leise = L.klangProfil(new Float32Array(rate * 5), rate);
+  assert.deepEqual([leise.energy, leise.danceability], [0, 0]);
+  const kalt = L.emblemFarben(L.achsenWerte({ warmth: 0, darkness: 0 }));
+  const warm = L.emblemFarben(L.achsenWerte({ warmth: 10, darkness: 0 }));
+  assert.ok(kalt.haupt[2] > kalt.haupt[0] && warm.haupt[0] > warm.haupt[2]);      // kalt = blau, warm = orangerot
+  const mitte = L.emblemFarben(L.achsenWerte({ warmth: 5 }));
+  assert.ok(mitte.haupt[1] < mitte.haupt[0] && mitte.haupt[1] < mitte.haupt[2]);  // Mitte = Violett, nie Grün
+  const hell = (f) => f.haupt.reduce((a, b) => a + b);
+  assert.ok(hell(L.emblemFarben(L.achsenWerte({ darkness: 10 }))) < hell(L.emblemFarben(L.achsenWerte({ darkness: 0 }))));
 });

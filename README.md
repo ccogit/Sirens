@@ -171,6 +171,21 @@ py -3.11 -m unittest discover -s tests
 
 Ist Node installiert, laufen dabei auch die Tests der Seitenlogik (`tests/logic.test.mjs`).
 
+## Spielwiese: Zeitvertreib, solange Claude arbeitet
+
+Wartet ein Auftrag nur noch auf Claude, zeigt die Auftragsseite eine Spielwiese. „Lieblingssong spielen“ holt einen gut
+bewerteten Song (+1 oder +2) und spielt ihn; nach dem Stück folgt der nächste. Der Song lässt sich in Echtzeit verbiegen:
+auf der Fläche ziehen (links dumpf, rechts dünn, oben Echo), dazu Stottern, Rückwärts, Bremse und Tempo.
+
+Zwei Ansichten zum Umschalten:
+
+- **Wellen:** drei Wellenbänder wie im Logo, die mit Bass, Mitten und Höhen gehen.
+- **Emblem:** das gespiegelte Spektral-Emblem aus dem Cover-Konzept, gerechnet auf der Grafikkarte (WebGL 2). Die zwölf
+  Achsen des Songs (Energie, Tanzbar, Experiment, Wärme, Dunkel, Psychedelik, Organisch, Elektronisch, Melodie, Groove,
+  Stimme, Sampling) bestimmen Form und Farbe; am Achsenrad daneben lässt sich jede Achse verziehen, „Profil des Songs“
+  stellt zurück. Die Achsen kommen aus den Katalogbewertungen (`achsen` je Datei, siehe `catalog-ratings`); fehlen sie,
+  schätzt die Seite Energie, Dunkel, Wärme, Tanzbar und Tempo aus dem Klang, der Rest steht auf Mitte.
+
 ## Songs weiterbearbeiten und Versionen aufräumen
 
 Unter **Songs** stehen alle Songs in Bearbeitung und die in den letzten 30 Tagen aktualisierten Produktionen als

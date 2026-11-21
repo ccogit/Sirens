@@ -243,9 +243,70 @@ export function lieblingsDateien(katalog) {
     for (const release of artist.releases) {
       for (const song of release.songs) {
         const mp3 = song.dateien.filter((d) => /\.mp3$/i.test(d.pfad) && d.bewertung);
-        if (mp3.length) liste.push({ pfad: besteDatei({ dateien: mp3 }).pfad, titel: song.titel, artist: artist.slug });
+        if (!mp3.length) continue;
+        const beste = besteDatei({ dateien: mp3 });
+        liste.push({ pfad: beste.pfad, titel: song.titel, artist: artist.slug, achsen: beste.bewertung.achsen || null });
       }
     }
   }
   return liste;
+}
+
+// Die zwölf Achsen eines Songs (je 0–10) in fester Reihenfolge; sie bestimmen Form und Farbe des Emblems.
+export const ACHSEN = [["energy", "Energie"], ["danceability", "Tanzbar"], ["experimentalism", "Experiment"], ["warmth", "Wärme"],
+  ["darkness", "Dunkel"], ["psychedelia", "Psychedelik"], ["organicness", "Organisch"], ["electronicness", "Elektronisch"],
+  ["melodicity", "Melodie"], ["groove", "Groove"], ["vocal_presence", "Stimme"], ["sampling_intensity", "Sampling"]];
+
+// Profil eines Songs als Liste von zwölf Werten; was fehlt, kommt aus der Schätzung, sonst steht es auf Mitte.
+export function achsenWerte(profil, schaetzung = {}) {
+  return ACHSEN.map(([name]) => {
+    const wert = profil?.[name] ?? schaetzung[name] ?? 5;
+    return Math.min(10, Math.max(0, Number(wert) || 0));
+  });
+}
+
+// Was sich aus dem Klang selbst lesen lässt: Tempo, Energie, Dunkelheit, Wärme, Tanzbarkeit. `daten`: ein Kanal, `rate`: Abtastrate.
+export function klangProfil(daten, rate) {
+  const laenge = Math.min(daten.length, rate * 60);
+  const ab = Math.floor((daten.length - laenge) / 2);   // eine Minute aus der Mitte genügt
+  const fenster = Math.max(1, Math.floor(rate / 100));  // Hüllkurve mit 100 Werten je Sekunde
+  const huelle = new Float32Array(Math.floor(laenge / fenster));
+  const alpha = Math.exp((-2 * Math.PI * 300) / rate);  // Tiefpass bei 300 Hz für den Anteil der Tiefen
+  let summe = 0; let tief = 0; let tiefSumme = 0; let wechsel = 0; let vorher = 0;
+  for (let i = 0; i < huelle.length * fenster; i += 1) {
+    const x = daten[ab + i];
+    summe += x * x;
+    tief = alpha * tief + (1 - alpha) * x;
+    tiefSumme += tief * tief;
+    if ((x >= 0) !== (vorher >= 0)) wechsel += 1;
+    vorher = x;
+    huelle[Math.floor(i / fenster)] += x * x;
+  }
+  const n = Math.max(1, huelle.length * fenster);
+  const grenzen = (wert) => Math.round(Math.min(10, Math.max(0, wert)) * 10) / 10;
+  const anstieg = Array.from(huelle, (v, i) => Math.max(0, Math.sqrt(v) - Math.sqrt(huelle[i - 1] || 0)));
+  const korrelation = (versatz) => { let s = 0; for (let i = versatz; i < anstieg.length; i += 1) s += anstieg[i] * anstieg[i - versatz]; return s; };
+  let bestes = 0; let bpm = 120;
+  for (let kandidat = 70; kandidat <= 180; kandidat += 1) {  // Schlagabstand, der sich am stärksten wiederholt
+    const wert = korrelation(Math.round(6000 / kandidat));
+    if (wert > bestes) { bestes = wert; bpm = kandidat; }
+  }
+  const ruhe = korrelation(0) || 1;
+  const db = 10 * Math.log10(summe / n + 1e-12);
+  return { bpm, energy: grenzen((db + 28) / 2), darkness: grenzen(10 - ((wechsel / n - 0.02) / 0.12) * 10),
+    warmth: grenzen(((tiefSumme / (summe || 1)) - 0.2) / 0.06), danceability: grenzen((bestes / ruhe) * 14) };
+}
+
+// Farben des Emblems wie im Cover-Konzept: Farbton aus Wärme und Tongeschlecht (über Violett, nie über Grün),
+// Sättigung aus Energie und Psychedelik, Helligkeit aus Dunkelheit. Werte 0–10; liefert [r, g, b] je 0…1.
+export function emblemFarben(werte, dur = false) {
+  const [energie, , , waerme, dunkel, psy] = werte.map((w) => w / 10);
+  const ton = (220 + 160 * waerme + (dur ? 12 : -12)) / 360;
+  const satt = Math.min(0.92, 0.38 + 0.45 * energie + 0.2 * psy);
+  const hell = 0.66 - 0.26 * dunkel;
+  const hsl = (h, s, l) => [0, 8, 4].map((nn) => {
+    const k = (nn + (((h % 1) + 1) % 1) * 12) % 12;
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  });
+  return { haupt: hsl(ton, satt, hell), akzent: hsl(ton + (25 + 140 * psy) / 360, satt, hell + 0.06) };
 }
