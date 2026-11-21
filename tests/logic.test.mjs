@@ -217,3 +217,16 @@ test("Auto-DJ komponiert Energieverläufe über mehrere Songs",()=>{
   const welle=Array.from({length:8},(_,i)=>DJ.setEnergieZiel("welle",i));
   assert.ok(Math.max(...welle)-Math.min(...welle)>.35);
 });
+
+
+test("Auto-DJ: Tempoübernahme über mehrere Tracks hält reale Taktlängen konstant",()=>{
+  const a={bpm:120,duration:180,confidence:.8,phrase_confidence:.7,
+    cues_out:[{zeit:100,score:.7,energie:.4,grund:"Break"}]};
+  const b={bpm:125,duration:180,confidence:.8,phrase_confidence:.7,
+    cues_in:[{zeit:8,score:.7,energie:.4,grund:"Build"}]};
+  const cue=DJ.findeUebergang(a,b,25,8,.19,.6,1.08);
+  assert.ok(cue);
+  assert.ok(Math.abs(cue.bpm-129.6)<.01);
+  assert.ok(Math.abs(cue.rateB-129.6/125)<.01);
+  assert.ok(Math.abs(cue.dauer*1.08-16)<.01);
+});
