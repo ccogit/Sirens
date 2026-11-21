@@ -1,6 +1,6 @@
 """Leichtgewichtige Beatgrid-Schätzung für den lokalen Auto-DJ.
 
-Nur die ersten 90 Sekunden werden mit ffmpeg auf 4 kHz/mono heruntergerechnet.
+Maximal 360 Sekunden werden mit ffmpeg auf 4 kHz/mono heruntergerechnet.
 Kein ML-Modell, keine Datenbank und keine Änderung an Songdateien.
 """
 from array import array
@@ -12,10 +12,12 @@ import threading
 from pathlib import Path
 
 from .contracts import Ablehnung, safe_audio_path
+from .dramaturgie import analyse_abschnitte
 
 HOP = 40                   # 10 ms bei 4 kHz
 HZ = 100
-MAX_SECONDS = 90
+MAX_SECONDS = 360
+BEAT_WINDOW = 90
 
 
 def beatgrid(onset, hz=HZ):
@@ -54,25 +56,40 @@ def beatgrid(onset, hz=HZ):
             "confidence": sicherheit, "meter": 4, "method": "onset-autocorrelation"}
 
 
-def _onsets(pcm, hz=4000):
-    """Positive Energieanstiege unterdrücken stationäre laute Abschnitte."""
+def _merkmale(pcm):
+    """RMS, Onsets und Hochfrequenz-Proxy pro 10 ms, ohne große FFT-Modelle."""
     samples = array("h")
     samples.frombytes(pcm[:len(pcm) - len(pcm) % 2])
     if sys.byteorder != "little":
         samples.byteswap()
-    energy = []
+    energie, brillanz = [], []
     for i in range(0, len(samples) - HOP + 1, HOP):
-        part = samples[i:i + HOP]
-        energy.append(math.sqrt(sum(v * v for v in part) / HOP))
-    if not energy:
-        return []
-    # Zeitlich geglättete RMS-Lautheit, dann positive Flanken über dem lokalen Grundpegel.
-    n = len(energy)
-    result = [0.0] * n
-    for i in range(5, n):
-        baseline = sum(energy[i - 5:i]) / 5
-        result[i] = max(0.0, energy[i] - baseline)
-    return result
+        teil = samples[i:i + HOP]
+        rms = math.sqrt(sum(v * v for v in teil) / HOP)
+        energie.append(rms)
+        differenz = sum(abs(teil[k] - teil[k-1]) for k in range(1,HOP))
+        brillanz.append(differenz / max(1, HOP-1) / max(1,rms))
+    # Onset = positiver Energieanstieg gegenüber kurzem Grundpegel.
+    onset = [0.0] * len(energie)
+    for i in range(5, len(energie)):
+        baseline = sum(energie[i-5:i]) / 5
+        onset[i] = max(0.0, energie[i] - baseline)
+    return onset, energie, brillanz
+
+
+def _bar0(onsets, beat0, bpm):
+    """Probabler 4er-Downbeat, über den langen Rhythmus geschätzt."""
+    period = 60 / bpm
+    bar = period * 4
+    scores = []
+    for offset in range(4):
+        start = beat0 + offset * period
+        score = 0.0
+        for k in range(max(1, int(min(len(onsets)/HZ, 65)/bar))):
+            pos = round((start + k*bar)*HZ)
+            score += sum(onsets[max(0,pos-3):min(len(onsets),pos+5)])
+        scores.append(score)
+    return round((beat0 + max(range(4),key=scores.__getitem__)*period) % bar,3)
 
 
 def analysieren(datei, ffmpeg="ffmpeg"):
@@ -88,9 +105,18 @@ def analysieren(datei, ffmpeg="ffmpeg"):
     if lauf.returncode != 0:
         raise Ablehnung("beat_decode", "Die Audiodatei konnte nicht analysiert werden.", status=422)
     try:
-        onsets = _onsets(lauf.stdout)
-        grid = beatgrid(onsets)
-        grid["energy"] = round(min(1.0, max(0.0, sum(onsets) / max(len(onsets), 1) / 2100)), 2)
+        onsets, energie, brillanz = _merkmale(lauf.stdout)
+        # Ein rhythmischer Ausschnitt reicht für das Tempo. Die volle Länge
+        # wird dagegen für Intro, Breakdown, Drop und Outro benötigt.
+        grid = beatgrid(onsets[:BEAT_WINDOW * HZ])
+        dauer = len(onsets) / HZ
+        bar0 = _bar0(onsets, grid["beat0"], grid["bpm"])
+        grid["bar0"] = bar0
+        grid["duration"] = round(dauer,2)
+        grid["energy"] = round(min(1.0,max(0.0,
+            sum(onsets)/max(len(onsets),1)/2100)),2)
+        grid.update(analyse_abschnitte(energie,onsets,brillanz,
+                                      grid["bpm"],bar0,dauer,HZ))
         return grid
     except ValueError as exc:
         raise Ablehnung("beat_missing", str(exc), status=422) from exc
