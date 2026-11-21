@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { h } from "./dom.js";
 import { katalogSongs, klassifizierung } from "./auto_logic.js";
 import { AutoMixer } from "./auto_mix.js";
+import { visualisieren } from "./live_visual.js";
 
 function uhr(sekunden) {
   if (!Number.isFinite(sekunden)) return "0:00";
@@ -23,12 +24,15 @@ function timeline(inhalt,info) {
   }
 }
 
-export function autoDjAnsicht() {
+export function autoDjAnsicht(isProducing=()=>false) {
   let beendet=false, katalogTimer=null, alle=[], selected=new Set(), aktuell=null, laufend=false;
   const stand=h("p",{class:"auto-status",role:"status"},"Katalog wird geladen …");
   const now=h("strong",{},"Noch kein Song gestartet");
   const meta=h("span",{},"Song-Analyse und Ein-/Ausstiegspunkte erscheinen hier.");
   const arc=h("div",{class:"auto-arc",role:"img","aria-label":"Analysierter Songverlauf mit Energie und möglichen Übergängen"});
+  const neon=h("canvas",{class:"auto-canvas","aria-label":"Audioreaktiver GPU-Neontunnel"});
+  const scope=h("canvas",{class:"auto-canvas",hidden:true});
+  let stopVisual=null;
   const next=h("div",{class:"auto-next"},"Noch kein Übergang geplant.");
   const history=h("ol",{class:"auto-history"});
   const duration=h("output",{},"0:00 / 0:00");
@@ -58,6 +62,7 @@ export function autoDjAnsicht() {
         h("h2",{},"Ein Set, das sich selbst weiterspielt."),
         h("p",{},"Sirens sucht Übergänge nach Beat, 4-Takt-Phrasen, Breaks, Build-ups und Energieverlauf."))),
     h("section",{class:"auto-now"},
+      neon,scope,
       h("div",{class:"auto-now-top"},
         h("span",{class:"auto-air"},"● ON AIR / AUTO MIX"),
         duration),
@@ -195,11 +200,14 @@ export function autoDjAnsicht() {
   });
   nextBeat.addEventListener("click",()=>mixer.naechsterTakt());
   katalogLaden();
-  return {el:toy, stop:()=>{
+  return {el:toy, activate:()=>{
+    if(!stopVisual)stopVisual=visualisieren(neon,scope,
+      ()=>mixer.engine.analyser,()=>"cosmic",isProducing);
+  }, deactivate:()=>{stopVisual?.();stopVisual=null;}, stop:()=>{
     mixer.stop();laufend=false;
     start.disabled=false;stop.disabled=true;nextBeat.disabled=true;
     start.textContent="▶ Endlos-Set starten";
   }, destroy:()=>{
-    beendet=true;clearTimeout(katalogTimer);mixer.destroy();
+    beendet=true;clearTimeout(katalogTimer);stopVisual?.();stopVisual=null;mixer.destroy();
   }};
 }
