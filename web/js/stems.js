@@ -2,6 +2,7 @@
 import { api } from "./api.js";
 import { h, leeren } from "./dom.js";
 import { StemAudio } from "./stem_audio.js";
+import { warpStage } from "./stem_visual.js";
 
 const NAMEN = { vocals: "Gesang", drums: "Schlagzeug", bass: "Bass",
                 other: "Übrige Instrumente", piano: "Klavier", guitar: "Gitarre" };
@@ -13,7 +14,7 @@ function zeit(sekunden) {
     String(Math.floor(sekunden % 60)).padStart(2, "0") : "0:00";
 }
 
-export function stemSpiel() {
+export function stemSpiel(isProducing = () => false) {
   let beendet = false, token = 0, timer = null, takt = null, engine = null;
   let spuren = [], solo = null;
   const song = h("select", { "aria-label": "Song für Stem Studio" },
@@ -33,6 +34,58 @@ export function stemSpiel() {
   const uhr = h("span", { class: "stems-clock" }, "0:00 / 0:00");
   const spurenEl = h("div", { class: "stems-tracks" });
   const alle = h("button", { type: "button", class: "lab-mode" }, "Alle Spuren an");
+  const visOption = { modus: "live", dichte: 1, szene: 0 };
+  const buehne = h("canvas", { class: "stems-visual-canvas",
+    role: "img", "aria-label": "Live gerenderter audioreaktiver 3D-Tunnel mit Lichtskulpturen" });
+  const metriken = h("span", { class: "stems-perf" }, "WebGL2 · GPU wird vorbereitet");
+  const live = h("span", { class: "stems-visual-live" }, "DEMO · Visuelle Vorschau");
+  const qualitaet = h("select", { "aria-label": "GPU-Performance-Profil" },
+    h("option", { value: "eco" }, "Eco · 15 FPS"),
+    h("option", { value: "live" }, "Live · 45 FPS"),
+    h("option", { value: "ultra" }, "RTX Ultra · bis 4K / 160 Steps"));
+  qualitaet.value = visOption.modus;
+  qualitaet.addEventListener("change", () => { visOption.modus = qualitaet.value; });
+  const dichte = h("input", { type: "range", min: "50", max: "150", value: "100",
+    "aria-label": "3D-Renderdichte in Prozent" });
+  const dichteWert = h("output", {}, "100 %");
+  dichte.addEventListener("input", () => {
+    visOption.dichte = Number(dichte.value) / 100;
+    dichteWert.textContent = dichte.value + " %";
+  });
+  const szene = [["◈ Neon-Kathedrale",0],["⬡ Hypercube",1],["✺ Quantum Nebula",2]]
+    .map(([name,id]) => h("button", { type: "button", class: "stems-scene",
+      "aria-pressed": String(id === 0), onclick: () => {
+        visOption.szene = id;
+        for (const knopf of szene) knopf.setAttribute("aria-pressed", String(knopf.dataset.scene === String(id)));
+      }, "data-scene": id }, name));
+  const vollbild = h("button", { type: "button", class: "stems-fullscreen",
+    onclick: () => { if (buehne.requestFullscreen) buehne.requestFullscreen().catch(() => {}); } }, "⛶ Vollbild");
+  const visual = h("section", { class: "stems-visual" },
+    h("div", { class: "stems-visual-title" },
+      h("div", {}, h("span", { class: "stems-kicker" }, "WARP STAGE · RTX EXPERIMENT"),
+        h("h2", {}, "Flieg durch deinen Song.")),
+      vollbild),
+    h("div", { class: "stems-visual-wrap" }, buehne,
+      h("div", { class: "stems-visual-hud" }, live, metriken)),
+    h("div", { class: "stems-scenes", role: "group", "aria-label": "3D-Welt auswählen" }, szene),
+    h("div", { class: "stems-gpu-controls" },
+      h("label", {}, "GPU-Profil", qualitaet),
+      h("label", {}, "Renderdichte", h("span", {}, dichte, dichteWert))),
+    h("p", { class: "stems-hint" },
+      "RTX Ultra ist absichtlich anspruchsvoll. WebGL2 nutzt die vom Browser gewählte GPU; Auflösung und Bildrate sind auf 4K/60 FPS begrenzt. Während Claude produziert, wird automatisch Eco erzwungen."));
+
+  const stopVisual = warpStage(buehne,
+    () => engine?.laeuft ? engine.analyser : null,
+    isProducing,
+    () => buehne.closest(".lab-toy")?.hidden === false,
+    visOption,
+    (info) => {
+      metriken.textContent = info.renderer + " · " + info.w + "×" + info.h +
+        " · " + info.steps + " Steps · " + info.fps + " FPS" + (info.eco ? " · CLAUDE ECO" : "");
+      live.textContent = info.demo ? "DEMO · Ohne Audio" : "LIVE · AUF DEINEN SONG";
+      if (info.fehler) metriken.textContent = info.fehler;
+    });
+
   const mixer = h("section", { class: "stems-mixer", hidden: true },
     h("div", { class: "stems-transport" }, play, uhr),
     position, h("div", { class: "stems-mix-head" }, h("h2", {}, "Instrumente live mischen"), alle),
@@ -233,6 +286,7 @@ export function stemSpiel() {
         h("p", { class: "lab-eyebrow" }, "SIRENS · STEM STUDIO"),
         h("h2", {}, "Hör jedes Instrument einzeln."),
         h("p", {}, "Demucs trennt einen Song einmalig lokal. Danach lassen sich Gesang, Schlagzeug, Bass und Instrumente während des Abspielens live solo, stumm oder lauter schalten.")),
+      visual,
       h("section", { class: "stems-setup" },
         h("label", {}, "Song aus deinem Katalog", song),
         h("label", {}, "Trennmodell", modell),
@@ -244,6 +298,7 @@ export function stemSpiel() {
     beenden() {
       beendet = true;
       clearTimeout(timer);
+      stopVisual();
       stoppen();
     },
   };
