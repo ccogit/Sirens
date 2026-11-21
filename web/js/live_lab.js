@@ -150,7 +150,7 @@ export function liveLabAnsicht(el) {
     onclick: () => { mitAudio(() => engine.pad(art)); }
   }, h("span", {}, label), h("kbd", {}, key)));
 
-  const autoToy = autoDjAnsicht();
+  const autoToy = autoDjAnsicht(() => produktionLaeuft);
   // Spielzeuge: immer nur eines ist zu sehen und zu hören.
   let spielzeug = (() => { try { return ["wiese","pult","auto"].includes(localStorage.getItem("sirens.spielzeug")) ? localStorage.getItem("sirens.spielzeug") : "pult"; } catch { return "pult"; } })();
   const kisten = {};
@@ -163,12 +163,15 @@ export function liveLabAnsicht(el) {
     for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
     if (key === "wiese") {
       for (const audio of engine.decks) audio.pause();
+      autoToy.deactivate();
       autoToy.stop();
     } else if (key === "auto") {
       for (const audio of engine.decks) audio.pause();
       spielAnhalten();
+      autoToy.activate();
     } else {
       spielAnhalten();
+      autoToy.deactivate();
       autoToy.stop();
     }
   }
