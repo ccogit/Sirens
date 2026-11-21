@@ -73,3 +73,40 @@ export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.
   for (let i=0; i<liste.length; i++) { ticket -= gewichte[i]; if (ticket < 0) return liste[i]; }
   return liste[liste.length-1];
 }
+
+
+export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19) {
+  if (!(von?.bpm>0) || !(nach?.bpm>0)) return null;
+  const t=tempoAngleichung(nach.bpm,von.bpm);
+  if (!t || Math.abs(1-t.rate)>erlaubteAbweichung) return null;
+  const dauer=taktzahl*240/von.bpm;
+  let beste=null;
+  for (const a of von.cues_out||[]) for (const b of nach.cues_in||[]) {
+    if (a.zeit<jetzt+Math.max(2,dauer*.7) ||
+        a.zeit+dauer>=von.duration-0.25 ||
+        b.zeit+dauer/t.rate>=nach.duration-0.5) continue;
+    const energiematch=1-Math.abs(a.energie-b.energie);
+    const ruhe=1-(a.energie+b.energie)/2;
+    const score=.31*a.score+.32*b.score+.18*energiematch+.10*ruhe+
+      .09*Math.max(0,1-t.abweichung*6);
+    if(!beste||beste.score<score) beste={
+      startA:a.zeit,startB:b.zeit,rateB:t.rate,normalB:t.normalized,
+      bpm:von.bpm,bars:taktzahl,dauer,score,
+      ausgang:a.grund,eingang:b.grund,energieA:a.energie,energieB:b.energie,
+      confidence:Math.min(von.confidence||0,nach.confidence||0,
+        von.phrase_confidence||0,nach.phrase_confidence||0)
+    };
+  }
+  return beste;
+}
+
+export function klassifizierung(info) {
+  if (!info) return ["Analyse offen"];
+  const tags=[stimmung(info)];
+  const seg=info.timeline||[];
+  if (seg.some((s)=>/Break/i.test(s.phase))) tags.push("Breaks");
+  if (seg.some((s)=>/Aufbau/i.test(s.phase))) tags.push("Build-ups");
+  const energy=seg.reduce((sum,s)=>sum+s.energie,0)/Math.max(1,seg.length);
+  tags.push(energy>=.68?"druckvoll":energy<.35?"zurückhaltend":"dynamisch");
+  return tags;
+}
