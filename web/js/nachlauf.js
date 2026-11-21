@@ -193,7 +193,10 @@ function soundcloud(order, { tun, neuLaden, bereit }) {
           "Wurde die Datei im bestehenden SoundCloud-Track wirklich erfolgreich ausgetauscht?")) : null);
   }
   if (s.stand === "beauftragt") return phase("SoundCloud", s.stand, hinweis("Claude lädt den Song hoch."));
-  if (s.stand === "ausgelassen") return phase("SoundCloud", s.stand, h("p", {}, "Kein Upload."));
+  if (s.stand === "ausgelassen") return phase("SoundCloud", s.stand,
+    h("p", {}, "Bisher bewusst nicht veröffentlicht."),
+    h("button", { type: "button", class: "knopf zweit",
+      onclick: () => tun("soundcloud", { entscheidung: "wieder_oeffnen" }) }, "Doch auf SoundCloud veröffentlichen"));
   if (!bereit) return phase("SoundCloud", s.stand, h("p", { class: "hinweis" }, "Kommt, sobald Master, Cover und Beschreibung stehen."));
   if (!order.nachlauf_info.werkzeuge.soundcloud) {
     return phase("SoundCloud", "wartet",
