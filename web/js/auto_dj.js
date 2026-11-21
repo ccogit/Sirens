@@ -144,13 +144,18 @@ export function autoDjAnsicht(isProducing=()=>false) {
     const zeilen=sichtbar.filter(s=>!filter||s.genres.includes(filter)).slice(0,150);
     list.replaceChildren(...zeilen.map(s=>{
       const check=h("input",{type:"checkbox",checked:selected.has(s.pfad),"aria-label":s.text+" für persönliche Auswahl"});
-      check.addEventListener("change",()=>{if(check.checked)selected.add(s.pfad);else selected.delete(s.pfad);count.textContent=selected.size+" vorgemerkt · "+erlaubt().length+" im Set";});
+      check.addEventListener("change",()=>{
+        if(check.checked)selected.add(s.pfad);else selected.delete(s.pfad);
+        count.textContent=selected.size+" vorgemerkt · "+erlaubt().length+" im Set";
+        if(mixer.running&&erlaubt().length>=2)mixer.setPool(erlaubt());
+      });
       return h("label",{class:"auto-songrow"},check,
         h("span",{},h("strong",{},s.titel),h("small",{},s.artist+" · "+s.release)),
         s.rating>0?h("em",{},"♥ "+s.rating):null,
         s.genres.length?h("small",{},s.genres.slice(0,2).join(", ")):null);
     }));
     count.textContent=selected.size+" vorgemerkt · "+erlaubt().length+" im Set";
+    if(mixer.running&&erlaubt().length>=2)mixer.setPool(erlaubt());
     if(!zeilen.length) list.append(h("p",{},"Keine passenden Songs gefunden."));
   }
 
@@ -174,9 +179,16 @@ export function autoDjAnsicht(isProducing=()=>false) {
   search.addEventListener("input",aktualisieren);
   mode.addEventListener("change",aktualisieren);
   genre.addEventListener("change",aktualisieren);
-  random.addEventListener("change",()=>{stand.textContent=random.checked?
+  for(const el of [bars,tolerance]) el.addEventListener("change",()=>{
+    mixer.bars=Number(bars.value);mixer.tolerance=Number(tolerance.value);
+    stand.textContent="Mix-Einstellungen gelten ab dem nächsten noch nicht vorbereiteten Übergang.";
+  });
+  random.addEventListener("change",()=>{
+    mixer.randomness=random.checked;
+    stand.textContent=random.checked?
     "Zufallsmodus aktiv: musikalisch gewichtete Auswahl.":
-    "Die Übergänge werden weiterhin bewertet; weniger zufällige Reihenfolge.";});
+    "Die Übergänge werden weiterhin bewertet; weniger zufällige Reihenfolge.";
+  });
   start.addEventListener("click",async()=>{
     const songs=erlaubt();
     if(songs.length<2){stand.textContent="Mindestens zwei passende Songs erforderlich. Quelle/Filter prüfen.";return;}
