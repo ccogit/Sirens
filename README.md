@@ -240,7 +240,8 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Breite und 1,5-fache Pixelauflösung begrenzt. Wenn Claude tatsächlich arbeitet,
   wird auf etwa 15 FPS und 1000 Pixel Breite gedrosselt; im Hintergrundtab pausiert das Zeichnen.
   Die Wahl der tatsächlichen GPU trifft der Browser bzw. das Betriebssystem. Es wird
-  **kein CUDA-Modell** gestartet, das der Musikgenerierung GPU-Speicher wegnehmen würde.
+  Im DJ-Pult startet kein CUDA-KI-Modell. Nur die ausdrücklich gewählte Stem-Trennung
+  darf CUDA verwenden; bei laufender Claude-Produktion wird der Start blockiert.
 
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
