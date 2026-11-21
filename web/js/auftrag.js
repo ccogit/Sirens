@@ -1,7 +1,7 @@
 // Einzelansicht eines Auftrags: oben steht immer, was der Nutzer jetzt tun kann.
 import { api } from "./api.js";
 import { eingabenMerken, eingabenWiederherstellen, fehlerZeigen, feld, h, leeren, meldung } from "./dom.js";
-import { anzeige, auftragTitel, fehlerFeld } from "./logic.js";
+import { ablaufStationen, anzeige, auftragTitel, fehlerFeld } from "./logic.js";
 import { LAEUFT, ablaufGesamt, angaben, ergebnis, planAnsicht, songs } from "./auftrag_teile.js";
 import { knoepfeAktualisieren } from "./player.js";
 import { claudeKasten } from "./claude.js";
@@ -9,9 +9,10 @@ import { nachlaufAnsicht } from "./nachlauf.js";
 
 const ABBRECHBAR = ["offen", "in_arbeit", "rueckfrage", "plan_wartet", "antwort_da", "fehler"];
 
-export function auftragAnsicht(el, id) {
+export function auftragAnsicht(el, id, unterseite = "") {
   let order = null;
   let beendet = false;
+  let masteringFokussiert = false;
   const inhalt = h("div", {});
   el.append(inhalt);
 
@@ -74,9 +75,10 @@ export function auftragAnsicht(el, id) {
         },
         abschliessen: () => tun("abschliessen"),
         fertigMachen: (pfad) => tun("nachlauf", { pfad }),
+        archivieren: (pfad) => tun("version", { entscheidung: "archivieren", pfad, bestaetigt: true }),
       });
     }
-    if (s === "nachlauf") return nachlaufAnsicht(order, { tun, neuLaden: () => laden(true) });
+    if (s === "nachlauf") return nachlaufAnsicht(order, { tun, neuLaden: () => laden(true), masteringOffen: unterseite === "mastering" });
     return null;
   }
 
@@ -91,17 +93,42 @@ export function auftragAnsicht(el, id) {
         : "Auch Claude hat hier noch etwas zu erledigen.";
     const planLesen = order.plan && order.status !== "plan_wartet"
       ? h("details", { class: "klappe", "data-auf": "plan" }, h("summary", {}, "Der Plan"), planAnsicht(order.plan)) : null;
+    const stationen = ablaufStationen(order);
+    const fertig = stationen.filter((st) => st.zustand === "erledigt" || st.zustand === "ausgelassen").length;
+    const aktuell = stationen.find((st) => st.zustand === "aktiv");
+    const fuellung = h("span", { class: "progress-fill" });
+    fuellung.style.width = Math.round(fertig / Math.max(stationen.length, 1) * 100) + "%";  // als Attribut würde die CSP es sperren
     leeren(inhalt).append(
-      h("header", { class: "auftrag-kopf" },
-        h("h1", {}, auftragTitel({ ...order, titel: order.plan?.titel || order.wunsch.optionen.titelwunsch })),
+      h("div", { class: "backbar" },
+        h("a", { href: "#/" }, "← Alle Aufträge"),
         h("span", { class: "klein zahlen" }, order.id)),
-      h("div", { class: "zweispaltig" },
-        h("section", { class: `block jetzt ${stand.klasse}`, "aria-label": "Nächster Schritt" },
-          h("p", { class: "dran" }, h("span", { class: "dran-marke lampe" }, stand.text), lage.naechster_schritt),
+      h("header", { class: "auftrag-kopf" },
+        h("div", {},
+          h("p", { class: "eyebrow" }, "DEIN MUSIKPROJEKT"),
+          h("h1", {}, auftragTitel({ ...order, titel: order.plan?.titel || order.wunsch.optionen.titelwunsch }))),
+        h("span", { class: "order-pill " + stand.klasse },
+          h("span", { class: "order-pill-dot", "aria-hidden": "true" }), stand.text)),
+      h("div", { class: "zweispaltig order-layout" },
+        h("section", { class: "block jetzt " + stand.klasse, "aria-label": "Nächster Schritt" },
+          h("p", { class: "eyebrow" }, "ALS NÄCHSTES"),
+          h("h2", { class: "next-action" }, lage.naechster_schritt),
           lage.claude_auch_dran ? claudeKasten(order.claude, fuerClaude, () => laden(true)) : null,
           jetztTun()),
-        h("aside", { "aria-label": "Zum Nachlesen" },
-          ablaufGesamt(order, stand.klasse), planLesen, angaben(order),
+        h("aside", { class: "order-sidebar", "aria-label": "Projektübersicht" },
+          h("section", { class: "block order-progress", "aria-label": "Fortschritt" },
+            h("div", { class: "progress-top" },
+              h("h2", {}, "Fortschritt"),
+              h("span", { class: "klein zahlen" }, fertig + " / " + stationen.length)),
+            h("p", { class: "progress-current" }, aktuell ? aktuell.name : order.status === "abgeschlossen" ? "Abgeschlossen" : "In Vorbereitung"),
+            h("div", { class: "progress-track", role: "progressbar",
+              "aria-label": "Erledigte Prozessschritte", "aria-valuemin": "0",
+              "aria-valuemax": String(stationen.length), "aria-valuenow": String(fertig) },
+              fuellung),
+            h("p", { class: "hinweis" }, "Die Details siehst du nur, wenn du sie brauchst.")),
+          h("details", { class: "order-more", "data-auf": "ablauf" },
+            h("summary", {}, "Alle Schritte & Meldungen"),
+            ablaufGesamt(order, stand.klasse)),
+          planLesen, angaben(order),
           ABBRECHBAR.includes(order.status) ? h("p", { class: "abbrechen" },
             h("button", { type: "button", class: "schlicht", onclick: () => {
               const knopf = inhalt.querySelector(".abbrechen");
@@ -112,6 +139,10 @@ export function auftragAnsicht(el, id) {
     eingabenWiederherstellen(inhalt, merk);
     for (const d of inhalt.querySelectorAll("details[data-auf]")) if (auf.has(d.dataset.auf)) d.open = auf.get(d.dataset.auf);
     knoepfeAktualisieren();
+    if (unterseite === "mastering" && order.status === "nachlauf" && !masteringFokussiert) {
+      masteringFokussiert = true;
+      inhalt.querySelector('[aria-label="Mastering"]')?.scrollIntoView({ block: "start" });
+    }
   }
 
   async function laden(erzwingen = false) {

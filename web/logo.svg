@@ -1,9 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sirens">
-  <!-- Ein S aus drei Wellenlinien in den Signalfarben der Seite: du (orange), läuft (gelb), Claude (blau). -->
-  <rect width="64" height="64" rx="14" fill="#15171c"/>
-  <g fill="none" stroke-linecap="round" stroke-width="3.4">
-    <path stroke="#7f8cff" d="M47.04 15.53A16 16 0 1 0 32 37A6 6 0 1 1 26.36 45.05"/>
-    <path stroke="#ff8a4c" d="M42.34 17.24A11 11 0 1 0 32 32A11 11 0 1 1 21.66 46.76"/>
-    <path stroke="#f0c24a" d="M37.64 18.95A6 6 0 1 0 32 27A16 16 0 1 1 16.96 48.47"/>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eceaff"/>
+      <stop offset="1" stop-color="#cbd4ff"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6261d7"/>
+      <stop offset="1" stop-color="#353b88"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#background)"/>
+  <g fill="none" stroke-linecap="round" stroke-width="3.8">
+    <path stroke="url(#wave)" d="M47.04 15.53A16 16 0 1 0 32 37A6 6 0 1 1 26.36 45.05"/>
+    <path stroke="#8584e9" d="M42.34 17.24A11 11 0 1 0 32 32A11 11 0 1 1 21.66 46.76"/>
+    <path stroke="#b2a9f5" d="M37.64 18.95A6 6 0 1 0 32 27A16 16 0 1 1 16.96 48.47"/>
   </g>
 </svg>

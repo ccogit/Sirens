@@ -23,6 +23,19 @@
       "description": "Arbeitsschritt, den Claude gerade ausführt (siehe ablauf.py); fehlt, solange nichts gemeldet ist.",
       "type": "string"
     },
+    "archivierte_versionen": {
+      "description": "Sicher aus dem Musikordner in die Auftragsablage archivierte frühere Fassungen.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pfad", "archiv", "status"],
+        "properties": {
+          "pfad": {"type": "string"},
+          "archiv": {"type": "string"},
+          "status": {"const": "archiviert"}
+        }
+      }
+    },
     "nachlauf_weitere": {
       "description": "Weitere Songs dieses Auftrags, die fertig gemacht werden und gerade zurückgestellt sind (gleicher Aufbau wie nachlauf).",
       "type": "array",

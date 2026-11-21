@@ -3,20 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f6f8fc">
   <title>Sirens</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern.css">
+  <link rel="stylesheet" href="songs.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body>
   <a class="sprung" href="#ansicht">Zum Inhalt</a>
   <header class="kopf">
     <a class="marke" href="#/"><img src="logo.svg" alt="" width="26" height="26">Sirens</a>
     <nav aria-label="Hauptnavigation">
-      <a href="#/" data-nav="start">Aufträge</a>
+      <a href="#/" data-nav="start">Übersicht</a>
+      <a href="#/songs" data-nav="songs">Songs</a>
       <a href="#/neu" data-nav="neu">Neuer Auftrag</a>
-      <a href="#/mastern" data-nav="mastern">Song fertig machen</a>
+      <a href="#/mastern" data-nav="mastern">Song bearbeiten</a>
     </nav>
+    <button class="theme-switch" id="theme-switch" type="button" aria-label="Dunkles Erscheinungsbild einschalten" aria-pressed="false">☾</button>
   </header>
   <main id="ansicht" tabindex="-1"></main>
   <div id="meldung" class="meldung" role="status" aria-live="polite" hidden></div>
