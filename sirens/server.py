@@ -14,6 +14,7 @@ from . import ablauf, nachlauf
 from .contracts import BILD_EXT, Ablehnung, safe_audio_path
 from .service import NutzerAktionen
 from .starter import SATZ, ClaudeStarter
+from .stems import StemDienst
 from .store import Store
 from .workflow import lage
 
@@ -40,6 +41,7 @@ class App:
                              cover=nach.cover, soundcloud=nach.soundcloud, textedit=nach.text_aendern,
                              version=nach.version)
         self.starter = ClaudeStarter(cfg)
+        self.stems = StemDienst(cfg)
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""
@@ -178,6 +180,11 @@ class Handler(BaseHTTPRequestHandler):
                 min_score = None
             return self._json(200, app.katalog.baum(bekannte_bewertungen(app.cfg, app.store),
                                                     query.get("q", ""), min_score))
+        if pfad == "/api/stems":
+            return self._json(200, app.stems.zustand(query.get("pfad"), query.get("modell", "htdemucs")))
+        if pfad == "/api/stems/audio":
+            datei = app.stems.audiodatei(query.get("pfad"), query.get("modell", "htdemucs"), query.get("stem"))
+            return self._audio_datei(datei)
         if pfad == "/api/audio":
             return self._audio(query.get("pfad"))
         if pfad == "/api/bild":
@@ -198,6 +205,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _schreiben(self, pfad, data):
         app = self.app
+        if self.command == "POST" and pfad == "/api/stems":
+            if not isinstance(data, dict):
+                raise Ablehnung("invalid", "Die Stem-Anfrage muss ein Objekt sein.")
+            stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"))
+            return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
         if self.command == "POST" and pfad == "/api/catalog/refresh":
             app.katalog.scan_im_hintergrund()
             return self._json(202, {"zustand": "laeuft"})
@@ -251,6 +263,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _audio(self, pfad):
         datei = safe_audio_path(self.app.cfg.music_root, pfad)
+        return self._audio_datei(datei)
+
+    def _audio_datei(self, datei):
         if not datei.is_file():
             raise Ablehnung("not_found", "Die Datei gibt es nicht.", "pfad", 404)
         groesse = datei.stat().st_size
