@@ -96,8 +96,9 @@ def nachlauf_lage(n):
         return NUTZER, 9, "Bitte entscheiden: bei SoundCloud hochladen?"
     if stand["soundcloud"] == "beauftragt":
         return CLAUDE, 9, "Claude lädt den Song bei SoundCloud hoch."
-    if stand["soundcloud"] == "fertig" and n["soundcloud"].get("cover_offen"):
-        return NUTZER, 9, "Bei SoundCloud liegt noch das bisherige Cover. Bitte dort ersetzen."
+    if stand["soundcloud"] == "fertig" and any(n["soundcloud"].get(k) for k in
+                                               ("cover_offen", "text_offen", "audio_offen")):
+        return NUTZER, 9, "Lokale Fassung geändert. Bitte den bestehenden SoundCloud-Track aktualisieren."
     return NUTZER, 10, "Alles erledigt. Bitte abschließen."
 
 
