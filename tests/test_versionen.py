@@ -92,6 +92,29 @@ class Versionen(Fall):
         self.assertFalse(order["nachlauf"]["soundcloud"]["text_offen"])
         self.assertEqual(order["nachlauf"]["soundcloud"]["link"], "https://soundcloud.com/cco/too-tidy")
 
+    def test_cover_version_wird_nach_wechsel_archivierbar(self):
+        order = self.veroeffentlicht()
+        neu = "cco/lab-notes/Too Tidy - Cover neu.png"
+        (self.cfg.music_root / neu).write_bytes(b"neues bild")
+        order = self.tun("cover", order, entscheidung="datei", datei=neu)
+        self.assertEqual(order["nachlauf"]["cover_entscheidung"], {"alt": COVER, "neu": neu})
+        order = self.tun("version", order, entscheidung="archivieren", pfad=COVER, bestaetigt=True)
+        self.assertTrue((self.cfg.music_root / neu).exists())
+        self.assertFalse((self.cfg.music_root / COVER).exists())
+        self.assertTrue((self.cfg.data_dir / "versionen-archiv" / order["id"] / COVER).exists())
+
+    def test_neue_textdatei_fuehrt_zur_versionsentscheidung(self):
+        order = self.veroeffentlicht()
+        order = self.tun("text_aendern", order, wunsch="Besser formulieren")
+        neu = "cco/lab-notes/Too Tidy - Beschreibung v2.txt"
+        (self.cfg.music_root / neu).write_text("Zweite Fassung", encoding="utf-8")
+        self.cli("phase", order["id"], "--name", "text", "--file", neu)
+        order = self.store.load(order["id"])
+        self.assertEqual(order["nachlauf"]["text_entscheidung"], {"alt": TEXT, "neu": neu})
+        order = self.tun("version", order, entscheidung="behalten", pfad=TEXT)
+        self.assertIsNone(order["nachlauf"]["text_entscheidung"])
+        self.assertTrue((self.cfg.music_root / TEXT).exists())
+
     def test_metadaten_fehler_bleibt_offen(self):
         order = self.veroeffentlicht()
         order = self.tun("text_aendern", order, wunsch="")
