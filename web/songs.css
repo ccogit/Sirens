@@ -51,3 +51,18 @@
   .library-header > a { width: 100%; }
   .kopf .theme-switch { margin-left: auto; width: 34px; height: 34px; }
 }
+
+/* Neuer Master ist eine eigenständige Hauptaktion – nicht hinter »Bearbeiten« versteckt. */
+.song-row-actions .song-remaster { white-space: nowrap; border-radius: 10px; font-size: .83rem; padding: .54rem .8rem; }
+.song-row-actions .song-edit { background: transparent; box-shadow: none; border-color: transparent; }
+.song-row-actions .song-edit:hover:not(:disabled) { background: var(--mulde); box-shadow: none; }
+.remaster-detail { border: 1px solid var(--linie); border-radius: 13px; padding: .85rem 1rem; margin-top: .85rem; background: var(--mulde); }
+.remaster-detail > summary { color: var(--akzent); font-weight: 750; }
+.remaster-detail[open] > summary { margin-bottom: .75rem; }
+.remaster-detail > .hinweis { margin-bottom: .5rem; }
+[aria-label="Mastering"] { scroll-margin-top: 8rem; }
+@media (max-width: 40rem) {
+  .song-row-actions { flex-wrap: wrap; gap: .25rem; justify-content: flex-end; }
+  .song-row-actions .song-remaster { padding: .46rem .55rem; }
+  .song-row-actions .song-edit { padding: .2rem .4rem; }
+}
