@@ -166,7 +166,7 @@ def soundcloud_aktualisieren(service, oid, data):
         aktu.update(text_offen=bool(fehler), text_fehler=fehler)
         if not fehler:
             eintrag(order, NUTZER, "status", "Beschreibung auf dem bestehenden SoundCloud-Track aktualisiert.")
-    return service.store.mutate(oid, None, fn)
+    return service.store.mutate(oid, revision(data), fn)
 
 
 def soundcloud_wieder_oeffnen(service, oid, data):
