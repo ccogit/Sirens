@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { h, leeren } from "./dom.js";
 import { StemAudio } from "./stem_audio.js";
 import { warpStage } from "./stem_visual.js";
+import { instrumentLabor } from "./stem_labor.js";
 
 const NAMEN = { vocals: "Gesang", drums: "Schlagzeug", bass: "Bass",
                 other: "Übrige Instrumente", piano: "Klavier", guitar: "Gitarre" };
@@ -16,7 +17,8 @@ function zeit(sekunden) {
 
 export function stemSpiel(isProducing = () => false) {
   let beendet = false, token = 0, timer = null, takt = null, engine = null;
-  let spuren = [], solo = null;
+  let spuren = [], solo = null, labor = null;
+  const laborEl = h("div", { hidden: true });
   const song = h("select", { "aria-label": "Song für Stem Studio" },
     h("option", { value: "" }, "Songs werden geladen …"));
   const modell = h("select", { "aria-label": "KI-Trennmodell" },
@@ -99,12 +101,17 @@ export function stemSpiel(isProducing = () => false) {
   }
 
   function pausieren() {
+    labor?.pause();
     engine?.pause();
     play.textContent = "▶ Spielen";
   }
 
   function stoppen() {
     pausieren();
+    labor?.beenden();
+    labor = null;
+    laborEl.hidden = true;
+    leeren(laborEl);
     if (takt) clearInterval(takt);
     takt = null;
     engine?.beenden();
@@ -119,7 +126,10 @@ export function stemSpiel(isProducing = () => false) {
 
   function mischen() {
     for (const [i, s] of spuren.entries()) {
-      engine?.pegel(i, (!s.mute && (solo === null || solo === s.name)) ? s.pegel / 100 : 0);
+      const laut = (!s.mute && (solo === null || solo === s.name)) ? s.pegel / 100 : 0;
+      const ersetzt = labor?.aktuelleSpur() === s.name;
+      engine?.pegel(i, ersetzt ? 0 : laut);
+      if (ersetzt) labor.pegel(laut);
       s.solo.setAttribute("aria-pressed", String(solo === s.name));
       s.muteButton.setAttribute("aria-pressed", String(s.mute));
       s.muteButton.textContent = s.mute ? "Stumm ✓" : "Stumm";
@@ -154,9 +164,12 @@ export function stemSpiel(isProducing = () => false) {
         spuren.push(spur);
       }
       mixer.hidden = false;
-      player.onEnde = () => { play.textContent = "▶ Spielen"; aktualisieren(); };
+      labor = instrumentLabor(player, song.value, modell.value, stems, mischen);
+      laborEl.append(labor.el);
+      laborEl.hidden = false;
+      player.onEnde = () => { labor?.pause(); play.textContent = "▶ Spielen"; aktualisieren(); };
       mischen();
-      takt = setInterval(aktualisieren, 120);
+      takt = setInterval(() => { aktualisieren(); labor?.tick(); }, 100);
       aktualisieren();
       status.textContent = "Bereit. Alle Instrumente starten samplegenau auf derselben Zeitachse.";
     } catch (err) {
@@ -239,6 +252,7 @@ export function stemSpiel(isProducing = () => false) {
     document.getElementById("player-audio")?.pause();
     try {
       await engine.schalten();
+      if (engine.laeuft) labor?.play(); else labor?.pause();
       play.textContent = engine.laeuft ? "❚❚ Pause" : "▶ Spielen";
       aktualisieren();
     } catch (err) {
@@ -249,6 +263,7 @@ export function stemSpiel(isProducing = () => false) {
   position.addEventListener("input", () => {
     if (!engine?.bereit) return;
     engine.springen(Number(position.value) / 1000 * engine.dauer);
+    labor?.seek();
     aktualisieren();
   });
   alle.addEventListener("click", () => {
@@ -293,7 +308,7 @@ export function stemSpiel(isProducing = () => false) {
         h("label", {}, "Berechnung", geraet),
         trennen, status,
         h("p", { class: "stems-hint" }, "Keine Cloud-Uploads. Das Original bleibt unverändert. Standardmäßig läuft die Trennung auf der CPU. Für die RTX 5080 wähle CUDA (mit passender PyTorch-Version); während Claude arbeitet, ist CUDA gesperrt. Das 6-Stem-Modell ist bei Gitarre und Klavier experimentell.")),
-      mixer),
+      mixer, laborEl),
     pausieren,
     beenden() {
       beendet = true;
