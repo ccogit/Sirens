@@ -1,0 +1,7 @@
+# Zugangsdaten und alles, was nur auf diesem Rechner gilt
+.env
+.claude/
+.idea/
+tmp/
+__pycache__/
+*.pyc

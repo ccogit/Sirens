@@ -1,0 +1,31 @@
+{
+  "quelle": "12 Paare aus Original und eMastered-Fassung (Album out-of-copyright) sowie 2 weitere eMastered-Fassungen (sound-objects), gemessen am 14.11.2026 mit mastering_engine.analysis",
+  "paare": 12,
+  "master": 14,
+  "veraenderung": {
+    "lufs": 2.42,
+    "crest": -1.71,
+    "spanne": -1.5,
+    "breite": 0.01,
+    "baender": {
+      "sub": -1.1,
+      "bass": 0.76,
+      "low_mid": 0.28,
+      "high_mid": 0.79,
+      "air": 3.03
+    }
+  },
+  "master_median": {
+    "lufs": -10.38,
+    "crest": 11.51,
+    "spanne": 5.4,
+    "spitze": 0.31,
+    "baender": {
+      "sub": 21.44,
+      "bass": 15.08,
+      "low_mid": 7.36,
+      "high_mid": -12.47,
+      "air": -17.62
+    }
+  }
+}

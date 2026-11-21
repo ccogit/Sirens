@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Sirens</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <a class="sprung" href="#ansicht">Zum Inhalt</a>
+  <header class="kopf">
+    <a class="marke" href="#/"><img src="logo.svg" alt="" width="26" height="26">Sirens</a>
+    <nav aria-label="Hauptnavigation">
+      <a href="#/" data-nav="start">Aufträge</a>
+      <a href="#/neu" data-nav="neu">Neuer Auftrag</a>
+      <a href="#/mastern" data-nav="mastern">Song fertig machen</a>
+    </nav>
+  </header>
+  <main id="ansicht" tabindex="-1"></main>
+  <div id="meldung" class="meldung" role="status" aria-live="polite" hidden></div>
+  <aside id="player" class="player" aria-label="Player" hidden>
+    <span id="player-titel"></span>
+    <audio id="player-audio" controls preload="none"></audio>
+    <button type="button" id="player-zu" class="schlicht" aria-label="Player schließen">✕</button>
+  </aside>
+  <noscript>Diese Seite braucht JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

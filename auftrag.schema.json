@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sirens v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "revision",
+    "created_at",
+    "updated_at",
+    "status",
+    "vorgaenger_id",
+    "wunsch",
+    "plan",
+    "tracks_stand",
+    "ergebnis",
+    "verlauf",
+    "bewertungen"
+  ],
+  "properties": {
+    "detail_schritt": {
+      "description": "Arbeitsschritt, den Claude gerade ausführt (siehe ablauf.py); fehlt, solange nichts gemeldet ist.",
+      "type": "string"
+    },
+    "nachlauf_weitere": {
+      "description": "Weitere Songs dieses Auftrags, die fertig gemacht werden und gerade zurückgestellt sind (gleicher Aufbau wie nachlauf).",
+      "type": "array",
+      "items": {"type": "object", "required": ["favorit", "mastering", "ableton", "cover", "text", "soundcloud"]}
+    },
+    "nachlauf": {
+      "description": "Nachlauf für den Favoriten (Mastering, Ableton, Cover, Text, SoundCloud); fehlt, solange er nicht begonnen wurde.",
+      "type": ["object", "null"],
+      "required": ["favorit", "mastering", "ableton", "cover", "text", "soundcloud"]
+    },
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^SA-[0-9]{8}-[0-9]{3}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "status": {
+      "enum": [
+        "entwurf",
+        "offen",
+        "in_arbeit",
+        "rueckfrage",
+        "plan_wartet",
+        "antwort_da",
+        "gesendet",
+        "fertig", "nachlauf",
+        "abgeschlossen",
+        "fehler",
+        "abgebrochen"
+      ]
+    },
+    "vorgaenger_id": {"type": ["string", "null"]},
+    "wunsch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weg", "umfang", "referenzen", "wunsch", "optionen"],
+      "properties": {
+        "weg": {"enum": ["referenz", "beschreibung"]},
+        "umfang": {"enum": ["song", "album"]},
+        "track_count": {"type": ["integer", "null"], "minimum": 2, "maximum": 20},
+        "artist_slug": {"type": "string"},
+        "ziel_release_slug": {"type": "string"},
+        "bezug": {"enum": ["im_stil", "fortsetzung", "neufassung"]},
+        "referenzen": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pfad", "artist_slug", "release_slug", "titel", "version", "fassung", "gewicht", "uebernehmen"],
+            "properties": {
+              "pfad": {"type": "string"},
+              "artist_slug": {"type": "string"},
+              "release_slug": {"type": "string"},
+              "titel": {"type": "string"},
+              "version": {"type": ["integer", "null"]},
+              "fassung": {"type": "string"},
+              "gewicht": {"enum": ["normal", "stark"]},
+              "uebernehmen": {"type": "string"}
+            }
+          }
+        },
+        "wunsch": {"type": "string"},
+        "track_wuensche": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nr", "text"],
+            "properties": {"nr": {"type": "integer", "minimum": 1}, "text": {"type": "string"}}
+          }
+        },
+        "optionen": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "titelwunsch": {"type": "string"},
+            "sprache": {"type": "string"},
+            "gesang": {"enum": ["mit", "instrumental", "egal"]},
+            "no_gos": {"type": "string"},
+            "provider": {"enum": ["suno", "minimax"]},
+            "planfreigabe": {"enum": ["an", "aus"]},
+            "zweitgutachten": {"enum": ["an", "aus"]},
+            "tempo": {"enum": ["normal", "schnell"]}
+          }
+        }
+      }
+    },
+    "plan": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["titel", "konzept", "tracks"],
+      "properties": {
+        "titel": {"type": "string"},
+        "konzept": {"type": "string"},
+        "tracks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nr", "titel", "idee", "stil_kurz", "text"],
+            "properties": {
+              "nr": {"type": "integer", "minimum": 1, "maximum": 20},
+              "titel": {"type": "string"},
+              "idee": {"type": "string"},
+              "stil_kurz": {"type": "string"},
+              "text": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "tracks_stand": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nr", "titel", "schritt", "dateien"],
+        "properties": {
+          "nr": {"type": "integer", "minimum": 1, "maximum": 20},
+          "titel": {"type": "string"},
+          "schritt": {"enum": ["geplant", "text", "paket", "geprueft", "gesendet", "fertig", "fehler"]},
+          "dateien": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "ergebnis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_slug", "song_slugs", "package_ids"],
+      "properties": {
+        "release_slug": {"type": "string"},
+        "song_slugs": {"type": "array", "items": {"type": "string"}},
+        "package_ids": {"type": "array", "items": {"type": "integer"}}
+      }
+    },
+    "verlauf": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zeit", "von", "art", "text"],
+        "properties": {
+          "zeit": {"type": "string", "format": "date-time"},
+          "von": {"enum": ["nutzer", "claude"]},
+          "art": {"enum": ["status", "notiz", "rueckfrage", "antwort", "plan_aenderung"]},
+          "text": {"type": "string"},
+          "station": {"description": "Station beim Schreiben (1-10); fehlt bei älteren Einträgen.", "type": "integer"}
+        }
+      }
+    },
+    "bewertungen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pfad", "score", "favorit", "kommentar", "zeit", "uebernommen"],
+        "properties": {
+          "pfad": {"type": "string"},
+          "score": {"type": "integer", "minimum": -2, "maximum": 2},
+          "favorit": {"type": "boolean"},
+          "kommentar": {"type": "string"},
+          "zeit": {"type": "string", "format": "date-time"},
+          "uebernommen": {"type": "boolean"},
+          "evaluation_id": {"type": "integer"}
+        }
+      }
+    }
+  }
+}
