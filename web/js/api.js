@@ -38,6 +38,6 @@ export const api = {
   bildUrl: (pfad) => `/api/bild?pfad=${encodeURIComponent(pfad)}`,
   audioUrl: (pfad) => `/api/audio?pfad=${encodeURIComponent(pfad)}`,
   stemStatus: (pfad, modell) => ruf("GET", `/api/stems?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}`),
-  stemStart: (pfad, modell) => ruf("POST", "/api/stems", { pfad, modell }),
+  stemStart: (pfad, modell, device = "cpu") => ruf("POST", "/api/stems", { pfad, modell, device }),
   stemAudioUrl: (pfad, modell, stem) => `/api/stems/audio?pfad=${encodeURIComponent(pfad)}&modell=${encodeURIComponent(modell)}&stem=${encodeURIComponent(stem)}`,
 };
