@@ -7,6 +7,7 @@ export function deriveState({capabilities, gpu, mock=false, songs=0, error=null,
   if (mock) flags.push("Testmodus – kein Ton, keine KI");
   if (gpu?.available === false) flags.push("Keine GPU verfügbar");
   if (songs === 0) flags.push("Leere Bibliothek");
+  if (capabilities && !selected?.available && error) flags.push("Kein Modell installiert oder freigegeben");
   const state = (text,enabled=false) => ({text:[text,...flags].filter(Boolean).join(" · "),enabled,selected});
   if (error?.error === "busy_gpu") return state("GPU beschäftigt");
   if (error) return state(error.status === 503 && !capabilities ? "Schalter aus oder RT nicht verfügbar (503)" : "API-Fehler: " + (error.message || error.status || "unbekannt"));
