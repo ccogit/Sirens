@@ -14,7 +14,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | gemergt |
 | KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | gemergt |
 | KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | gemergt |
-| KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | vergeben (24.11.2026) |
+| KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | gemergt |
 | KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | gemergt |
 | KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 gemergt | gemergt |
 | KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | gemergt |
@@ -28,7 +28,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
-| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | vergeben (24.11.2026) |
+| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | offen |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt, ein neuronaler Pfad freigegeben | gesperrt (optional, wartet auf neuronalen Pfad und Freigabe) |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt | offen |

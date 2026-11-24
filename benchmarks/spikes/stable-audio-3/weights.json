@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "id": "small-music",
+      "url": "https://huggingface.co/stabilityai/stable-audio-3-small-music",
+      "filename": "model.safetensors",
+      "size_bytes": null,
+      "sha256": null,
+      "license": "Stability AI Community License; gated",
+      "license_url": "https://huggingface.co/stabilityai/stable-audio-3-small-music/blob/main/LICENSE.md",
+      "approved": false
+    },
+    {
+      "id": "small-music-text-encoder",
+      "url": "https://huggingface.co/stabilityai/stable-audio-3-small-music/tree/main/t5gemma-b-b-ul2",
+      "filename": "t5gemma-b-b-ul2/model.safetensors",
+      "size_bytes": null,
+      "sha256": null,
+      "license": "Gemma Terms of Use; gated",
+      "license_url": "https://ai.google.dev/gemma/terms",
+      "approved": false
+    }
+  ]
+}
