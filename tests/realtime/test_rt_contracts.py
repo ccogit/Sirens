@@ -172,7 +172,12 @@ class HTTP(ServerFall):
         validate("capabilities",body)
         self.server.app.cfg = replace(self.cfg,rt_enabled=True,rt_mock=True)
         status, body, _ = self.http("GET",path)
-        self.assertEqual((status,body),(200,EXAMPLE["schemas"]["capabilities"]["valid"]))
+        # Mock eingeschaltet: das Beispiel aus den Verträgen steht vorn, nicht installierte echte Worker folgen.
+        beispiel = EXAMPLE["schemas"]["capabilities"]["valid"]
+        self.assertEqual((status,body["protocol_version"]),(200,beispiel["protocol_version"]))
+        mocks = [c for c in body["capabilities"] if c["mock"]]
+        self.assertEqual(mocks, beispiel["capabilities"])
+        self.assertTrue(all(not c["available"] for c in body["capabilities"] if not c["mock"]))
         validate("capabilities",body)
         for headers, code in (({"Origin":"https://example.invalid"},"forbidden_origin"),
                               ({"Host":"example.invalid"},"forbidden_host")):
