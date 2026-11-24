@@ -13,6 +13,7 @@ from workers.sam_audio.backend import SamBackend, verify_snapshot, PIN
 from workers.sam_audio.adapter import Cancelled, encode, separate, split_sample
 from workers.sam_audio.cache import SemanticCache, validate_assets
 from sirens.realtime.model_registry import ModelRegistry
+from sirens.realtime.schemas import validate
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -73,11 +74,25 @@ class SemanticTests(unittest.TestCase):
                 self.assertTrue(-32768 <= a <= 32767 and -32768 <= b <= 32767)
 
     def test_registry_disabled_even_with_interpreter(self):
+        template = ROOT / "workers" / "sam_audio" / "manifest.pending.json"
+        manifest = json.loads(template.read_text(encoding="utf-8"))
+        cap = validate("capability", manifest["capability"])
+        self.assertFalse(cap["available"])
+        self.assertFalse(cap["mock"])
         for env in ({}, {"SIRENS_RT_SAM_AUDIO_PYTHON": sys.executable}):
             reg = ModelRegistry(ROOT, env=env)
-            cap = next(c for c in reg.capabilities() if c["id"] == "sam_audio")
-            self.assertFalse(cap["available"])
-            self.assertFalse(cap["mock"])
+            self.assertFalse(any(c["id"] == "sam_audio" and c["available"]
+                                 for c in reg.capabilities()))
+        # Simulierte lokale Freigabe: Registry verlangt zusätzlich Interpreter.
+        worker = self.root / "workers" / "sam_audio"
+        worker.mkdir(parents=True)
+        (worker / "worker.py").write_text("# Test", encoding="utf-8")
+        cap["available"] = True
+        cap["model_revision"] = "test-only"
+        (worker / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        self.assertFalse(ModelRegistry(self.root, env={}).capabilities()[0]["available"])
+        self.assertTrue(ModelRegistry(self.root, env={
+            "SIRENS_RT_SAM_AUDIO_PYTHON": sys.executable}).capabilities()[0]["available"])
 
     def test_ipc_lifecycle(self):
         code = ("from workers.sam_audio.worker import main\n"
