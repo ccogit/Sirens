@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "sam_audio",
+  "interpreter_env": "SIRENS_RT_SAM_AUDIO_PYTHON",
+  "script": "worker.py",
+  "args": [],
+  "capability": {
+    "id": "sam_audio",
+    "mock": false,
+    "available": false,
+    "mode": "offline",
+    "sample_rates": [
+      44100,
+      48000
+    ],
+    "channels": 2,
+    "context_frames": 0,
+    "hop_frames": 1,
+    "latency_frames": 0,
+    "controls": [],
+    "vram_peak_bytes": "unknown",
+    "device": "cuda",
+    "license": "SAM License (Gewichte: gated, nicht freigegeben)",
+    "model_revision": "sam-audio-small:unverified"
+  }
+}
