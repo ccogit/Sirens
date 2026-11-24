@@ -98,11 +98,11 @@ export function autoDjAnsicht(isProducing=()=>false) {
     h("p",{class:"auto-privacy"},"Lokal: Analyse durch ffmpeg, Mixing mit Web Audio. BPM und Phrasengrenzen sind Schätzungen – keine echten Genre-, Stimm- oder Harmonietags. Originale bleiben unverändert."));
   const mixer=new AutoMixer(api,{
     status:text=>{ if(!beendet) stand.textContent=text; },
-    song:(song,info)=>{
+    song:(song,info,effektiv)=>{
       if(beendet)return;
       aktuell={song,info};
       now.textContent=song.text;
-      meta.textContent=info.bpm.toFixed(1)+" BPM · "+klassifizierung(info).join(" · ")+
+      meta.textContent=effektiv.toFixed(2)+" BPM (Set) · Original "+info.bpm.toFixed(2)+" BPM · "+klassifizierung(info).join(" · ")+
         " · Beat-Sicherheit "+Math.round(info.confidence*100)+" %";
       timeline(arc,info);
     },
@@ -115,8 +115,9 @@ export function autoDjAnsicht(isProducing=()=>false) {
         h("strong",{},plan.song.text),
         h("p",{},"Übergang bei "+uhr(cue.startA)+" → Einstieg "+uhr(cue.startB)),
         h("p",{},"Ausgang: "+cue.ausgang+" · Eingang: "+cue.eingang),
-        h("p",{},cue.bpm.toFixed(1)+" BPM · "+"Tempo B: "+
-          (cue.rateB*100).toFixed(1)+" % · "+cue.bars+" Takte überblenden"),
+        h("p",{},cue.sync?cue.bpm.toFixed(2)+" BPM · Tempo B: "+
+          (cue.rateB*100).toFixed(2)+" % · "+cue.bars+" Takte · Beat-Sync":
+          "Direktwechsel · "+cue.bpm.toFixed(2)+" BPM · kein sicherer Tempo-Match"),
         h("p",{},"Regie-Ziel: "+Math.round(plan.zielEnergie*100)+" % Energie"),
         h("p",{class:"auto-confidence"},"Struktur-Schätzung "+Math.round(cue.confidence*100)+" % · Energiematch "+
           Math.round((1-Math.abs(cue.energieA-cue.energieB))*100)+" %"));

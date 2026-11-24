@@ -273,3 +273,31 @@ test("Signal Room: Register lehnt doppelte IDs ab, Vorschau darf fehlen",()=>{
   let rejected=false;try{validateTools([t,t]);}catch{rejected=true;}
   assert.equal(rejected,true);
 });
+
+test("Auto-DJ hält Halb-/Doppeltempo über den nächsten Übergang",()=>{
+  const track=bpm=>({bpm,duration:200,confidence:.9,phrase_confidence:.8,
+    cues_out:[{zeit:100,score:.8,energie:.5,grund:"out"}],
+    cues_in:[{zeit:8,score:.8,energie:.5,grund:"in"}]});
+  const a=track(160), b=track(82), c=track(156);
+  const ab=DJ.findeUebergang(a,b,20,8);
+  assert.ok(ab); assert.equal(ab.normalB,164);
+  const bc=DJ.findeUebergang(b,c,20,8,.19,null,ab.rateB,ab.normalB);
+  assert.ok(bc); assert.equal(bc.normalB,156);
+  assert.ok(Math.abs(bc.bpm-160)<1e-9);
+  assert.ok(Math.abs(bc.rateB-160/156)<1e-9);
+});
+
+test("Auto-DJ korrigiert verspätete Wiedergabe und Drift mit begrenzter Rate",()=>{
+  const cue={startA:100,startB:8,rateA:1.08,rateB:.96};
+  assert.ok(Math.abs(DJ.syncFehler(110.8,17.6,cue))<1e-9);
+  assert.equal(DJ.syncRate(110.8,17.6,cue),.96);
+  assert.ok(DJ.syncRate(110.8,17.55,cue)>.96);
+  assert.ok(DJ.syncRate(110.8,17.65,cue)<.96);
+  assert.equal(DJ.syncRate(110.8,8,cue),.96*1.03);
+  let b=8-.06;
+  for(let i=0;i<400;i++){
+    const a=100+i*.035*cue.rateA;
+    b+=DJ.syncRate(a,b,cue)*.035;
+  }
+  assert.ok(Math.abs(DJ.syncFehler(100+400*.035*cue.rateA,b,cue))<.013);
+});

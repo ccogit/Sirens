@@ -20,6 +20,18 @@ class TaktErkennung(unittest.TestCase):
         bar0 = _bar0(impulse, grid["beat0"], grid["bpm"])
         self.assertAlmostEqual(bar0, 0.05, delta=0.07)
 
+    def test_subframe_tempo_und_phase_ohne_drift(self):
+        for bpm in (122.5, 127.3, 133.7):
+            with self.subTest(bpm=bpm):
+                impulse = [0.0] * 9000
+                period = 60 / bpm
+                for i in range(int(89 / period)):
+                    impulse[round((0.073 + i * period) * 100)] = 1.0 if i % 4 == 0 else 0.65
+                grid = beatgrid(impulse)
+                self.assertAlmostEqual(grid["bpm"], bpm, delta=0.04)
+                self.assertAlmostEqual(grid["beat0"], 0.073, delta=0.015)
+                self.assertLess(abs(240 * 60 / grid["bpm"] - 240 * period), 0.04)
+
     def test_kein_beat(self):
         with self.assertRaises(ValueError):
             beatgrid([0.0] * 5000)

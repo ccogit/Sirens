@@ -20,6 +20,39 @@ MAX_SECONDS = 360
 BEAT_WINDOW = 90
 
 
+def _feinraster(signal, lag, hz):
+    """Sub-frame Tempo und Phase aus kohärenten Onset-Spitzen über das ganze Fenster."""
+    peaks = [(i / hz, v) for i, v in enumerate(signal[1:-1], 1)
+             if v > 0 and v >= signal[i-1] and v > signal[i+1]]
+    if len(peaks) < 8:
+        phases = [0.0] * lag
+        for i, v in enumerate(signal):
+            phases[i % lag] += v
+        phase = max(range(lag), key=phases.__getitem__)
+        return lag / hz, phase / hz, phases[phase] / max(sum(phases), 1e-9)
+    total = sum(v for _, v in peaks)
+    lo, hi = hz / (lag + 1.25), hz / (lag - 1.25)
+    span = max(1.0, peaks[-1][0] - peaks[0][0])
+    steps = max(8, math.ceil((hi - lo) * span * 5))
+
+    def coherence(f):
+        w = math.tau * f
+        x = sum(v * math.cos(w * t) for t, v in peaks)
+        y = sum(v * math.sin(w * t) for t, v in peaks)
+        return math.hypot(x, y), x, y
+
+    step = (hi - lo) / steps
+    f = max((lo + i * step for i in range(steps + 1)),
+            key=lambda x: coherence(x)[0])
+    f = max((f + step * i / 16 for i in range(-16, 17)
+             if lo <= f + step * i / 16 <= hi),
+            key=lambda x: coherence(x)[0])
+    strength, x, y = coherence(f)
+    period = 1 / f
+    phase = (math.atan2(y, x) / (math.tau * f)) % period
+    return period, phase, min(1.0, strength / total)
+
+
 def beatgrid(onset, hz=HZ):
     """Aus einem Onset-Verlauf BPM und Beatphase gewinnen (4/4-Bar-Annahme)."""
     if len(onset) < 8 * hz:
@@ -43,16 +76,12 @@ def beatgrid(onset, hz=HZ):
     score, lag = max(kandidaten)
     if score <= 0:
         raise ValueError("Kein regelmäßiger Beat gefunden.")
-    phasen = [0.0] * lag
-    for i, v in enumerate(signal):
-        phasen[i % lag] += v
-    phase = max(range(lag), key=phasen.__getitem__)
-    phase_anteil = phasen[phase] / max(sum(phasen), 1e-9)
-    bpm = 60 * hz / lag
+    period, phase, phase_anteil = _feinraster(signal, lag, hz)
+    bpm = 60 / period
     # Konfidenz ist eine Schätzung, kein Beweis für Taktart/Downbeat.
     staerke = min(1.0, score * (len(signal) - lag) / max(e, 1e-9) * 1.3)
     sicherheit = round(min(0.99, max(0.05, staerke * 0.8 + phase_anteil * 0.2)), 2)
-    return {"bpm": round(bpm, 2), "beat0": round(phase / hz, 3),
+    return {"bpm": round(bpm, 4), "beat0": round(phase, 3),
             "confidence": sicherheit, "meter": 4, "method": "onset-autocorrelation"}
 
 
