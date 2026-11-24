@@ -34,7 +34,10 @@
 .lab-toy .spiel-flaeche { height: clamp(18rem, calc(100vh - 31rem), 46rem); }
 
 /* Startseite: Mini-DJ-Deck im kantigen Signal-Room-Design. Kein Audio, keine Endlosschleife. */
-.dashboard-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+/* Deck und „Neuer Auftrag" nebeneinander; erst auf schmalen Bildschirmen untereinander. */
+.dashboard-actions { display: flex; gap: 1rem; align-items: stretch; flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.dashboard-actions .spiel-knopf { flex: 0 1 25rem; }
+.dashboard-actions .new-order { flex: 0 0 auto; display: inline-flex; align-items: center; }
 .spiel-knopf {
   --deck-bg: #14171a; --deck-ink: #f0f0e7; --deck-dim: #b1b5ad;
   --deck-line: #454a43; --deck-acid: #d9fa76; --deck-peach: #ffab7b;
@@ -99,6 +102,8 @@
 .deck-scratch .deck-label { background: var(--deck-peach); }
 .deck-scratch .deck-status { color: var(--deck-peach); }
 @media (max-width: 40rem) {
+  .dashboard-actions { flex-wrap: wrap; }
+  .dashboard-actions .spiel-knopf { flex-basis: 100%; }
   .spiel-knopf { grid-template-columns: 66px minmax(0, 1fr); gap: .6rem; }
   .deck-turntable { width: 66px; height: 66px; }
   .deck-vinyl { width: 54px; }

@@ -28,13 +28,13 @@ function spielKnopf() {
   const pads = Array.from({ length: 16 }, (_, i) =>
     h("i", { class: i % 4 === 0 ? "deck-kick" : "" }));
   const link = h("a", { class: "spiel-knopf", href: "#/lab",
-    "aria-label": "Spielen: DJ-Pult, Beat-Pads, Emblem, Auto-DJ, Kick-Tausch und Stem Studio" },
+    "aria-label": "Play: DJ-Pult, Beat-Pads, Emblem, Auto-DJ, Kick-Tausch und Stem Studio" },
     h("span", { class: "deck-turntable", "aria-hidden": "true" },
       h("span", { class: "deck-vinyl" }, h("span", { class: "deck-label" }, "S")),
       h("span", { class: "deck-arm" })),
     h("span", { class: "deck-copy", "aria-hidden": "true" },
       h("span", { class: "deck-top" }, h("span", {}, "LIVE LAB / 01"), status),
-      h("span", { class: "deck-title" }, "SPIELEN", h("span", { class: "deck-arrow" }, "↗")),
+      h("span", { class: "deck-title" }, "PLAY", h("span", { class: "deck-arrow" }, "↗")),
       h("small", {}, "DJ · Beat-Pads · Emblem · Auto-DJ · Kick-Tausch · Stems"),
       h("span", { class: "deck-pads" }, pads)));
   const bewegung = window.matchMedia("(prefers-reduced-motion: reduce)");

@@ -131,11 +131,16 @@
 .library-tags button:hover { color: var(--akzent); }
 
 .library-description, .library-no-description { margin: .22rem 0 0; color: var(--leise); font-size: .8rem; }
-.library-description summary { cursor: pointer; }
-.library-description summary span { display: inline-block; max-width: calc(100% - 1.2rem);
+.library-description summary { cursor: pointer; list-style: none; }
+.library-description summary::-webkit-details-marker { display: none; }
+.library-description summary span { display: inline-block; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.library-description[open] summary span { display: none; }
-.library-description[open] summary::after { content: "Beschreibung einklappen"; }
+/* Geöffnet: nur der volle Text; die Kurzzeile bleibt für Tastatur und Screenreader bedienbar, aber unsichtbar. */
+.library-description[open] > summary { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; }
+.library-song:has(> .library-track-description) { cursor: pointer; }
+.library-song:has(> .library-track-description) :is(button, a, select, input, meter) { cursor: auto; }
+.library-song:has(> .library-track-description) :is(button, a, select) { cursor: pointer; }
 .library-description p { white-space: pre-line; margin: .45rem 0; max-width: 82ch; }
 .library-album-description, .library-detail > .library-no-description { margin: .25rem 1rem .8rem; }
 .library-track-description { max-width: 72ch; }

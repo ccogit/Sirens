@@ -180,7 +180,15 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
     if (player.isConnected) knoepfeAktualisieren();
   }
   fassungZeigen();
-  return h("li", { class: "library-song" },
+  // Klick irgendwo auf die Zeile klappt die Beschreibung auf und zu; Bedienelemente behalten ihre Wirkung.
+  const aufklappen = event => {
+    const details = event.currentTarget.querySelector(":scope > .library-track-description");
+    if (!details || details.tagName !== "DETAILS") return;
+    if (event.target.closest("button, a, select, input, option, label, summary, meter, audio")) return;
+    if (window.getSelection?.().toString()) return;
+    details.open = !details.open;
+  };
+  return h("li", { class: "library-song", onclick: aufklappen },
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
     h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
