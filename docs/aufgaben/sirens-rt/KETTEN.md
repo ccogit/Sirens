@@ -40,7 +40,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 gemergt | gemergt |
 | KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | gemergt |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
-| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | offen (Freigabe 24.11.2026; Merge erst nach G4) |
+| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | vergeben (24.11.2026) |
 
 Im Register steht als Voraussetzung nur, wessen **Code** gebraucht wird. Ketten werden **vorgezogen**: Sie
 starten, sobald ihre Voraussetzung vergeben ist, und bauen auf deren Branch auf (Regel 11). Ketten zu echten
@@ -110,11 +110,11 @@ reservieren nichts und ändern diese Datei nicht.
    wurde, je Abnahmepunkt der Beleg (Test, Befehl, Ausgabe), was nicht geprüft werden konnte („nicht
    gemessen“ samt Skript und Aufruf für den Koordinator), Abweichungen von der Aufgabe mit Grund, Versionen,
    Pins und Lizenzen fremder Projekte, offene Risiken, Rückbau.
-4. **Früh pushen, die CI prüft.** Nach dem ersten Commit sofort pushen und den Draft-PR öffnen; danach in
-   kleinen Schritten weiter pushen. Maßgeblich ist die CI des PR (sie führt
-   `python -m unittest discover -s tests -v` aus), nicht die eigene Umgebung. Wer das Repo nicht vollständig
-   auschecken oder die Tests nicht lokal ausführen kann, pusht trotzdem und behebt Fehler anhand der
-   CI-Ausgabe. Ein lokal nicht geprüfter Stand ist nie ein Grund, nicht zu pushen oder keinen PR zu öffnen.
+4. **Früh pushen, keine CI.** Nach dem ersten Commit sofort pushen und den Draft-PR öffnen; danach in
+   kleinen Schritten weiter pushen. GitHub Actions ist abgeschaltet (seit 24.11.2026): Es gibt keine CI-Läufe,
+   nicht darauf warten. Die maßgebliche Prüfung (`py -3.11 -m unittest discover -s tests -v` unter Windows)
+   macht der Koordinator nach „Ready for review“; Tests müssen unter Linux und Windows laufen. Ein lokal nicht
+   geprüfter Stand ist nie ein Grund, nicht zu pushen oder keinen PR zu öffnen.
    Tests zu jeder Änderung, ohne Netz, ohne GPU, ohne Modellgewichte.
 5. **Nie ohne PR enden.** Jede Antwort im Chat, die die Arbeit beendet, setzt einen gepushten Stand und einen
    PR voraus. Ist alles fertig und die CI grün: Ready for review. Geht es nicht weiter (Blockade, CI bleibt
