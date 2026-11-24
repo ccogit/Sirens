@@ -67,3 +67,191 @@
   .song-row-actions .song-remaster { padding: .46rem .55rem; }
   .song-row-actions .song-edit { padding: .2rem .4rem; }
 }
+
+/* Desktop-Bibliothek: Auswahl und Titelliste bleiben nebeneinander sichtbar. */
+.songs-library { max-width: 112rem; margin-inline: auto; }
+.songs-library .library-header { align-items: center; margin-bottom: 1rem; }
+.songs-library .library-header h1 { margin: 0; }
+.library-desktop { display: grid; grid-template-columns: clamp(17rem, 26vw, 25rem) minmax(0, 1fr);
+  gap: clamp(1.75rem, 3vw, 4rem); align-items: start; }
+.library-detail { display: flex; flex-direction: column; max-height: calc(100vh - 11rem); overflow: hidden; }
+.library-detail:empty { display: none; }
+.library-sidebar { position: sticky; top: 6rem; display: flex; flex-direction: column;
+  max-height: calc(100vh - 12rem); padding: 0 1rem 0 0; border-inline-end: 1px solid var(--linie); }
+.library-sidebar .library-toolbar { padding: 0 0 .4rem; gap: .55rem; border: 0; }
+.library-toolbar input[type="search"] { flex: 1; min-width: 0; }
+.library-catalog-status { margin: .4rem .4rem .55rem; }
+.library-navigation { overflow: auto; min-height: 0; }
+.library-navigation button { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center; gap: .55rem; width: 100%; text-align: left; padding: .35rem .45rem;
+  border: 0; border-inline-start: 3px solid transparent; border-radius: 0 var(--r-klein, 3px) var(--r-klein, 3px) 0; background: transparent; color: var(--tinte); cursor: pointer; }
+.library-navigation button:hover { background: var(--signal-hover, var(--mulde)); }
+.library-navigation button[aria-current] { background: var(--signal-hover, var(--mulde)); border-inline-start-color: var(--akzent); font-weight: 700; }
+.library-navigation img, .library-navigation-art { display: grid; place-items: center; width: 2rem; height: 2rem;
+  border-radius: var(--r-klein, 3px); object-fit: cover; background: var(--mulde); }
+.library-navigation-name { overflow-wrap: anywhere; }
+.library-release-header { display: flex; flex: none; gap: 1.45rem; align-items: end; padding: 1.15rem 1.2rem 1.4rem;
+  background: var(--signal-stage, var(--flaeche)); border-bottom: 1px solid var(--linie); border-radius: var(--r, 5px) var(--r, 5px) 0 0; }
+.library-release-header img { width: clamp(5rem, 8vw, 8rem); aspect-ratio: 1; object-fit: cover; border-radius: var(--r-klein, 3px); box-shadow: none; }
+.library-release-header h2, .library-release-header p { margin: 0; }
+.library-release-header h2 { font-size: clamp(1.55rem, 2.6vw, 2.75rem); line-height: 1.08; letter-spacing: -.025em; }
+.library-release-header p { margin-top: .5rem; }
+.library-single-controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5rem; }
+.library-song-list { overflow: auto; min-height: 0; list-style: none; padding: 0; margin: 0; }
+.library-song, .library-album-empty { border-top: 1px solid var(--linie); padding: .4rem 1rem; }
+.library-song { display: grid; grid-template-columns: 1.9rem auto minmax(0, 1fr) minmax(7rem, 13rem) minmax(5rem, auto);
+  align-items: center; gap: .65rem; }
+.library-song:hover { background: var(--signal-hover, var(--mulde)); }
+.library-song-art { display: grid; place-items: center; height: 1.9rem; overflow: hidden;
+  border-radius: var(--r-klein, 3px); background: var(--akzent-zart); color: var(--akzent); }
+.library-song-art img { width: 100%; height: 100%; object-fit: cover; }
+.library-song-identity { min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.library-song-meta { display: flex; flex-wrap: wrap; gap: .15rem .6rem; }
+.library-song-meta:not(:has(> :not([hidden]))) { display: none; }
+.library-song-play { display: flex; }
+.library-song-version { min-width: 0; }
+.songs-library .library-song-version select { width: 100%; min-width: 0; padding: .3rem .5rem; text-overflow: ellipsis;
+  border-color: transparent; background-color: transparent; }
+.songs-library .library-song-version select:hover, .songs-library .library-song-version select:focus-visible { border-color: var(--linie); }
+.library-song-version > span { display: block; overflow-wrap: anywhere; }
+.library-song-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.songs-library .library-song-actions button { padding: .3rem .6rem; white-space: nowrap; background: transparent; border-color: transparent; }
+.songs-library .library-song-actions button:hover, .songs-library .library-song-actions button:focus-visible { border-color: var(--linie); }
+.library-song-play .abspielen { border-color: transparent; }
+
+.library-filters { padding: .45rem 0; }
+.library-filters summary { cursor: pointer; font-weight: 650; }
+.library-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .55rem; }
+.library-filter-grid label { display: grid; gap: .15rem; min-width: 0; font-size: .78rem; }
+.library-filter-grid select { min-width: 0; padding: .27rem; }
+.library-filters p { margin: .45rem 0; }
+.library-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .25rem; }
+.library-tags button { border: 0; border-radius: 4px; background: var(--mulde); color: var(--leise);
+  font-size: .75rem; padding: .14rem .35rem; cursor: pointer; }
+.library-tags button:hover { color: var(--akzent); }
+
+.library-description, .library-no-description { margin: .22rem 0 0; color: var(--leise); font-size: .8rem; }
+.library-description summary { cursor: pointer; list-style: none; }
+.library-description summary::-webkit-details-marker { display: none; }
+.library-description summary span { display: inline-block; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+/* Geöffnet: nur der volle Text; die Kurzzeile bleibt für Tastatur und Screenreader bedienbar, aber unsichtbar. */
+.library-description[open] > summary { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; }
+.library-song:has(> .library-track-description) { cursor: pointer; }
+.library-song:has(> .library-track-description) :is(button, a, select, input, meter) { cursor: auto; }
+.library-song:has(> .library-track-description) :is(button, a, select) { cursor: pointer; }
+.library-description p { white-space: pre-line; margin: .45rem 0; max-width: 82ch; }
+.library-album-description, .library-detail > .library-no-description { margin: .25rem 1rem .8rem; }
+.library-track-description { max-width: 72ch; }
+
+.library-profile { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem 1rem; }
+.library-profile dt { font-weight: 650; }
+.library-profile dd { margin: 0; }
+.library-song:has(.library-description[open]) { align-items: start; }
+.library-extra > details > summary { cursor: pointer; padding: .8rem 1rem; border-top: 1px solid var(--linie); color: var(--leise); }
+
+/* Nur die Bibliothek verwendet einen an den Desktop gebundenen Arbeitsbereich. */
+body.songs-page, body.songs-page:has(#player:not([hidden])) {
+  display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden;
+}
+body.songs-page > .kopf { flex: none; }
+body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; max-width: none; display: flex; padding-block: 1.5rem .8rem; }
+.songs-page .songs-library { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+html[data-theme] .songs-page .library-header { margin-bottom: 1.25rem; flex: none; }
+html[data-theme] .songs-page .library-header h1 { font-size: clamp(1.7rem, 2.8vw, 2.65rem); line-height: 1; letter-spacing: -.055em; text-align: left; }
+.songs-page .library-desktop { flex: 1; min-height: 0; align-items: stretch; gap: clamp(1rem, 2.7vw, 3rem); }
+.songs-page .library-sidebar, .songs-page .library-detail { position: static; max-height: none; min-height: 0; }
+.songs-page .library-sidebar { overflow: auto; }
+.songs-page .library-navigation, .songs-page .library-song-list { overscroll-behavior: contain; scrollbar-width: thin; }
+.songs-page .library-release-header { padding: .65rem .8rem .85rem; gap: 1rem; align-items: center; }
+.songs-page .library-release-header img { width: 4.5rem; box-shadow: none; }
+.songs-page .library-release-header h2 { font-size: clamp(1.45rem, 2.4vw, 2.1rem); }
+.library-detail-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.library-detail-body .library-song-list { overflow: visible; }
+.library-album-overview { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: clamp(1rem, 2.5vw, 2.5rem); align-items: start; padding: .8rem 1rem 1rem; }
+.library-album-overview .library-album-description, .library-album-overview .library-no-description { margin: 0; }
+.library-album-description .library-description-text { line-height: 1.55; }
+.library-album-facts { min-width: 0; border-inline-start: 1px solid var(--linie); padding-inline-start: 1rem; }
+.library-album-facts h3 { margin: 0 0 .55rem; font-size: .88rem; }
+.library-album-facts dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: .5rem .8rem; margin: 0; font-size: .8rem; }
+.library-album-facts dt { color: var(--leise); font-size: .72rem; }
+.library-album-facts dd { margin: .08rem 0 0; color: var(--tinte); overflow-wrap: anywhere; }
+.library-album-description .library-description-text p { margin: 0 0 .5rem; max-width: none; }
+.songs-page .library-song { border-top-color: color-mix(in srgb, var(--linie), transparent 35%); }
+.songs-page .library-song-art { grid-column: 1; width: 1.9rem; }
+.songs-page .library-song-play { grid-column: 2; }
+.songs-page .library-song-identity { grid-column: 3; }
+.songs-page .library-song-status:not([hidden]) { margin-inline-start: .6rem; }
+.songs-page .library-track-description summary { color: var(--leise); font-weight: 400; }
+.songs-page .library-track-description { margin-top: .12rem; }
+.songs-page .library-tags { margin: 0; }
+
+.library-sc-numbers { display: flex; flex-wrap: wrap; gap: .12rem .65rem; margin-top: .15rem;
+  color: var(--leise); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.library-sc-numbers strong { font-weight: 650; }
+.library-sc-versions { color: var(--leise); font-size: .74rem; }
+.library-sc-versions summary { cursor: pointer; }
+
+.library-song-heading { display: flex; gap: .45rem; align-items: baseline; flex-wrap: wrap; }
+.library-sc-symbol { color: var(--akzent); display: inline-flex; font-size: .9rem; line-height: 1; text-decoration: none; }
+.library-sc-symbol.privat { color: var(--leise); }
+.library-profile-content { margin: .45rem 0 .25rem; padding: .1rem 0 .25rem; }
+.library-profile-content > p { font-size: .9rem; line-height: 1.55; margin: 0 0 .7rem; }
+.library-profile { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .45rem 1rem; margin: 0 0 .55rem; }
+.library-profile dt { font-weight: 500; font-size: .72rem; color: var(--leise); }
+.library-profile dd { color: var(--tinte); overflow-wrap: anywhere; }
+[data-theme="dark"] .songs-library select { color-scheme: dark; }
+.songs-library select option { background-color: var(--flaeche); color: var(--tinte); }
+
+.library-sc-metric { display: inline-flex; align-items: center; gap: .24rem; }
+.library-sc-glyph { display: inline-flex; justify-content: center; width: .95rem; font-size: .88rem; line-height: 1; color: var(--akzent); }
+.library-sc-glyph.likes_count { color: var(--gut); }
+.library-sc-metric.leer .library-sc-glyph { color: inherit; }
+
+
+.library-sc-meter { width: 2.7rem; height: .35rem; margin-inline: .1rem .15rem; appearance: none; border: 0; background: none; }
+.library-sc-meter::-webkit-meter-bar { background: var(--linie); border: 0; border-radius: 10px; }
+.library-sc-meter::-webkit-meter-optimum-value { background: var(--akzent); border-radius: 10px; }
+.library-sc-meter.likes_count::-webkit-meter-optimum-value { background: var(--gut); }
+.library-sc-meter::-moz-meter-bar { background: var(--akzent); border-radius: 10px; }
+.library-sc-meter.likes_count::-moz-meter-bar { background: var(--gut); }
+
+.songs-page .library-song, .library-song-columns {
+  display: grid; grid-template-columns: 1.9rem 2rem minmax(0, 1fr) clamp(14rem, 18vw, 17rem) minmax(6rem, 11rem) 6rem;
+  column-gap: .65rem;
+}
+.library-song-columns {
+  font-family: var(--mono, monospace);
+  padding: .3rem 1rem; align-items: center; color: var(--leise); font-size: .73rem;
+  position: sticky; top: 0; background: var(--flaeche); z-index: 1;
+}
+.library-song-columns::before { content: ""; grid-column: 2; width: 2rem; }
+.library-song-stats { grid-column: 4; min-width: 0; padding: 0 .65rem 0 .35rem;
+  border-inline-end: 1px solid color-mix(in srgb, var(--linie), transparent 25%); }
+.songs-page .library-song-version { grid-column: 5; }
+.songs-page .library-song-actions { grid-column: 6; }
+.library-sc-numbers, .library-song-columns .library-sc-numbers {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .35rem; margin: 0;
+  align-items: start; text-align: center;
+}
+.library-sc-track-name { grid-column: 1 / -1; text-align: left; }
+.library-sc-metric { display: grid; font-family: var(--mono, monospace); justify-items: center; row-gap: .22rem; min-width: 0; }
+.library-song-columns .library-sc-numbers { font-size: .69rem; font-weight: 650; }
+.library-song .library-sc-metric strong { color: var(--tinte); }
+.library-song .library-sc-metric.leer strong, .library-sc-unavailable { color: var(--leise); opacity: .6; }
+.library-song-stats > .library-sc-unavailable { display: block; text-align: center; font-size: .75rem; }
+.library-sc-metric .library-sc-glyph { display: none; }
+.library-sc-meter { width: min(100%, 2.35rem); margin: 0; height: .28rem; }
+
+.songs-page .library-song > :not(.library-track-description) { grid-row: 1; }
+.songs-page .library-song > .library-track-description { grid-column: 3 / -1; grid-row: 2; }
+.songs-page .library-track-description[open] { max-width: none; }
+.library-profile-content {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: start; gap: clamp(1rem, 2.5vw, 2.5rem); padding: .25rem 0 .45rem;
+}
+.library-profile-content > p { margin: 0; max-width: 72ch; }
+.library-profile-facts { min-width: 0; padding-inline-start: 1rem; border-inline-start: 1px solid var(--linie); }

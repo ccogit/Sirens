@@ -33,34 +33,90 @@
 .lab-toy .spielwiese { margin-top: 0; }
 .lab-toy .spiel-flaeche { height: clamp(18rem, calc(100vh - 31rem), 46rem); }
 
-/* Spiel-Knopf der Startseite: der Rand dreht sich, die Buchstaben hüpfen, die Balken tanzen */
-.dashboard-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-.spiel-knopf { position: relative; isolation: isolate; overflow: hidden; display: inline-grid; grid-template-columns: auto auto; align-items: center; gap: .05rem .8rem;
-  padding: .75rem 1.4rem .7rem 1.1rem; border-radius: 20px; text-decoration: none; color: #fff; transition: transform .2s ease; }
-.spiel-knopf::before { content: ""; position: absolute; z-index: -2; left: 50%; top: 50%; width: 240%; aspect-ratio: 1; translate: -50% -50%;
-  background: conic-gradient(#ff8a4c, #f0c24a, #6fe3c1, #7f8cff, #d06bff, #ff5fa2, #ff8a4c); animation: spiel-dreh 3.4s linear infinite; }
-.spiel-knopf::after { content: ""; position: absolute; z-index: -1; inset: 3px; border-radius: 17px; background: #121a36; }
-.spiel-knopf:hover { transform: rotate(-2deg) scale(1.06); }
-.spiel-knopf:active { transform: rotate(2deg) scale(.97); }
-.spiel-knopf-takt { display: flex; gap: 3px; align-items: flex-end; height: 1.7rem; grid-row: 1 / span 2; }
-.spiel-knopf-takt i { width: 5px; height: 100%; border-radius: 3px; background: linear-gradient(#f0c24a, #ff8a4c); transform-origin: bottom; animation: spiel-takt .8s ease-in-out infinite alternate; }
-.spiel-knopf-takt i:nth-child(2) { animation-delay: -.5s; } .spiel-knopf-takt i:nth-child(3) { animation-delay: -.2s; }
-.spiel-knopf-takt i:nth-child(4) { animation-delay: -.65s; } .spiel-knopf-takt i:nth-child(5) { animation-delay: -.35s; }
-.spiel-knopf-wort { display: flex; }
-.spiel-knopf-wort b { display: inline-block; font-family: var(--titel); font-size: 1.3rem; font-weight: 800; letter-spacing: .07em; animation: spiel-huepf 1.6s ease-in-out infinite; }
-.spiel-knopf-wort b:nth-child(1) { color: #ffb37a; } .spiel-knopf-wort b:nth-child(2) { color: #f0c24a; animation-delay: .09s; }
-.spiel-knopf-wort b:nth-child(3) { color: #6fe3c1; animation-delay: .18s; } .spiel-knopf-wort b:nth-child(4) { color: #9aa8ff; animation-delay: .27s; }
-.spiel-knopf-wort b:nth-child(5) { color: #d99bff; animation-delay: .36s; } .spiel-knopf-wort b:nth-child(6) { color: #ff8fbd; animation-delay: .45s; }
-.spiel-knopf-wort b:nth-child(7) { color: #ffb37a; animation-delay: .54s; }
-.spiel-knopf:hover .spiel-knopf-wort b { animation-duration: .45s; }
-.spiel-knopf:hover .spiel-knopf-takt i { animation-duration: .25s; }
-.spiel-knopf small { grid-column: 2; font-size: .72rem; color: #c3cbec; white-space: nowrap; }
-@keyframes spiel-dreh { to { rotate: 360deg; } }
-@keyframes spiel-takt { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
-@keyframes spiel-huepf { 0%, 55%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-6px) rotate(-8deg); } 40% { transform: translateY(1px) rotate(4deg); } }
+/* Startseite: Mini-DJ-Deck im kantigen Signal-Room-Design. Kein Audio, keine Endlosschleife. */
+/* Deck und „Neuer Auftrag" nebeneinander; erst auf schmalen Bildschirmen untereinander. */
+.dashboard-actions { display: flex; gap: 1rem; align-items: stretch; flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.dashboard-actions .spiel-knopf { flex: 0 1 25rem; }
+.dashboard-actions .new-order { flex: 0 0 auto; display: inline-flex; align-items: center; }
+.spiel-knopf {
+  --deck-bg: #14171a; --deck-ink: #f0f0e7; --deck-dim: #b1b5ad;
+  --deck-line: #454a43; --deck-acid: #d9fa76; --deck-peach: #ffab7b;
+  position: relative; isolation: isolate; overflow: hidden;
+  display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center;
+  gap: .85rem; width: min(100%, 25rem); box-sizing: border-box;
+  padding: .65rem .8rem; border: 1px solid var(--deck-line); border-left: 3px solid var(--deck-peach);
+  border-radius: var(--r, 5px); background: var(--deck-bg); color: var(--deck-ink);
+  text-decoration: none; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.spiel-knopf::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at var(--mx, 0%) var(--my, 50%), #d9fa761b, transparent 58%),
+    repeating-linear-gradient(90deg, #ffffff05 0 1px, transparent 1px 22px);
+  opacity: .65;
+}
+.spiel-knopf:hover, .spiel-knopf:focus-visible { border-color: var(--deck-acid); color: var(--deck-ink); }
+.spiel-knopf:active { box-shadow: inset 0 0 0 2px var(--deck-peach); }
+.spiel-knopf > span { pointer-events: none; min-width: 0; }
+.deck-turntable {
+  position: relative; display: grid; place-items: center; width: 76px; height: 76px;
+  border: 1px solid var(--deck-line); border-radius: 3px; background: #0d0f11;
+}
+.deck-vinyl {
+  position: relative; display: grid; place-items: center; width: 62px; aspect-ratio: 1;
+  border: 1px solid #656a64; border-radius: 50%;
+  background: conic-gradient(from 35deg, transparent, #ffffff26, transparent 32%, #ffffff1c, transparent 70%),
+    repeating-radial-gradient(circle, #1a1d21 0 2px, #353a38 3px, #16191b 4px 5px);
+  transform: rotate(var(--scratch, 0deg)); transition: transform .11s ease-out;
+}
+.deck-vinyl::after {
+  content: ""; position: absolute; width: 3px; height: 9px; background: var(--deck-peach);
+  top: 4px; left: 50%; border-radius: 1px;
+}
+.deck-label {
+  display: grid; place-items: center; width: 23px; aspect-ratio: 1; border-radius: 50%;
+  background: var(--deck-acid); color: #171810; font: 900 .78rem/1 var(--mono, monospace);
+}
+.deck-arm {
+  position: absolute; top: 8px; right: 7px; width: 5px; height: 43px;
+  border-radius: 2px; background: #b1b5ad; transform-origin: 50% 4px;
+  transform: rotate(calc(26deg + var(--arm, 0deg))); transition: transform .12s ease-out;
+  box-shadow: 1px 1px 3px #0009;
+}
+.deck-arm::before, .deck-arm::after { content: ""; position: absolute; background: var(--deck-peach); }
+.deck-arm::before { width: 9px; height: 9px; border-radius: 50%; top: -2px; left: -2px; }
+.deck-arm::after { width: 7px; height: 10px; bottom: -2px; left: -1px; border-radius: 1px; }
+.deck-copy { display: grid; gap: .22rem; min-width: 0; }
+.deck-top { display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  font: 650 .62rem/1.2 var(--mono, monospace); letter-spacing: .08em; color: var(--deck-dim); }
+.deck-status { color: var(--deck-acid); white-space: nowrap; letter-spacing: 0; }
+.deck-title { display: flex; align-items: center; justify-content: space-between;
+  font: 880 1.65rem/.96 var(--titel, system-ui, sans-serif); letter-spacing: -.055em; }
+.deck-arrow { color: var(--deck-peach); font-size: 1.25rem; transition: transform .15s ease; }
+.spiel-knopf:hover .deck-arrow { transform: translate(2px, -2px); }
+.spiel-knopf small { font-size: .68rem; line-height: 1.3; color: var(--deck-dim); overflow-wrap: anywhere; }
+.deck-pads { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; margin-top: 2px; }
+.deck-pads i { display: block; height: 5px; background: #41463f; border-radius: 1px; }
+.deck-pads .deck-kick { background: #a16e51; }
+.deck-pads .deck-hit { background: var(--deck-acid); box-shadow: 0 0 7px #d9fa7670; }
+.deck-scratch .deck-label { background: var(--deck-peach); }
+.deck-scratch .deck-status { color: var(--deck-peach); }
+@media (max-width: 40rem) {
+  .dashboard-actions { flex-wrap: wrap; }
+  .dashboard-actions .spiel-knopf { flex-basis: 100%; }
+  .spiel-knopf { grid-template-columns: 66px minmax(0, 1fr); gap: .6rem; }
+  .deck-turntable { width: 66px; height: 66px; }
+  .deck-vinyl { width: 54px; }
+  .deck-arm { height: 36px; }
+  .deck-top { letter-spacing: 0; }
+  .deck-title { font-size: 1.45rem; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .spiel-knopf::before, .spiel-knopf-takt i, .spiel-knopf-wort b { animation: none; }
-  .spiel-knopf:hover, .spiel-knopf:active { transform: none; }
+  .spiel-knopf, .deck-vinyl, .deck-arm, .deck-arrow { transition: none; }
+  .deck-vinyl { transform: none; }
+  .deck-arm { transform: rotate(26deg); }
+  .spiel-knopf:hover .deck-arrow { transform: none; }
+  .spiel-knopf::before { background: repeating-linear-gradient(90deg, #ffffff05 0 1px, transparent 1px 22px); }
 }
 
 /* Kick-Tausch im Live Lab */

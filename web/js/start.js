@@ -22,12 +22,58 @@ function karte(a) {
     h("span", { class: "karte-link", "aria-hidden": "true" }, "Ansehen ↗")));
 }
 
-// Der Weg zu den Spielzeugen (Live Lab): hüpfende Buchstaben, tanzende Balken, ein Rand, der sich dreht.
+// Mini-Deck: rein visuelles Scratch-Spielzeug; der Link bleibt immer ein normaler Link.
 function spielKnopf() {
-  return h("a", { class: "spiel-knopf", href: "#/lab", "aria-label": "Spielen: DJ-Pult, Beat-Pads, Emblem, Auto-DJ, Kick-Tausch und Stem Studio" },
-    h("span", { class: "spiel-knopf-takt", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map(() => h("i", {}))),
-    h("span", { class: "spiel-knopf-wort", "aria-hidden": "true" }, [..."SPIELEN"].map((buchstabe) => h("b", {}, buchstabe))),
-    h("small", { "aria-hidden": "true" }, "DJ-Pult, Emblem, Auto-DJ, Kick-Tausch, Stem Studio"));
+  const status = h("span", { class: "deck-status" }, "STANDBY");
+  const pads = Array.from({ length: 16 }, (_, i) =>
+    h("i", { class: i % 4 === 0 ? "deck-kick" : "" }));
+  const link = h("a", { class: "spiel-knopf", href: "#/lab",
+    "aria-label": "Play: DJ-Pult, Beat-Pads, Emblem, Auto-DJ, Kick-Tausch und Stem Studio" },
+    h("span", { class: "deck-turntable", "aria-hidden": "true" },
+      h("span", { class: "deck-vinyl" }, h("span", { class: "deck-label" }, "S")),
+      h("span", { class: "deck-arm" })),
+    h("span", { class: "deck-copy", "aria-hidden": "true" },
+      h("span", { class: "deck-top" }, h("span", {}, "LIVE LAB / 01"), status),
+      h("span", { class: "deck-title" }, "PLAY", h("span", { class: "deck-arrow" }, "↗")),
+      h("small", {}, "DJ · Beat-Pads · Emblem · Auto-DJ · Kick-Tausch · Stems"),
+      h("span", { class: "deck-pads" }, pads)));
+  const bewegung = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const begrenzen = (v, min, max) => Math.max(min, Math.min(max, v));
+  let letzterX = null, letzterTakt = null, schritt = -1, winkel = 0;
+  function reset() {
+    letzterX = letzterTakt = null; winkel = 0;
+    if (schritt >= 0) pads[schritt].classList.remove("deck-hit");
+    schritt = -1;
+    for (const name of ["--scratch", "--arm", "--mx", "--my"]) link.style.removeProperty(name);
+    link.classList.remove("deck-scratch");
+    status.textContent = "STANDBY";
+  }
+  link.addEventListener("pointermove", (e) => {
+    if (bewegung.matches || e.pointerType === "touch") { reset(); return; }
+    const r = link.getBoundingClientRect();
+    const x = begrenzen((e.clientX - r.left) / Math.max(1, r.width), 0, 1);
+    const y = begrenzen((e.clientY - r.top) / Math.max(1, r.height), 0, 1);
+    const dx = letzterX === null ? 0 : e.clientX - letzterX;
+    const tempo = letzterTakt === null ? 0 : Math.abs(dx) / Math.max(1, e.timeStamp - letzterTakt);
+    letzterX = e.clientX; letzterTakt = e.timeStamp;
+    winkel = (winkel + dx * 2.4) % 360;
+    link.style.setProperty("--scratch", winkel + "deg");
+    link.style.setProperty("--arm", (y * 32 - 16) + "deg");
+    link.style.setProperty("--mx", (x * 100) + "%");
+    link.style.setProperty("--my", (y * 100) + "%");
+    const neu = Math.min(15, Math.floor(x * 16));
+    if (neu !== schritt) {
+      if (schritt >= 0) pads[schritt].classList.remove("deck-hit");
+      pads[neu].classList.add("deck-hit");
+      schritt = neu;
+    }
+    link.classList.toggle("deck-scratch", tempo > .7);
+    const text = tempo > 1.5 ? "BASS-ALARM!" : tempo > .7 ? "WIKI-WIKI" :
+      y < .28 ? "DJ MAUS" : "IM TAKT";
+    if (status.textContent !== text) status.textContent = text;
+  });
+  for (const name of ["pointerleave", "pointercancel", "blur"]) link.addEventListener(name, reset);
+  return link;
 }
 
 function zaehler(zahl, text, farbe) {
