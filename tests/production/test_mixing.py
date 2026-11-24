@@ -141,7 +141,7 @@ class MixingTests(unittest.TestCase):
                                    delta=.1, msg=version)
             self.assertAlmostEqual(report["measured"]["true_peak_dbtp"], -4.18,
                                    delta=.1, msg=version)
-            for repeat in range(5):
+            for repeat in range(10):
                 with self.subTest(repeat=repeat + 1, ffmpeg=version):
                     if repeat:
                         second = Path(tmp) / f"repeat-{repeat}"
