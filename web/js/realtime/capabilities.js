@@ -2,7 +2,7 @@
 export const modeLabel = mode => ({streaming:"Live",lookahead:"Lookahead",offline:"Offline"}[mode] || "Unbekannt");
 export function deriveState({capabilities, gpu, mock=false, songs=0, error=null, capabilityId=null}) {
   const list = capabilities?.capabilities || [];
-  const selected = list.find(c => c.id === capabilityId) || list.find(c => c.available);
+  const selected = capabilityId ? list.find(c => c.id === capabilityId) : list.find(c => c.available);
   const flags = [];
   if (mock) flags.push("Testmodus – kein Ton, keine KI");
   if (gpu?.available === false) flags.push("Keine GPU verfügbar");
