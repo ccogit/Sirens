@@ -1,5 +1,7 @@
 """Mock-Sitzungen: Steuerzustand und begrenzte Arbeit außerhalb des HTTP-Threads."""
 import json
+import hashlib
+import logging
 import queue
 import struct
 import subprocess
@@ -18,6 +20,7 @@ from .gpu_manager import GPUManager
 from .model_registry import ModelRegistry
 from .music_analysis import analyse_pcm, source_hash, CorrectionStore
 from .pcm import pack
+from .recordings import Recording, recording_root, repair, save_session, load_session, validate_session
 from .schemas import validate
 from .worker_supervisor import WorkerSupervisor
 
@@ -43,6 +46,8 @@ class Sources:
         self.lock = threading.RLock()
         self.items = {}
         self.grids = {}
+        self.digests = {}
+        self.recorded = {}
         self.corrections = CorrectionStore(cfg.realtime_dir / "cache" / "beatgrid")
 
     def register(self, relative):
@@ -72,13 +77,18 @@ class Sources:
             return dict(id=aid, kind="source", sample_rate=48000, channels=2,
                         nframes=FIXTURE_FRAMES)
         with self.lock:
+            if aid in self.recorded:
+                return dict(self.recorded[aid])
             if aid not in self.items:
                 raise error("not_found")
             return dict(self.items[aid][1])
 
     def load(self, aid):
         if aid == FIXTURE_ID:
-            return fixture_pcm(0, FIXTURE_FRAMES)
+            raw = fixture_pcm(0, FIXTURE_FRAMES)
+            with self.lock:
+                self.digests[aid] = hashlib.sha256(raw).hexdigest()
+            return raw
         with self.lock:
             relative, meta = self.items[aid]
             self.grids.pop(aid, None)
@@ -107,6 +117,8 @@ class Sources:
             stereo = array("f", (x/32768 for x in samples for _ in range(2)))
         else:
             stereo = array("f", (x/32768 for x in samples))
+        with self.lock:
+            self.digests[aid] = digest
         # Analyse beim expliziten Laden; GET dekodiert und hasht niemals.
         try:
             grid = self.corrections.load(digest, 48000)
@@ -123,12 +135,123 @@ class Sources:
             stereo.byteswap()
         return stereo.tobytes()
 
+    def record_asset(self, path, rate):
+        with wave.open(str(path), "rb") as wav:
+            count = wav.getnframes()
+        aid = new_id()
+        meta = dict(id=aid, kind="recording", sample_rate=rate, channels=2, nframes=count)
+        with self.lock:
+            self.recorded[aid] = meta
+        return dict(meta)
+
     def beatgrid(self, aid):
         self.metadata(aid)
         with self.lock:
             if aid not in self.grids:
                 raise error("unavailable")
             return dict(self.grids[aid])
+
+
+class Recordings:
+    """Begrenzte, an eine Sitzung gebundene Exportverwaltung."""
+    LIMIT = 16 * 1024**3
+    RESERVATION = 4 * 1024**3
+
+    def __init__(self, cfg, sources):
+        self.cfg, self.sources = cfg, sources
+        self.root = None
+        self.items = {}
+        self.exports = {}
+        self.lock = threading.RLock()
+
+    def _prepare(self):
+        if self.root is None:
+            self.root = recording_root(self.cfg.realtime_dir / "recordings", self.cfg.music_root)
+            for part in self.root.glob("*/segment-*.wav.part"):
+                try:
+                    repair(self.root, part.relative_to(self.root), self.cfg.music_root)
+                except (Ablehnung, OSError, ValueError):
+                    logging.warning("RT: Ein verwaistes Aufnahmesegment konnte nicht repariert werden.")
+        return self.root
+
+    def _budget(self):
+        root = self._prepare()
+        used = sum(p.stat().st_size for p in root.glob("*/*") if p.is_file() and not p.is_symlink())
+        reserved = sum(rec.max_bytes-rec.total for rec, result in self.items.values() if result is None)
+        return max(0, self.LIMIT-used-reserved)
+
+    def create(self, sid, body, rate):
+        if not isinstance(body, dict) or set(body) != {"name", "sample_rate"}:
+            raise invalid("recording")
+        if body["sample_rate"] != rate or type(body["sample_rate"]) is not int:
+            raise invalid("sample_rate")
+        with self.lock:
+            if len(self.items) >= MAX_HISTORY or any(
+                    key[0] == sid and result is None for key, (_, result) in self.items.items()):
+                raise error("unavailable")
+            budget = min(self.RESERVATION, self._budget()-1024**2)
+            if budget < 6:
+                raise error("unavailable")
+            rid = new_id()
+            rec = Recording(self.root, self.cfg.music_root, body["name"], rate, max_bytes=budget)
+            self.items[sid, rid] = (rec, None)
+            return {"id": rid, "next_frame": 0}
+
+    def _get(self, sid, rid):
+        asset_id(rid)
+        if (sid, rid) not in self.items:
+            raise error("not_found")
+        return self.items[sid, rid]
+
+    def append(self, sid, rid, start, payload):
+        with self.lock:
+            rec, result = self._get(sid, rid)
+            if result is not None:
+                raise invalid("recording")
+            try:
+                return {"next_frame": rec.append(payload, start)}
+            except (Ablehnung, OSError):
+                self.close(sid, rid)
+                raise
+
+    def close(self, sid, rid):
+        with self.lock:
+            rec, result = self._get(sid, rid)
+            if result is None:
+                paths = rec.stop()
+                result = {"id": rid, "assets": [self.sources.record_asset(p, rec.rate) for p in paths],
+                          "next_frame": rec.total // 6}
+                self.items[sid, rid] = (rec, result)
+            return result
+
+    def close_session(self, sid):
+        with self.lock:
+            for key, (_, result) in tuple(self.items.items()):
+                if key[0] == sid and result is None:
+                    self.close(*key)
+
+    def export(self, sid, body):
+        validate_session(body)
+        with self.lock:
+            with self.sources.lock:
+                for source in body["sources"]:
+                    if self.sources.digests.get(source["asset_id"]) != source["sha256"]:
+                        raise invalid("source_hash")
+            for aid in body["assets"]:
+                self.sources.metadata(aid)
+            if len(self.exports) >= MAX_HISTORY or self._budget() < 5 * 1024**2:
+                raise error("unavailable")
+            path = save_session(self.root, self.cfg.music_root, body)
+            eid = new_id()
+            self.exports[sid, eid] = path.relative_to(self.root)
+            return {"id": eid}
+
+    def load_export(self, sid, eid):
+        asset_id(eid)
+        with self.lock:
+            if (sid, eid) not in self.exports:
+                raise error("not_found")
+            return load_session(self.root, self.cfg.music_root, self.exports[sid, eid])
 
 
 class SidecarProcess:
@@ -249,6 +372,8 @@ class Session:
                 if state != "created":
                     raise invalid("state")
                 self.asset = self.manager.asset(args["asset_id"])
+                if self.asset["kind"] != "source":
+                    raise error("unavailable")
                 self._state("loading")
                 self.job = dict(id=new_id(), session_id=self.data["id"], state="queued",
                                 progress=0, asset_id=args["asset_id"], error=None)
@@ -388,11 +513,16 @@ class Session:
             with self.lock:
                 if not self.stop.is_set():
                     self._state("error")
+                    self.token = None
                     if self.job and self.job["state"] in ("queued", "running"):
                         self._job_state("error")
                         self.job["error"] = (exc.as_dict() if isinstance(exc, Ablehnung)
                                              else error("unavailable").as_dict())
         finally:
+            try:
+                self.manager.recordings.close_session(self.data["id"])
+            except (Ablehnung, OSError):
+                logging.warning("RT: Aufnahme konnte nicht abgeschlossen werden.")
             try:
                 if sidecar:
                     try:
@@ -423,6 +553,7 @@ class Session:
                 with self.lock:
                     self._state("error")
                 raise error("unavailable")
+        self.manager.recordings.close_session(self.data["id"])
         with self.lock:
             if self.data["state"] == "stopping":
                 self._state("closed")
@@ -433,6 +564,7 @@ class Sessions:
     def __init__(self, cfg, origins, *, supervisor=WorkerSupervisor, sidecar_factory=SidecarProcess):
         self.registry = ModelRegistry(mock_enabled=cfg.rt_mock)
         self.sources = Sources(cfg)
+        self.recordings = Recordings(cfg, self.sources)
         self.gpu = GPUManager(reserve_bytes=cfg.rt_reserve_bytes)
         self.origins = origins
         self.supervisor = supervisor
