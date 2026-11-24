@@ -364,6 +364,9 @@ class WorkerSupervisor:
                     if msg["type"] != "result":
                         worker.stop()
                         raise error("unavailable")
+                    if kind == "file_job" and raw:
+                        worker.stop()
+                        raise invalid("payload")
                     return (msg["payload"], raw) if kind == "process" else msg["payload"]
             finally:
                 self.serial.release()
@@ -395,7 +398,8 @@ class WorkerSupervisor:
         expected = jobs / job_id
         published = jobs / (job_id + ".ready")
         if (not source.is_file() or not any(root in source.parents
-                for root in (self.music_root, self.realtime_dir))
+                for root in (self.music_root, self.realtime_dir / "cache"))
+                or self.realtime_dir == self.music_root or self.music_root in self.realtime_dir.parents
                 or out_dir != expected or out_dir.resolve() != expected
                 or jobs.resolve() != jobs or out_dir.exists() or out_dir.is_symlink()
                 or published.exists() or published.is_symlink()):
@@ -405,6 +409,8 @@ class WorkerSupervisor:
         try:
             result = self._exchange("file_job", {"job_id": job_id, "source": str(source),
                                     "out_dir": str(out_dir), "params": params}, b"", timeout)
+            # Keine weiteren Schreibzugriffe des Workers nach der Antwort.
+            self.worker.stop()
             files = result.get("files")
             if not isinstance(files, list) or not files or any(
                     not isinstance(name, str) or name in ("", ".", "..")
