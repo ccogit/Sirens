@@ -21,41 +21,76 @@ function auftragOeffnen(datei, treffer, mastern = false) {
   } }, mastern ? "Neu mastern" : starten ? "Bearbeiten" : "Auftrag öffnen");
 }
 
-function dateiZeile(datei, treffer) {
-  const teile = [datei.version == null ? "Originaldatei" : "Version " + datei.version,
-    datei.fassung, datei.unterordner, datei.pfad.split(".").pop().toUpperCase()];
-  const schalter = h("button", { type: "button", class: "klein-knopf", onclick: async () => {
-    schalter.disabled = true;
+function fassungsname(datei) {
+  return [datei.version == null ? "Originaldatei" : "Version " + datei.version,
+    datei.fassung, datei.pfad.split(".").pop().toUpperCase(), datei.unterordner].filter(Boolean).join(" · ");
+}
+
+function masterKnopf(datei) {
+  return h("button", { type: "button", class: "klein-knopf", onclick: async (e) => {
+    const taste = e.currentTarget;
+    taste.disabled = true;
     try {
       const auftrag = await api.mastern(datei.pfad, ["mastering"]);
       location.hash = "#/auftrag/" + auftrag.id + "/mastering";
     } catch (fehler) {
       meldung(fehler.meldung, "fehler");
-      schalter.disabled = false;
+      taste.disabled = false;
     }
   } }, "Mastern");
-  return h("li", { class: "library-take" },
-    abspielKnopf(datei.pfad), h("span", {}, teile.filter(Boolean).join(" · ")),
-    h("span", { class: "klein" }, treffer?.song.sync_offen ? "SoundCloud-Update offen"
-      : treffer?.song.soundcloud ? "Auf SoundCloud" : ""),
-    treffer ? auftragOeffnen(datei, treffer) : schalter,
-    treffer?.song.bearbeitbar && treffer.song.waehlbar ? auftragOeffnen(datei, treffer, true) : null);
 }
 
-function songZeile(song, stil, auftraege) {
+function songZeile(song, stil, auftraege, gewaehlt) {
   const cover = song.cover || song.dateien.map(d => auftraege.get(d.pfad)?.song.cover).find(Boolean);
+  const titel = h("strong", {}, song.titel);
+  const status = h("span", { class: "klein library-song-status", "aria-live": "polite" });
+  const player = h("div", { class: "library-song-play" });
+  const aktionen = h("div", { class: "library-song-actions" });
+  const id = song.dateien[0].pfad;
+  const auswahl = song.dateien.length > 1 ? h("select", {
+    "aria-label": "Fassung für " + song.titel,
+    onchange: () => {
+      gewaehlt.set(id, song.dateien[Number(auswahl.value)].pfad);
+      fassungZeigen();
+    },
+  }, song.dateien.map((datei, index) => h("option", { value: String(index) }, fassungsname(datei)))) : null;
+  if (auswahl) {
+    const index = song.dateien.findIndex(datei => datei.pfad === gewaehlt.get(id));
+    auswahl.value = String(Math.max(0, index));
+  }
+  const fassung = h("div", { class: "library-song-version" }, auswahl ||
+    h("span", { class: "klein" }, fassungsname(song.dateien[0])));
+
+  function fassungZeigen() {
+    const datei = song.dateien[Number(auswahl?.value || 0)];
+    const treffer = auftraege.get(datei.pfad);
+    const knopf = abspielKnopf(datei.pfad);
+    knopf.dataset.name = song.titel + ", " + fassungsname(datei);
+    knopf.setAttribute("aria-label", "Anhören: " + knopf.dataset.name);
+    player.replaceChildren(knopf);
+    if (auswahl) auswahl.title = fassungsname(datei);
+    status.textContent = treffer?.song.sync_offen ? "SoundCloud-Update offen"
+      : treffer?.song.soundcloud ? "Auf SoundCloud" : "";
+    status.hidden = !status.textContent;
+    aktionen.replaceChildren(treffer ? auftragOeffnen(datei, treffer) : masterKnopf(datei));
+    if (treffer?.song.bearbeitbar && treffer.song.waehlbar) aktionen.append(auftragOeffnen(datei, treffer, true));
+    if (player.isConnected) knoepfeAktualisieren();
+  }
+  fassungZeigen();
   return h("li", { class: "library-song" },
-    cover ? h("img", { class: "song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : null,
-    h("div", {},
-      h("strong", {}, song.titel),
-      stil ? h("div", { class: "klein" }, "Stilreferenz " + stil) : null,
-      h("ul", { class: "library-takes" }, song.dateien.map(d => dateiZeile(d, auftraege.get(d.pfad))))));
+    h("span", { class: "library-song-art", "aria-hidden": "true" },
+      cover ? h("img", { src: api.bildUrl(cover), alt: "", loading: "lazy" }) : "♫"),
+    player, h("div", { class: "library-song-identity" }, titel,
+      h("div", { class: "library-song-meta" },
+        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status)),
+    fassung, aktionen);
 }
 
 export function songsAnsicht(el) {
   let beendet = false;
   let katalog = null;
   const auftraege = new Map();
+  const fassungen = new Map();
   let lauf = 0;
   let wartezeit;
   const suchId = neueId();
@@ -93,7 +128,7 @@ export function songsAnsicht(el) {
     }
     return [...clusters].sort(([a], [b]) => a.localeCompare(b, "de")).map(([titel, eintraege]) =>
       h("li", {}, gruppe("single:" + gruppierung.value + ":" + titel, titel, eintraege.length, "",
-        () => eintraege.map(({ song, stil }) => songZeile(song, stil, auftraege)), gesucht)));
+        () => eintraege.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen)), gesucht)));
   }
 
   function zeichnen() {
@@ -111,8 +146,8 @@ export function songsAnsicht(el) {
         : gesucht ? "Keine passenden Songs gefunden." : "Der Musikordner enthält keine Songs.");
     for (const album of alben) {
       inhalt.append(gruppe(album.pfad, album.titel, album.songs.length, album.stilreferenz,
-        () => album.songs.length ? album.songs.map(s => songZeile(s, "", auftraege))
-          : [h("li", { class: "library-song klein" }, "In diesem Albumordner liegt derzeit keine Audiodatei.")],
+        () => album.songs.length ? album.songs.map(s => songZeile(s, "", auftraege, fassungen))
+          : [h("li", { class: "library-album-empty klein" }, "In diesem Albumordner liegt derzeit keine Audiodatei.")],
         gesucht && releases.length < 8, album.cover));
     }
     if (singles.length) inhalt.append(gruppe("Singles", "Singles", singles.length, "",
