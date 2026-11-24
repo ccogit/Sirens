@@ -64,7 +64,8 @@ def inventory(root=ROOT, registry=None):
             continue
         gate = gate_evidence(root, cap)
         rows.append({"id": cap["id"], "modus": cap["mode"],
-                     "freigegeben": bool(cap["available"] and gate), "g1": gate})
+                     "freigegeben": bool(cap["available"] and gate), "g1": gate,
+                     "registry_available": cap["available"]})
     return rows
 
 
@@ -124,7 +125,7 @@ def verify(before_hash, after_hash, before_workers, after_workers):
 
 
 def report(path, rows, errors, dry):
-    machine = dict(os=platform.platform(), python=sys.version, node=None, ffmpeg=None,
+    machine = dict(os=platform.system() + " " + platform.release(), python=sys.version, node=None, ffmpeg=None,
                    gpus=None, wsl=None, disk=None, git=None, notes=[])
     if not dry and os.name == "nt":
         from benchmarks.baseline import collect
@@ -161,7 +162,11 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
             row["status"] = "nicht_gemessen"
             row["minimum_seconds"] = (7200 if cid == "performance-soak" else
                                       1800 if row["modus"] == "streaming" and cid not in CORE else None)
-            if dry or not row["freigegeben"]:
+            if dry:
+                continue
+            if row.get("registry_available") and not row["g1"]:
+                errors.append("Registry meldet Verfügbarkeit ohne passendes G1: " + cid)
+            if not row["freigegeben"]:
                 continue
             # Bewusst lokale, explizit bereitgestellte argv-Liste; keine Shell.
             job = plan.get(cid)
@@ -169,6 +174,8 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 errors.append("Messpfad fehlt: " + cid)
                 continue
             try:
+                if job.get("instruction"):
+                    print(job["instruction"], flush=True)
                 steps = job.get("steps", [job.get("argv")])
                 if not isinstance(steps, list) or not steps:
                     raise ValueError("steps muss eine nichtleere Liste sein")
@@ -181,7 +188,9 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                             raise ValueError("argv muss eine nichtleere Textliste sein")
                         argv = [a.replace("{out}", str(result_path)).replace("{dir}", str(out))
                                 .replace("{python}", sys.executable) for a in argv]
-                        with subprocess.Popen(argv, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT) as proc:
+                        with subprocess.Popen(argv, cwd=ROOT,
+                                              stdout=None if job.get("interactive") else log,
+                                              stderr=None if job.get("interactive") else subprocess.STDOUT) as proc:
                             deadline = time.monotonic() + job.get("timeout", 14400)
                             try:
                                 while proc.poll() is None:
@@ -205,6 +214,8 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 if evidence["gate"] == "red":
                     raise ValueError("Messbericht meldet rot")
                 if row["minimum_seconds"] is not None:
+                    if evidence["messwerte"]["warm"]["underruns"] != 0:
+                        raise ValueError("Soak: unerwartete Underruns oder fehlender Zähler")
                     elapsed = evidence.get("elapsed_seconds")
                     if type(elapsed) not in (int, float) or elapsed < row["minimum_seconds"]:
                         raise ValueError("Soak-Dauer nicht belegt")
