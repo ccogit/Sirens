@@ -133,6 +133,7 @@ export function createSeparationApi(fetcher = globalThis.fetch) {
     return {
         start: (pfad, model) => json("POST", "separation/jobs", {pfad, model}),
         job: id => json("GET", jobPath(id)),
+        detail: id => json("GET", "separation/" + jobPath(id)),
         cancel: id => json("POST", jobPath(id) + "/cancel", {}),
         async exportMix(id, wav) {
             const response = await fetcher("/api/rt/v1/" + jobPath(id) + "/export", {
@@ -196,7 +197,10 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
             job.state === "cancelled" ? "Abgebrochen" : "Offline-Job: " + Math.round((job.progress || 0) * 100) + " %";
         if (["queued", "running"].includes(job.state)) {
             timer = setTimeout(async () => {
-                try { await show(await api.job(job.id)); } catch (e) { error(e); await cancelJob(); }
+                try {
+                    const state = await api.job(job.id);
+                    await show(state.state === "ready" ? await api.detail(job.id) : state);
+                } catch (e) { error(e); await cancelJob(); }
             }, 500);
             return;
         }
