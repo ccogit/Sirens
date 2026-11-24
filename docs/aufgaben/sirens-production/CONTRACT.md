@@ -61,3 +61,10 @@ Agent erhält JSON-Bericht aus CLI und schreibt neuen validierten Plan. revise e
 
 ## Tests
 A0 erstellt Beispiel-Fixtures und Validatoren. K1–K7 dürfen bis dahin eigene lokale Minimal-Fixtures aus diesen Beispielen nutzen, keine konkurrierenden Änderungen am gemeinsamen Contract. Tests mit temporären Verzeichnissen, stummen/Impuls-WAVs, künstlichen Bewertungen und ohne Netzwerk, Plugins oder GPU. 
+
+
+## K08-Integration: lokale Konfiguration und Job-API
+
+SIRENS_PRODUCTION_CONFIG verweist auf eine vertrauenswürdige lokale UTF-8-JSON-Datei mit schema_version=1; keine Pfade, ausführbaren Programme oder Freigabebelege aus UI/Brief/Plan übernehmen. CLI kann vorhandene, lizenzierte Assets und den vorhandenen WB-Instrumentworker nutzen. Generative Assets nur mit explizitem Lückenbeleg und der gemeinsamen App-GPU-Lease; eigenständiger CLI-Prozess erzeugt keine zweite GPU-Verwaltung. K03/K04 prüfen ihre Cache-Inputs selbst, kein Whole-Stage-Cache für den realen Adapter. K05-Messwerte werden im K06-Report mit Messmethode übernommen. Ableton-Return ist ein neuer Run mit technischer Prüfung ohne erneutes Mastering. Archivexport erzeugt eine neue UUID-Version unter konfiguriertem Exportroot und ist keine kommerzielle Freigabe.
+
+Loopback-API unter /api/production/v1/: POST start (brief, plan, preview_brief, preview_plan, mode; alternativ konfigurierter Pilot), revise (run, plan oder vorkonfigurierter Agenten-Revisionswunsch), cancel (run), export (run, destination), ableton-export (run), ableton-import (export, confirm); GET status?run=, audio?run=, return?export=. Start liefert 202 mit Run-ID; Full prüft zuerst einen 30–60-s-Preview als separaten Run, bei Fehler kein Full. Status succeeded erlaubt Audio erst nach WAV-/Reportprüfung. Der bereits vorhandene Signal-Room-Lifecycle stoppt Browseraudio und Polling, Abbruch ist eine separate explizite Aktion. Unbekannte freie Prompts benötigen einen agentengeplanten Plan, kein generischer synthetischer Fallback.

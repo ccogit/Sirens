@@ -51,8 +51,10 @@ class App:
         self.kick = KickTausch(cfg, umgebung())
         self.stems = StemDienst(cfg)
         self.stem_noten = StemNoten(self.stems)
-        from .production.integration import ProductionService
-        self.production = ProductionService(cfg)
+        from .production.integration import ProductionService, RealBackend
+        from .production.gpu import GPUAdapter
+        self.production = ProductionService(cfg, backend_factory=lambda cfg, options:
+            RealBackend(cfg, options, gpu_adapter_factory=lambda: GPUAdapter.from_app(self)))
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""

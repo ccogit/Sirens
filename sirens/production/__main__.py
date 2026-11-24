@@ -45,8 +45,14 @@ def main(argv=None, *, cfg=None, backend=None):
     try:
         if args.action == "inventory":
             result = {"schema_version": 1, "music_root_available": cfg.music_root.is_dir(),
-                      "data_dir_available": cfg.data_dir.is_dir(), "render_available": backend is not None,
+                      "data_dir_available": cfg.data_dir.is_dir(),
+                      "render_available": True if backend is not None else None,
+                      "configured": bool(integration.settings()),
                       "gpu_available": None, "ableton_available": None}
+            if cfg.music_root.is_dir():
+                from .references import collect
+                _, coverage = collect(cfg)
+                result["references"] = coverage
         elif args.action == "references":
             result = integration.references(cfg, read_manifest(args.brief))
         elif args.action == "benchmark":

@@ -5,7 +5,6 @@ import shutil
 import tempfile
 import threading
 
-
 from ..config import umgebung
 from ..store import write_json_atomic
 from .contracts import (ContractError, read_manifest, safe_path, sha256_file,
@@ -41,10 +40,11 @@ class RealBackend:
     """
     require_technical_pass = True
 
-    def __init__(self, cfg, options=None, *, asset_stage=None):
+    def __init__(self, cfg, options=None, *, asset_stage=None, gpu_adapter_factory=None):
         self.options = settings() if options is None else options
         self.store = RunStore(cfg)
         self.asset_stage = asset_stage
+        self.gpu_adapter_factory = gpu_adapter_factory
 
     @staticmethod
     def next_action(stage):
@@ -68,11 +68,23 @@ class RealBackend:
             return local_candidate(options["asset_root"], selected["file"],
                                    selected["source"], selected.get("measured"))
 
+        gaps = options.get("confirmed_gap_ids", [])
+        generated = options.get("generated_sources", {})
         def factory(check):
+            if gaps and self.gpu_adapter_factory is not None:
+                return Worker.coordinated(options["asset_python"], self.gpu_adapter_factory(),
+                                          peak_bytes=options["gpu_peak_bytes"], user_action=True,
+                                          model_dir=options.get("tts_snapshot"),
+                                          stable_cache=options.get("stable_cache"),
+                                          stable_python=options.get("stable_python"), cancelled=check)
             return Worker(options["asset_python"], cancelled=check)
 
+        # Standalone CLI must never invent a second GPU admission manager.
+        if gaps and self.gpu_adapter_factory is None:
+            gaps = []
         stage = AssetStage(resolve=resolve,
                            worker_factory=factory if options.get("asset_python") else None,
+                           generated_sources=generated, gap_ids=gaps,
                            cache_dir=self.store.root)
         return stage.assets(brief, plan, root, cancelled)
 
@@ -103,7 +115,20 @@ class RealBackend:
         analyzer = None
         if options.get("analysis_python") and options.get("analysis_root"):
             analyzer = mastering_analyzer(options["analysis_python"], options["analysis_root"])
+        if analyzer is None:
+            def analyzer(path):
+                measured = mix.get("premaster" if path.name == "mix.wav" else "measured", {})
+                return {**measured, "measurement_method": "K05 ffmpeg worker"}
         result = inspect_run(root, analyzer)
+        for name, key in (("mix", "premaster"), ("master", "measured")):
+            metrics = mix.get(key, {})
+            if result["technical"].get(name) is not None:
+                for field in ("bands_dbfs", "sub_side_mid_db"):
+                    result["technical"][name][field] = metrics.get(field)
+        if (result["technical"].get("master") or {}).get("sample_peak_dbfs") is None:
+            result["technical"]["errors"].append("master is silent or unreadable")
+            for gate in ("G1", "G2"):
+                result["gates"][gate] = {"status": "failed", "reasons": ["master is silent or unreadable"]}
         cancelled()
         return result
 
@@ -174,9 +199,10 @@ def export_ableton(store, run_id, options=None, *, midi_writer=None):
     return export_bundle(root, ableton_root(store), run_id, midi_writer=midi_writer)
 
 
-def import_ableton(store, export_id, confirm):
+def import_ableton(store, export_id, confirm, options=None):
     from .ableton import import_return
     from .quality import measure_wav
+    options = settings() if options is None else options
     receipt = import_return(ableton_root(store), export_id, store.runs, confirm=confirm)
     run_id = receipt["run_id"]
     root = store.get(run_id)
@@ -184,13 +210,23 @@ def import_ableton(store, export_id, confirm):
     try:
         technical = measure_wav(safe_path(root, "master.wav"))
         errors = ["clipping"] if technical["clipped_samples"] else []
+        missing = ["listening"]
+        if options.get("ffmpeg"):
+            from .mixing import analyze_return
+            measurement = analyze_return(safe_path(root, "master.wav"), ffmpeg=options["ffmpeg"],
+                                         worker_python=options.get("mix_python"))
+            technical.update(measurement["measured"])
+            if technical.get("true_peak_dbtp") is not None and technical["true_peak_dbtp"] > -1:
+                errors.append("true peak exceeds -1 dBTP")
+        if technical.get("lufs") is None or technical.get("true_peak_dbtp") is None:
+            missing.append("LUFS / true peak")
         report = dict(schema_version=1, technical={"master": technical, "errors": errors},
-                      music={}, production={}, gates={}, missing=["listening", "LUFS / true peak"],
+                      music={}, production={}, gates={}, missing=missing,
                       provenance={"source": "ableton_return"},
                       listening={"blind_pairs": [], "results": []})
         write_json_atomic(root / "report.json", report)
         store.status(run_id, "failed" if errors else "succeeded", "ableton_return", 1,
-                     error="clipping" if errors else None)
+                     error="Inspect technical report" if errors else None)
     except Exception:
         store.status(run_id, "failed", "ableton_return", error="Inspect returned WAV")
     return store.inspect(run_id)
@@ -292,7 +328,7 @@ class ProductionService:
     def _submit(self, brief, plan, mode, options, *, parent=None, preview=None):
         from .runner import Runner
         with self.lock:
-            if self.active is not None:
+            if self.active is not None and self.store.inspect(self.active)["status"] in ("queued", "running"):
                 raise ContractError("Wait for or cancel the active production job")
             store = self.store
             runner = Runner(self.cfg, self.backend_factory(self.cfg, options))
@@ -325,7 +361,8 @@ class ProductionService:
                         store.status(run_id, "failed", "prepare", error=type(exc).__name__)
                 finally:
                     with self.lock:
-                        self.active = None
+                        if self.active == run_id:
+                            self.active = None
 
             try:
                 threading.Thread(target=work, name="sirens-production", daemon=True).start()
@@ -348,7 +385,8 @@ class ProductionService:
     def export(self, run_id):
         result = export_ableton(self.store, run_id, self.options_factory())
         return {**result, "validated": True,
-                "instructions": "IMPORT.md im lokalen Exportordner lesen; WAV/MIDI ab 1.1.1, Warp aus."}
+                "instructions": "DATA_DIR/production/ableton/" + result["export_id"] +
+                                "/IMPORT.md lesen; WAV/MIDI ab 1.1.1, Warp aus."}
 
     def check_return(self, export_id):
         from .contracts import validate_ableton, validate_return
@@ -373,7 +411,7 @@ class ProductionService:
         return {"export_id": export_id, "validated": True}
 
     def take_return(self, export_id, confirm):
-        result = import_ableton(self.store, export_id, confirm)
+        result = import_ableton(self.store, export_id, confirm, self.options_factory())
         return self.status(result["run_id"])
 
 
