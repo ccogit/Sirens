@@ -121,6 +121,22 @@ def validate_arrangement(brief, plan, *, lyrics=None):
         if any(a[0] + a[1] > b[0] for a, b in zip(cues, cues[1:])):
             raise ValueError("Overlapping spoken cues")
         expected = brief["lyrics"] if lyrics is None else lyrics
+        # The authored preview carries stable section/cue IDs. Reconstruct
+        # the expected complete prefix from the original brief, not from the
+        # plan's request texts. Other plans retain the exact-lyrics check.
+        target = brief["target_seconds"]
+        if (lyrics is None and (target is None or 30 <= target <= 60)
+                and 30 <= plan["total_bars"] * 240 / plan["bpm"] + plan["tail_seconds"] <= 60):
+            source = re.split(r"\n[ \t]*\n", (expected or "").strip().replace("\r\n", "\n"))
+            if len(source) == 3:
+                source.append(source[0])
+            spoken_ids = ("chorus", "verse", "bridge", "chorus_final")
+            selected = [s["id"] for s in plan["sections"] if s["id"] in spoken_ids]
+            if (len(source) == 4 and selected
+                    and selected == list(spoken_ids[:len(selected)])
+                    and {r["id"] for r in requests.values() if r["kind"] == "speech"}
+                    == {"cue_" + sid for sid in selected}):
+                expected = "\n".join(source[:len(selected)])
         if " ".join(" ".join(c[2] for c in cues).split()) != " ".join((expected or "").split()):
             raise ValueError("Spoken lyrics differ from brief")
     return plan
