@@ -65,6 +65,59 @@ class TestMagentaCompanion(unittest.TestCase):
         self.adapter.process(pcm(.3))
         self.assertEqual(self.models[1].states, [None])
 
+    def test_warmup_resets_state(self):
+        self.adapter.load()
+        self.adapter.warmup()
+        self.adapter.process(pcm(.2))
+        self.assertEqual(self.models[0].states, [None, None])
+
+    def test_backend_model_api(self):
+        # Die gepinnte MRT2-API wird ohne JAX/Numpy nachgebaut.
+        from workers.magenta.backend import MagentaBackend
+
+        class Samples:
+            shape = (HOP, 2)
+
+            def reshape(self, *shape):
+                return self
+
+            def copy(self):
+                return self
+
+            def tobytes(self):
+                return pcm(.25)
+
+        class Numpy:
+            @staticmethod
+            def frombuffer(raw, dtype):
+                return Samples()
+
+            @staticmethod
+            def asarray(samples, dtype):
+                return samples
+
+        class Waveform:
+            def __init__(self, samples, sample_rate):
+                self.samples, self.sample_rate = samples, sample_rate
+
+        class Model:
+            def embed_style(self, wave):
+                assert wave.sample_rate == RATE
+                return "embedding"
+
+            def generate(self, *, conditioning, frames, state):
+                assert conditioning == {"style": "embedding"} and frames == 1
+                return Waveform(Samples(), RATE), (state or 0) + 1
+
+        backend = object.__new__(MagentaBackend)
+        backend.np, backend.waveform, backend.key = Numpy(), Waveform, "style"
+        backend.model = Model()
+        conditioning = backend.embed(pcm(.5))
+        raw, state = backend.generate(conditioning, None)
+        self.assertEqual(raw, pcm(.25))
+        self.assertEqual(backend.generate(conditioning, state)[1], 2)
+        backend.close()
+
     def test_bypass_and_unload(self):
         self.adapter.load(bypass=1)
         self.assertEqual(self.adapter.process(pcm(.5)), bytes(HOP * 8))
