@@ -260,6 +260,19 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Im DJ-Pult startet kein CUDA-KI-Modell; nur eine ausdrücklich gewählte Stem-Trennung
   kann CUDA benutzen (nicht während Claude produziert).
 
+Die einklappbare **Tool-Bibliothek** zeigt für jedes Werkzeug eine Karte mit Kurzbeschreibung, Kategorie
+und Hinweisen zu Voraussetzungen. Ein Klick öffnet den Arbeitsbereich, ohne ein Audio- oder KI-Verfahren
+automatisch zu starten. Über „Werkzeuge anzeigen“ lässt sich die Auswahl wieder öffnen; das zuletzt
+gewählte Werkzeug wird im Browser gespeichert.
+
+**Neue Lab-Werkzeuge ergänzen:** In `web/js/live_lab.js` einen Eintrag zum Register `werkzeuge`
+hinzufügen (stabile `id`, Titel, Kategorie, Symbol, Farbe, Beschreibung, Hinweis und Motiv als
+Liste von Balkenhöhen in Prozent). `panel` ist das DOM-Element des Werkzeugs;
+`anhalten` stoppt Audio beim Wechsel, optional `aktivieren` startet die Ansicht,
+`beenden` gibt beim Verlassen des Labs Ressourcen frei. Ein neuer Eintrag erscheint automatisch
+in der Bibliothek und nimmt am gemeinsamen Wechsel- und Aufräummechanismus teil.
+Karten und Layout liegen in `web/js/lab_library.js` und `web/live_lab.css`.
+
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
 geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben
