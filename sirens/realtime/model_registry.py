@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from ..config import umgebung
+from ..contracts import Ablehnung
 from .contracts import error, invalid
 from .schemas import validate
 
@@ -49,13 +50,8 @@ class ModelRegistry:
                 entry["capability"]["available"] = bool(cap["available"] and installed)
                 entry["command"] = (str(interpreter), "-u", str(script), *args)
                 self.entries[name] = entry
-            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, Ablehnung):
                 continue
-            except Exception as exc:
-                # Nur Vertragsfehler aus fehlerhaften lokalen Manifesten überspringen.
-                from ..contracts import Ablehnung
-                if not isinstance(exc, Ablehnung):
-                    raise
 
     def capabilities(self):
         return [copy.deepcopy(e["capability"]) for e in self.entries.values()]
