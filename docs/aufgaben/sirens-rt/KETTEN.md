@@ -37,6 +37,8 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
 | KETTE-43 | Welle 4: Produktintegration Teil 2 | 26 | KETTE-41 gemergt | gemergt |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
+| KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 gemergt | offen |
+| KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | offen |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt, Gate G4 bestanden, Freigabe des Repo-Eigentümers | gesperrt (wartet auf G4 und Freigabe) |
 
@@ -83,6 +85,8 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-43 | gemeinsame Dateien (README Abschnitt 4 Punkt 7) außer den Dateien von KETTE-28 und KETTE-35 |
 | KETTE-38 | `workers/stable_audio/`, `web/js/realtime/pad_scheduler.js`, `benchmarks/pads/`, Pad-Leiste als eigenes Modul unter `web/js/realtime/` |
 | KETTE-35 | `workers/stable_audio/`, `web/js/realtime/pad_scheduler.js`, `benchmarks/pads/` |
+| KETTE-44 | gemeinsame Dateien und `web/js/realtime/` (außer `gpu_panel.js`), `sirens/realtime/routes.py`, `sessions.py` |
+| KETTE-45 | `sirens/realtime/gpu_manager.py`, `worker_supervisor.py`, `model_registry.py`, `telemetry.py`, `web/js/realtime/gpu_panel.js`, CUDA-Sperre in `sirens/server.py` |
 | KETTE-31 | `sirens/realtime/sessions.py`, alle Adressen in `routes.py`, Einbau aller Hooks, `benchmarks/g2/` |
 
 Jede Kette schreibt außerdem ihre Tests unter `tests/realtime/` (Dateinamen mit dem eigenen Thema, z. B.

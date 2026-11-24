@@ -57,6 +57,8 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 | 25 | `AUFGABE-25-STEM-STUDIO-2.md` | Rest von WP08: Dateijob, RoFormer im Produkt | 08 |
 | 26 | `AUFGABE-26-INTEGRATION-2.md` | Rest von WP17 | 17 |
 | 27 | `AUFGABE-27-PADS-2.md` | Rest von WP12: Verdrahtung der Pads | 12 |
+| 28 | `AUFGABE-28-HOOKS-EINBAU.md` | Alle offenen Hooks in die Oberfläche | 17, 26 |
+| 29 | `AUFGABE-29-GPU-REGEL.md` | GPU-Regel, Profile, dauerhafter Supervisor | 03, 26 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 
