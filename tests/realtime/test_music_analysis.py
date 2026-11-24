@@ -8,7 +8,7 @@ from benchmarks.fixtures import generate
 from sirens.contracts import Ablehnung
 from sirens.realtime.music_analysis import (
     analyse_pcm, chroma_key, CorrectionStore, notes_to_frames, source_hash)
-from sirens.realtime.schema import validate
+from sirens.realtime.schemas import validate
 
 
 class MusicAnalysis(unittest.TestCase):
