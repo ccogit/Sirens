@@ -3,10 +3,10 @@ import {SpectralEffect} from "./spectral.js";
 import {GranularEffect} from "./granular.js";
 import {ConvolutionEffect} from "./convolution.js";
 export const presets=Object.freeze({
-    neutral:Object.freeze({pitch:1,mask:1,freeze:false,cloud:0,morph:0,wet:[0,0,0]}),
-    cloud:Object.freeze({pitch:1,mask:1,freeze:false,cloud:0.7,morph:0.5,wet:[0,0.8,0.3]}),
-    octave:Object.freeze({pitch:2,mask:0.8,freeze:false,cloud:0,morph:0,wet:[1,0,0]}),
-    freeze:Object.freeze({pitch:1,mask:0.65,freeze:true,cloud:0,morph:0.2,wet:[1,0,0.3]})
+    neutral:Object.freeze({pitch:1,mask:1,freeze:false,cloud:0,morph:0,wet:Object.freeze([0,0,0])}),
+    cloud:Object.freeze({pitch:1,mask:1,freeze:false,cloud:0.7,morph:0.5,wet:Object.freeze([0,0.8,0.3])}),
+    octave:Object.freeze({pitch:2,mask:0.8,freeze:false,cloud:0,morph:0,wet:Object.freeze([1,0,0])}),
+    freeze:Object.freeze({pitch:1,mask:0.65,freeze:true,cloud:0,morph:0.2,wet:Object.freeze([1,0,0.3])})
 });
 // Feste Reihenfolge und deklarierte Summenlatenz, auch bei Wet=0/Bypass.
 export class EffectRack {
@@ -24,6 +24,7 @@ export class EffectRack {
         for(let i=0;i<3;i++)this.effects[i].setWet(p.wet[i]);
     }
     setParameter(family,key,value){
+        if(!Number.isInteger(family)||family<0||family>2)throw new RangeError("Effekt");
         const e=this.effects[family];if(!e)throw new RangeError("Effekt");
         if(key==="wet")e.setWet(value);
         else if(key==="bypass")e.setBypass(value);

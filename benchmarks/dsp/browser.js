@@ -23,7 +23,7 @@ byId("start").onclick=async()=>{
                 interval=setInterval(()=>{
                     if(pending!==null)return;
                     pending=id++;issued=performance.now();node.port.postMessage({type:"probe",id:pending});
-                    timeout=setTimeout(()=>{result.timeouts++;show();stop();},2000);
+                    timeout=setTimeout(()=>{result.timeouts++;byId("save").disabled=false;show();stop();},2000);
                 },250);
             }else if(m.type==="probe"&&m.id===pending){
                 clearTimeout(timeout);const now=performance.now(),ts=context.getOutputTimestamp?.();
