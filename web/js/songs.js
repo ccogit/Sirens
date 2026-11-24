@@ -42,9 +42,15 @@ function masterKnopf(datei) {
 
 function beschreibung(text, klasse, leer) {
   if (!text) return h("p", { class: "klein library-no-description" }, leer);
-  return h("details", { class: "library-description " + klasse },
-    h("summary", {}, h("span", {}, text.split("\n\n")[0])),
-    h("div", { class: "library-description-text" }, text.split(/\n\n+/).map(absatz => h("p", {}, absatz))));
+  const [erster, ...weitere] = text.split(/\n\n+/);
+  const saetze = [...new Intl.Segmenter("de", { granularity: "sentence" }).segment(erster)];
+  const vorschau = erster.length <= 380 ? erster : saetze.slice(0, 2).map(satz => satz.segment).join("").trim();
+  const rest = [erster.slice(vorschau.length).trim(), ...weitere].filter(Boolean);
+  return h("section", { class: klasse },
+    h("p", { class: "library-album-intro" }, vorschau),
+    rest.length ? h("details", { class: "library-album-more" },
+      h("summary", {}, "Mehr zum Album"),
+      h("div", { class: "library-description-text" }, rest.map(absatz => h("p", {}, absatz)))) : null);
 }
 
 function profilAnsicht(profil, details, tagWaehlen) {
