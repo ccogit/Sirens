@@ -8,14 +8,14 @@ Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinat
 
 | Kette | Titel | Aufgaben | Voraussetzung | Stand |
 |---|---|---|---|---|
-| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | vergeben (24.11.2026) |
-| KETTE-P01 | Persönliches Referenzwissen | K01 | – | vergeben (24.11.2026) |
-| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | vergeben (24.11.2026) |
-| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | vergeben (24.11.2026) |
-| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | vergeben (24.11.2026) |
+| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | gemergt |
+| KETTE-P01 | Persönliches Referenzwissen | K01 | – | gemergt |
+| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | gemergt |
+| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | gemergt |
+| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | gemergt |
 | KETTE-P05 | Mixing und Mastering | K05 | – | vergeben (24.11.2026) |
-| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | vergeben (24.11.2026) |
-| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | vergeben (24.11.2026) |
+| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | gemergt |
+| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | gemergt |
 | KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | offen |
 
 ### Regeln für Bearbeiter (gelten vor den Formulierungen weiter unten)
@@ -47,10 +47,10 @@ Was die Externe nicht kann und deshalb parallel zu den Ketten am Zielrechner lä
 | Engpass | Wer | Schaltet frei | Stand |
 |---|---|---|---|
 | Gerüst `sirens/production`, `tests/production` | Claude | konfliktfreie parallele PRs | erledigt (dieser PR) |
-| Offline-Host: DawDreamer + Surge XT (VST3 vorhanden) in Worker-venv, Render-Rauchtest | Claude | K03 Hostwahl, G1 | läuft |
-| Ableton Live 12 Suite / Producer Pal: Capability-Probe read-only, isoliertes Test-Set | Claude, Start von Live durch Nutzer | K07 Spike, K03 | wartet auf Nutzer |
+| Offline-Host: DawDreamer + Surge XT (VST3 vorhanden) in Worker-venv, Render-Rauchtest | Claude | K03 Hostwahl, G1 | erledigt: DawDreamer 0.9.0 + Surge XT 1.3.4, Laden 2,2 s, 8,6 s Audio in 0,06 s, 48 kHz, kein NaN |
+| Ableton Live / Producer Pal: Capability-Probe im neuen Test-Set | Claude | K07 Spike, K03 | erledigt: Live 12.4.25b1 (Beta; 12.4.16 Suite ohne Pal), Pal 2.5.0; Tempo, Skala, Locators, Spuren, natives Instrument, Arrangement-MIDI mit Readback, WAV-Import ohne Warp ja; Speichern/Rendern unbeaufsichtigt nein |
 | AMM-WB (Port 8000, PostgreSQL) und SecondRoom (Port 8099) lokal starten | Claude | K01 echte Geschmacksdaten, K04 Samples, K05 Ketten | prüfen |
-| Lokaler TTS-Kandidat (Qwen3-TTS) laden und messen | Claude nach Zustimmung | K04 Spoken Word, G1 | wartet auf Zustimmung |
+| Lokaler TTS-Kandidat (Qwen3-TTS) laden und messen | Claude | K04 Spoken Word, G1 | erledigt: 1.7B-VoiceDesign (Apache-2.0), bf16 cuda, VRAM 4,1 GB, warm 9,4 s für 5,1 s Sprache (RTF 1,8), 24 kHz |
 | Clear-Head-Lyrics/Original im lokalen Katalog finden | Claude | K02, B0 | offen |
 | Hörurteile G1 (3 Groove-Varianten), B2/G3 (12 Blind-A/B) | Nutzer | G1, G3 | nach K08 |
 | Ableton-Roundtrip (Export in Live, Return) | Nutzer (ein Exportdialog) | G2 Ableton | nach P07 |
