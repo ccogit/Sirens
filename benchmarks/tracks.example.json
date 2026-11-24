@@ -1,0 +1,9 @@
+{
+  "tracks": [
+    {"pfad": "../../lokale-testtracks/techno.wav", "sha256": null, "genre": "Techno", "lizenz": "Eigene Aufnahme oder dokumentierte lokale Nutzungserlaubnis", "bpm": 140},
+    {"pfad": "../../lokale-testtracks/house.wav", "sha256": null, "genre": "House", "lizenz": "Lizenz lokal belegen"},
+    {"pfad": "../../lokale-testtracks/psytrance.wav", "sha256": null, "genre": "Psytrance", "lizenz": "Lizenz lokal belegen"},
+    {"pfad": "../../lokale-testtracks/industrial.wav", "sha256": null, "genre": "Industrial", "lizenz": "Lizenz lokal belegen"},
+    {"pfad": "../../lokale-testtracks/ambient.wav", "sha256": null, "genre": "Ambient", "lizenz": "Lizenz lokal belegen"}
+  ]
+}

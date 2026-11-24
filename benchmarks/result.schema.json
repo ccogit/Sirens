@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sirens Benchmark-Ergebnis",
+  "type": "object",
+  "required": [
+    "wp",
+    "kandidat",
+    "gate",
+    "modus",
+    "zeitpunkt",
+    "rechner",
+    "messwerte",
+    "notizen",
+    "befehl"
+  ],
+  "properties": {
+    "wp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kandidat": {
+      "type": "string",
+      "minLength": 1
+    },
+    "befehl": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate": {
+      "enum": [
+        "green",
+        "amber",
+        "red",
+        "nicht_gemessen"
+      ]
+    },
+    "modus": {
+      "enum": [
+        "streaming",
+        "lookahead",
+        "offline",
+        "unbekannt"
+      ]
+    },
+    "zeitpunkt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rechner": {
+      "type": "object",
+      "required": [
+        "os",
+        "python",
+        "node",
+        "ffmpeg",
+        "gpus",
+        "wsl",
+        "disk",
+        "git",
+        "notes"
+      ]
+    },
+    "messwerte": {
+      "type": "object",
+      "required": [
+        "warm",
+        "kalt"
+      ],
+      "properties": {
+        "warm": {
+          "$ref": "#/$defs/messung"
+        },
+        "kalt": {
+          "$ref": "#/$defs/messung"
+        }
+      }
+    },
+    "notizen": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "messung": {
+      "type": "object",
+      "required": [
+        "p50_ms",
+        "p95_ms",
+        "p99_ms",
+        "peak_vram_mib",
+        "rtf",
+        "underruns"
+      ],
+      "properties": {
+        "p50_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p99_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_vram_mib": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "rtf": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "underruns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
