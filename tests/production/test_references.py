@@ -120,6 +120,25 @@ class ReferencesTest(unittest.TestCase):
         self.assertEqual(tracks[0]["bpm_confidence"], 0.8)
         self.assertEqual(tracks[0]["features"]["method"], ref.METHOD)
 
+    def test_order_text_bound_to_exact_path_and_manifest_guard(self):
+        a = self.audio("electro/funk/Alpha - Version 1.wav", 1)
+        self.audio("electro/funk/Alpha - Version 2.wav", 2)
+        order = {"id": "SA-20261124-001", "updated_at": "2026-11-24", "bewertungen": [],
+                 "plan": {"tracks": [{"nr": 1, "text": "fixture words", "stil_kurz": "electro"}]},
+                 "tracks_stand": [{"nr": 1, "dateien": [a]}]}
+        (self.cfg.orders_dir / "SA-20261124-001.json").write_text(json.dumps(order), encoding="utf-8")
+        tracks, coverage = ref.collect(self.cfg)
+        by_path = {t["relative_path"]: t for t in tracks}
+        self.assertEqual(by_path[a]["lyrics"], "fixture words")
+        self.assertEqual(by_path[a]["style_hint"], "electro")
+        self.assertIsNone(by_path[a]["style_text"])
+        self.assertIsNone(next(t for t in tracks if t["relative_path"] != a)["lyrics"])
+        result = ref.build_references(tracks, coverage, brief())
+        result["holdout"] = [tracks[0]["id"]]
+        result["selected"] = [tracks[1]["id"]]
+        with self.assertRaisesRegex(ValueError, "holdout family leak"):
+            ref.validate_references(result)
+
     def test_missing_root(self):
         self.cfg.music_root.rmdir()
         tracks, coverage = ref.collect(self.cfg)
