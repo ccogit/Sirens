@@ -25,6 +25,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 gemergt | gemergt |
 | KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | gemergt |
 | KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-28 | Welle 2: Advanced Stem Studio Teil 2 – Dateijob und Verdrahtung | 25 | KETTE-26 gemergt | offen |
 | KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | gemergt |
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
 | KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, KETTE-14 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
@@ -32,9 +33,10 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | vergeben (24.11.2026) |
 | KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, KETTE-16 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
 | KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
-| KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | vergeben (24.11.2026) |
+| KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
+| KETTE-43 | Welle 4: Produktintegration Teil 2 | 26 | KETTE-41 gemergt | offen |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt, ein neuronaler Pfad freigegeben | gesperrt (optional, wartet auf neuronalen Pfad und Freigabe) |
-| KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt | offen |
+| KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | offen |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt, Gate G4 bestanden, Freigabe des Repo-Eigentümers | gesperrt (wartet auf G4 und Freigabe) |
 
 Im Register steht als Voraussetzung nur, wessen **Code** gebraucht wird. Ketten werden **vorgezogen**: Sie
@@ -75,6 +77,9 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-25 | `web/js/realtime/effects/`, `benchmarks/dsp/` |
 | KETTE-32 | `web/js/realtime/recorder.js`, `sirens/realtime/recordings.py`, `benchmarks/recorder/` |
 | KETTE-37 | `web/js/realtime/drum_architect.js`, `stem_crossover.js`, `acid_transformer.js` |
+| KETTE-28 | `workers/separation/`, `sirens/realtime/stem_adapter.py`, `web/js/realtime/advanced_stems.js`, Dateijob in `worker_supervisor.py` und `routes.py`, `benchmarks/separation/` |
+| KETTE-43 | gemeinsame Dateien (README Abschnitt 4 Punkt 7) außer den Dateien von KETTE-28 und KETTE-35 |
+| KETTE-35 | `workers/stable_audio/`, `web/js/realtime/pad_scheduler.js`, `benchmarks/pads/` |
 | KETTE-31 | `sirens/realtime/sessions.py`, alle Adressen in `routes.py`, Einbau aller Hooks, `benchmarks/g2/` |
 
 Jede Kette schreibt außerdem ihre Tests unter `tests/realtime/` (Dateinamen mit dem eigenen Thema, z. B.
