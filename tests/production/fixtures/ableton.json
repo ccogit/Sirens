@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "mock-run",
+  "export_id": "mock-export",
+  "bpm": 120,
+  "meter": [
+    4,
+    4
+  ],
+  "ppq": 960,
+  "sample_rate": 48000,
+  "frames": 96000,
+  "sections": [
+    {
+      "id": "intro",
+      "start_bar": 0,
+      "bars": 1,
+      "label": "Intro"
+    }
+  ],
+  "tracks": [
+    {
+      "track_id": "kick",
+      "role": "drums",
+      "audio_file": "audio/kick.wav",
+      "midi_file": null,
+      "patch": "tight_kick",
+      "automation_file": null,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "reference_mix": "reference.wav",
+  "project_file": null,
+  "mode": "import_bundle",
+  "capabilities": {
+    "live_version": null,
+    "edition": null,
+    "max_for_live": null,
+    "open_set": false,
+    "render": false,
+    "reason": "fixture",
+    "producer_pal": null,
+    "secondroom": null,
+    "wb": null,
+    "live_writer": null,
+    "guard_status": null,
+    "capture": null,
+    "saved_set": null
+  },
+  "warnings": [
+    "Schema-only fixture; audio generated in tests"
+  ]
+}
