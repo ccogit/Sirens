@@ -18,6 +18,8 @@ export function hookState(id, descriptors, {error=null, wired=false, measured=fa
     if(!diagnostic.gate_report_present)reasons.push("Nicht gemessen (G1-Bericht fehlt)");
     if(reasons.length)return {enabled:false,text:reasons.join(" · "),controls:cap?.controls||[]};
   }
+  if(!cap && ["dsp","drum","crossover","acid","mutation"].includes(id))
+    return {enabled:false,text:"Nicht gemessen (G3-Hörprüfung / Bedienpfad nicht freigegeben)",controls:[]};
   if(!cap)return {enabled:false,text:"Nicht installiert / nicht gemessen",controls:[]};
   if(!cap.available)return {enabled:false,text:"Nicht installiert oder nicht gemessen / freigegeben",controls:cap.controls||[]};
   if(id==="roformer"&&diagnostic?.available)return {enabled:false,text:"Registry: verfügbar · Bedienung im Advanced Stem Studio (Offline)",controls:cap.controls||[]};
