@@ -138,9 +138,6 @@
 .library-description[open] summary::after { content: "Beschreibung einklappen"; }
 .library-description p { white-space: pre-line; margin: .45rem 0; max-width: 82ch; }
 .library-album-description, .library-detail > .library-no-description { margin: .25rem 1rem .8rem; }
-.library-album-intro { margin: .65rem 0 .25rem; max-width: 88ch; line-height: 1.5; color: var(--tinte); }
-.library-album-more { font-size: .8rem; color: var(--leise); }
-.library-album-more summary { cursor: pointer; width: fit-content; }
 .library-track-description { max-width: 72ch; }
 
 .library-profile { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem 1rem; }
@@ -167,9 +164,8 @@ html[data-theme] .songs-page .library-header h1 { font-size: clamp(1.7rem, 2.8vw
 .songs-page .library-release-header h2 { font-size: clamp(1.45rem, 2.4vw, 2.1rem); }
 .library-detail-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .library-detail-body .library-song-list { overflow: visible; }
-.library-album-description .library-description-text { columns: 42ch 2; column-gap: 2rem; }
-.library-album-description .library-description-text p { margin-top: 0; max-width: none; }
-.library-album-more[open] summary { margin-bottom: .65rem; }
+.library-album-description .library-description-text { columns: 48ch 2; column-gap: clamp(1.5rem, 3vw, 3rem); line-height: 1.55; }
+.library-album-description .library-description-text p { margin: 0 0 .5rem; max-width: none; }
 .songs-page .library-song { border-top-color: color-mix(in srgb, var(--linie), transparent 35%); }
 .songs-page .library-song-art { grid-column: 1; width: 1.9rem; }
 .songs-page .library-song-play { grid-column: 2; }
