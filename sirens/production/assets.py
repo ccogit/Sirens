@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-import hashlib
 import http.client
 import json
 import os
@@ -227,9 +226,10 @@ class Worker:
 
 
 def _cache_key(request, source, input_hash, plan):
+    from .cache import cache_key
     value = dict(version=1, request=request, source=source, input_hash=input_hash,
                  bpm=plan["bpm"], key=plan["key"])
-    return hashlib.sha256(_json_bytes(value)).hexdigest()
+    return cache_key("asset", value, source["backend"], source["revision"], request["seed"])
 
 
 def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None,
@@ -241,6 +241,7 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
     a vetted Candidate or None. None alone is not permission to generate:
     the coordinator must separately confirm a catalogue gap via gap_ids.
     generated_sources is trusted local configuration keyed by 'speech'/'sound'.
+    cache_dir is the P00 production root (HashCache uses its cache/ subdirectory).
     Never infer a licence or automatically extract reference audio.
     """
     from .contracts import validate_plan, validate_assets, safe_path, sha256_file
@@ -253,8 +254,10 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
     assets_dir.mkdir()
     cache = None
     if cache_dir is not None:
-        cache = Path(cache_dir).resolve()
-        cache.mkdir(parents=True, exist_ok=True)
+        from .cache import HashCache
+        cache_root = Path(cache_dir).resolve()
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cache = HashCache(cache_root)
     entries = []
     for original in plan["asset_requests"]:
         request = dict(original)
@@ -297,24 +300,12 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                 worker.verify_source(request, source)
             approved_source(source, commercial=commercial, allow_test=allow_test)
             key = _cache_key(request, source, input_hash, plan)
-            cached = cache / (key + ".wav") if cache else None
-            receipt = cache / (key + ".json") if cache else None
             kwargs = dict(duration_seconds=request["duration_seconds"],
                           loop=request["kind"] == "loop", speech=request["kind"] == "speech")
             with tempfile.TemporaryDirectory(dir=assets_dir) as tmp:
                 pending = Path(tmp) / "asset.wav"
-                cache_hit = False
-                if cached and receipt and cached.is_file() and receipt.is_file() and not (
-                        cached.is_symlink() or receipt.is_symlink()):
-                    try:
-                        prior = json.loads(receipt.read_text(encoding="utf-8"))
-                        cache_hit = (prior["sha256"] == sha256_file(cached) and
-                                     prior["key"] == key)
-                        if cache_hit:
-                            shutil.copyfile(cached, pending)
-                            inspect_wav(pending, **kwargs)
-                    except (OSError, ValueError, KeyError, wave.Error):
-                        cache_hit = False
+                # P00 cache verifies immutable bytes before copying.
+                cache_hit = cache.restore(key, Path(tmp)) if cache is not None else False
                 if not cache_hit:
                     pending.unlink(missing_ok=True)
                     if candidate is not None:
@@ -345,15 +336,8 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                     if plan["key"] and request.get("tonal", False) and (
                             info["measured"]["key"] != plan["key"]):
                         raise AssetError("tonal loop key unverified or mismatched")
-                if cached and receipt and not cache_hit:
-                    with tempfile.NamedTemporaryFile(dir=cache, delete=False) as out:
-                        temp = Path(out.name)
-                    try:
-                        shutil.copyfile(pending, temp)
-                        os.replace(temp, cached)
-                        _write_json(receipt, {"key": key, "sha256": info["sha256"]})
-                    finally:
-                        temp.unlink(missing_ok=True)
+                if cache is not None and not cache_hit:
+                    cache.publish(key, Path(tmp), ["asset.wav"])
                 os.replace(pending, target)
             entries.append(dict(id=identifier, kind=request["kind"],
                                 file="assets/" + target.name, source=source,
@@ -541,3 +525,27 @@ def g1_requests(text, *, seed=101, speech_seconds=8):
                          prompt="calm close male spoken word, English, no singing",
                          seed=seed + len(sounds), duration_seconds=speech_seconds))
     return requests
+
+
+class AssetStage:
+    """K00 Runner's assets(brief, plan, root, cancelled) adapter.
+
+    Leave Runner's whole-stage cache disabled for this stage unless its key
+    includes the current selection, licensing and model receipts. This adapter
+    rechecks rights before restoring each asset through the shared P00 cache.
+    """
+    def __init__(self, *, resolve, worker_factory=None, generated_sources=None,
+                 gap_ids=(), cache_dir=None, commercial=False):
+        self.resolve = resolve
+        self.worker_factory = worker_factory
+        self.generated_sources = generated_sources
+        self.gap_ids = tuple(gap_ids)
+        self.cache_dir = cache_dir
+        self.commercial = commercial
+
+    def assets(self, brief, plan, root, cancelled):
+        worker = self.worker_factory(cancelled) if self.worker_factory else None
+        return render_assets(plan, root, resolve=self.resolve, worker=worker,
+                             generated_sources=self.generated_sources, gap_ids=self.gap_ids,
+                             cache_dir=self.cache_dir, commercial=self.commercial,
+                             cancelled=cancelled)
