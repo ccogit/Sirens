@@ -291,6 +291,8 @@ class Handler(BaseHTTPRequestHandler):
             app.katalog.scan_im_hintergrund()
             return self._json(202, {"zustand": "laeuft"})
         if self.command == "POST" and pfad == "/api/claude/start":
+            if app.cfg.rt_enabled and hasattr(app, "rt_gpu_provider"):
+                return self._json(202, app.starter.starten("Knopf auf der Seite", raise_busy=True))
             return self._json(202, app.starter.starten("Knopf auf der Seite"))
         if self.command == "POST" and pfad == "/api/ablauf":
             return self._json(200, {"schritte": ablauf.plan(data if isinstance(data, dict) else {})})
