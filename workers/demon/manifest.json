@@ -2,6 +2,10 @@
   "version": 1,
   "name": "demon",
   "interpreter_env": "SIRENS_RT_DEMON_PYTHON",
+  "python_dirs": [
+    ".venv-demon",
+    ".venv-spike-demon"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {

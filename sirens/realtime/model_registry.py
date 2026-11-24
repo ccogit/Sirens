@@ -22,7 +22,12 @@ PROFILES = {
 class ModelRegistry:
     def __init__(self, root=ROOT, env=None, *, mock_enabled=False):
         self.root = Path(root).resolve()
+        explizit = env is not None
         self.env = umgebung(env, self.root / ".env")
+        # Automatische Suche nach installierten Umgebungen: im Betrieb an; bei ausdrücklich übergebener Umgebung
+        # (Tests) nur, wenn sie es verlangt. SIRENS_RT_AUTODETECT=aus schaltet sie immer ab.
+        schalter = str(self.env.get("SIRENS_RT_AUTODETECT", "" if explizit else "an")).strip().lower()
+        self.autodetect = schalter in ("an", "1", "ja", "on", "true")
         self.entries = {}
         for path in sorted((self.root / "workers").glob("*/manifest.json")):
             try:
@@ -44,7 +49,7 @@ class ModelRegistry:
                 args = entry["args"]
                 if not isinstance(args, list) or any(not isinstance(a, str) or "\x00" in a for a in args):
                     continue
-                python = self.env.get(key, sys.executable if cap["mock"] else "")
+                python = self.env.get(key) or (sys.executable if cap["mock"] else self._gefunden(entry))
                 interpreter = Path(python).expanduser()
                 installed = bool(python and interpreter.is_absolute() and interpreter.is_file())
                 entry["capability"]["available"] = bool(cap["available"] and installed)
@@ -52,6 +57,24 @@ class ModelRegistry:
                 self.entries[name] = entry
             except (OSError, ValueError, TypeError, KeyError, AttributeError, Ablehnung):
                 continue
+
+    def _gefunden(self, entry):
+        """Interpreter einer installierten Umgebung ohne .env-Eintrag finden.
+
+        Das Manifest nennt unter `python_dirs` Ordner im Sirens-Ordner (nur `.venv…`, keine Pfade), in der
+        Reihenfolge, in der sie gesucht werden; die erste vorhandene Umgebung gilt.
+        """
+        dirs = entry.get("python_dirs", [])
+        if not self.autodetect or not isinstance(dirs, list):
+            return ""
+        for name in dirs:
+            if not isinstance(name, str) or not re.fullmatch(r"\.venv[-a-z0-9_.]{1,64}", name):
+                continue
+            for teil in (("Scripts", "python.exe"), ("bin", "python")):
+                kandidat = self.root.joinpath(name, *teil)
+                if kandidat.is_file() and kandidat.resolve().is_relative_to(self.root):
+                    return str(kandidat)
+        return ""
 
     def capabilities(self):
         return [copy.deepcopy(e["capability"]) for e in self.entries.values()]

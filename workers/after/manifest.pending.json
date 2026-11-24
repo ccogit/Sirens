@@ -2,6 +2,10 @@
   "version": 1,
   "name": "after",
   "interpreter_env": "SIRENS_RT_AFTER_PYTHON",
+  "python_dirs": [
+    ".venv-after",
+    ".venv-spike-after"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {

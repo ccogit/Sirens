@@ -2,6 +2,10 @@
   "version": 1,
   "name": "rave",
   "interpreter_env": "SIRENS_RT_RAVE_PYTHON",
+  "python_dirs": [
+    ".venv-rave",
+    ".venv-spike-rave"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {

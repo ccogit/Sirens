@@ -2,6 +2,9 @@
   "version": 1,
   "name": "magenta",
   "interpreter_env": "SIRENS_RT_MAGENTA_PYTHON",
+  "python_dirs": [
+    ".venv-magenta"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {
