@@ -241,11 +241,21 @@ export function songsAnsicht(el) {
       if (gruppe.value) sichtbar = songs.filter(song => schluessel(song) === gruppe.value);
       kopf.append(h("div", { class: "library-single-controls" }, gruppierung, gruppe));
     }
+    const zeile = ({ song, stil }) => songZeile(song, stil, auftraege, fassungen, tagWaehlen);
+    const haupttitel = [], weitere = [];
+    for (const eintrag of sichtbar) {
+      const extra = album && eintrag.song.dateien.every(datei =>
+        /^(weitere songs|notpublished)(?:\/|$)/i.test(datei.unterordner));
+      (extra ? weitere : haupttitel).push(eintrag);
+    }
+    const extraListe = weitere.length ? h("li", { class: "library-extra" },
+      h("details", { open: !haupttitel.length },
+        h("summary", {}, "Weitere lokale Songs (" + weitere.length + ")"),
+        h("ul", { class: "library-song-list" }, weitere.map(zeile)))) : null;
     inhalt.append(kopf,
       album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
-      sichtbar.length ? h("ul", { class: "library-song-list" },
-      sichtbar.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen, tagWaehlen)))
-      : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
+      sichtbar.length ? h("ul", { class: "library-song-list" }, haupttitel.map(zeile), extraListe)
+        : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
     knoepfeAktualisieren();
   }
 

@@ -146,3 +146,4 @@
 .library-profile dt { font-weight: 650; }
 .library-profile dd { margin: 0; }
 .library-song:has(.library-description[open]) { align-items: start; }
+.library-extra > details > summary { cursor: pointer; padding: .8rem 1rem; border-top: 1px solid var(--linie); color: var(--leise); }
