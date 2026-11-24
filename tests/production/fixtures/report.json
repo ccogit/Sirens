@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "technical": {},
+  "music": {},
+  "production": {},
+  "gates": {},
+  "missing": [
+    "listening"
+  ],
+  "provenance": {
+    "backend": "mock"
+  },
+  "listening": {
+    "blind_pairs": [],
+    "results": []
+  }
+}
