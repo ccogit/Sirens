@@ -41,5 +41,5 @@ test("Fehlende Bestätigung meldet Fehler",async()=>{
     const r=new Recorder({postMessage:()=>{}},async()=>0,async()=>{});
     r.start();
     r.receive({type:"block",buffer:new ArrayBuffer(BLOCK*8),frames:1,startFrame:0});
-    assert.match((await r.done).error,/Bestätigung/);
+    assert.match((await r.done).error,/bestätigung/i);
 });
