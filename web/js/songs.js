@@ -40,7 +40,7 @@ function masterKnopf(datei) {
   } }, "Mastern");
 }
 
-function songZeile(song, stil, auftraege, gewaehlt) {
+function songZeile(song, stil, auftraege, gewaehlt, tagWaehlen) {
   const cover = song.cover || song.dateien.map(d => auftraege.get(d.pfad)?.song.cover).find(Boolean);
   const titel = h("strong", {}, song.titel);
   const status = h("span", { class: "klein library-song-status", "aria-live": "polite" });
@@ -77,13 +77,43 @@ function songZeile(song, stil, auftraege, gewaehlt) {
     if (player.isConnected) knoepfeAktualisieren();
   }
   fassungZeigen();
+  const tags = [...new Set((song.soundcloud || []).flatMap(info => info.tags || []))];
   return h("li", { class: "library-song" },
     h("span", { class: "library-song-art", "aria-hidden": "true" },
       cover ? h("img", { src: api.bildUrl(cover), alt: "", loading: "lazy" }) : "♫"),
     player, h("div", { class: "library-song-identity" }, titel,
       h("div", { class: "library-song-meta" },
-        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status)),
+        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status),
+      tags.length ? h("div", { class: "library-tags" },
+        tags.slice(0, 3).map(tag => h("button", { type: "button", title: "Nach " + tag + " filtern",
+          onclick: () => tagWaehlen(tag) }, tag))) : null),
     fassung, aktionen);
+}
+
+const filterFelder = [
+  ["typ", "Alben / Singles", ["Album", "Singles"]],
+  ["stil", "Stilreferenz"],
+  ["genre", "SoundCloud-Genre"],
+  ["tags", "SoundCloud-Tag"],
+  ["format", "Dateiformat"],
+  ["wertung", "Bewertung", ["Positiv", "Bewertet", "Ohne Bewertung"]],
+  ["sc", "SoundCloud", ["Öffentlich zugeordnet", "Ohne Zuordnung"]],
+  ["cover", "Songcover", ["Mit Cover", "Ohne Cover"]],
+];
+
+function songMerkmale(release, song) {
+  const soundcloud = song.soundcloud || [];
+  const scores = song.dateien.map(d => d.bewertung?.score).filter(score => score != null);
+  return {
+    typ: [release.single ? "Singles" : "Album"],
+    stil: release.stilreferenz ? [release.stilreferenz] : [],
+    genre: [...new Set(soundcloud.map(info => info.genre).filter(Boolean))],
+    tags: [...new Set(soundcloud.flatMap(info => info.tags || []))],
+    format: [...new Set(song.dateien.map(d => d.pfad.split(".").pop().toUpperCase()))],
+    wertung: scores.length ? (scores.some(score => score > 0) ? ["Positiv", "Bewertet"] : ["Bewertet"]) : ["Ohne Bewertung"],
+    sc: [soundcloud.length ? "Öffentlich zugeordnet" : "Ohne Zuordnung"],
+    cover: [song.cover ? "Mit Cover" : "Ohne Cover"],
+  };
 }
 
 export function songsAnsicht(el) {
@@ -95,6 +125,22 @@ export function songsAnsicht(el) {
   const auftraege = new Map();
   const fassungen = new Map();
   const suche = h("input", { type: "search", placeholder: "Bibliothek durchsuchen", "aria-label": "Bibliothek durchsuchen" });
+  const filterStand = h("summary", {}, "Filter und Tags");
+  const filterBox = h("details", { class: "library-filters" }, filterStand);
+  const filter = Object.fromEntries(filterFelder.map(([name, titel]) => [name,
+    h("select", { "aria-label": titel, onchange: zeichnen })]));
+  filterBox.append(h("div", { class: "library-filter-grid" },
+    filterFelder.map(([name, titel]) => h("label", {}, titel, filter[name]))),
+    h("p", { class: "klein" }, "SoundCloud-Merkmale sind nur bei zugeordneten Songs verfügbar."),
+    h("button", { type: "button", class: "schlicht", onclick: () => {
+      for (const feld of Object.values(filter)) feld.value = "";
+      zeichnen();
+    } }, "Filter zurücksetzen"));
+  function tagWaehlen(tag) {
+    filterBox.open = true;
+    filter.tags.value = tag;
+    zeichnen();
+  }
   const stand = h("p", { class: "klein library-catalog-status", "aria-live": "polite" });
   const navigation = h("nav", { class: "library-navigation", "aria-label": "Alben und Singles" });
   const inhalt = h("section", { class: "library-detail", "aria-label": "Titelliste" });
@@ -106,7 +152,20 @@ export function songsAnsicht(el) {
   const gruppe = h("select", { "aria-label": "Single-Gruppe auswählen", onchange: () => { detailZeichnen(); gruppe.focus(); } });
 
   function auswahl() {
-    const releases = katalog?.releases || [];
+    const worte = suche.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const aktivFilter = Object.entries(filter).filter(([, feld]) => feld.value);
+    const releases = (katalog?.releases || []).flatMap(release => {
+      const basis = [release.titel, release.stilreferenz].join(" ").toLowerCase();
+      const songs = release.songs.filter(song => {
+        const merkmale = songMerkmale(release, song);
+        const text = [basis, song.titel, ...merkmale.tags, ...merkmale.genre].join(" ").toLowerCase();
+        return worte.every(wort => text.includes(wort)) &&
+          aktivFilter.every(([name, feld]) => merkmale[name].includes(feld.value));
+      });
+      const leerPassend = !release.songs.length && worte.every(wort => basis.includes(wort)) &&
+        !aktivFilter.length;
+      return songs.length || leerPassend ? [{ ...release, songs }] : [];
+    });
     const alben = releases.filter(release => !release.single);
     const singles = releases.filter(release => release.single)
       .flatMap(release => release.songs.map(song => ({ song, stil: release.stilreferenz })))
@@ -141,7 +200,7 @@ export function songsAnsicht(el) {
       kopf.append(h("div", { class: "library-single-controls" }, gruppierung, gruppe));
     }
     inhalt.append(kopf, sichtbar.length ? h("ul", { class: "library-song-list" },
-      sichtbar.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen)))
+      sichtbar.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen, tagWaehlen)))
       : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
     knoepfeAktualisieren();
   }
@@ -163,7 +222,26 @@ export function songsAnsicht(el) {
     h("span", { class: "library-navigation-name" }, titel), h("span", { class: "klein" }, String(anzahl)));
   }
 
+  function filterFuellen() {
+    const merkmale = (katalog.releases || []).flatMap(release =>
+      release.songs.map(song => songMerkmale(release, song)));
+    for (const [name, titel, werte] of filterFelder) {
+      const anzahl = new Map();
+      for (const song of merkmale)
+        for (const wert of song[name]) anzahl.set(wert, (anzahl.get(wert) || 0) + 1);
+      const sortiert = werte || [...anzahl.keys()].sort((a, b) => a.localeCompare(b, "de"));
+      const vorher = filter[name].value;
+      filter[name].replaceChildren(h("option", { value: "" }, "Alle"),
+        ...sortiert.filter(wert => anzahl.has(wert)).map(wert =>
+          h("option", { value: wert }, wert + " (" + anzahl.get(wert) + ")")));
+      filter[name].value = anzahl.has(vorher) ? vorher : "";
+    }
+  }
+
   function zeichnen() {
+    if (!katalog) return;
+    const filterAnzahl = Object.values(filter).filter(feld => feld.value).length;
+    filterStand.textContent = "Filter und Tags" + (filterAnzahl ? " · " + filterAnzahl + " aktiv" : "");
     const { alben, singles } = auswahl();
     if (!alben.some(album => album.pfad === aktiv) && !(aktiv === "Singles" && singles.length))
       aktiv = alben.find(album => album.songs.length)?.pfad || alben[0]?.pfad || (singles.length ? "Singles" : null);
@@ -181,9 +259,10 @@ export function songsAnsicht(el) {
     clearTimeout(wartezeit);
     const nummer = ++lauf;
     try {
-      const daten = await api.katalog(suche.value.trim());
+      const daten = await api.katalog();
       if (beendet || nummer !== lauf) return;
       katalog = daten;
+      filterFuellen();
       zeichnen();
       if (daten.zustand === "leer" || daten.zustand === "laeuft") wartezeit = setTimeout(laden, 700);
     } catch (fehler) {
@@ -191,11 +270,7 @@ export function songsAnsicht(el) {
     }
   }
 
-  suche.addEventListener("input", () => {
-    clearTimeout(wartezeit);
-    ++lauf;
-    wartezeit = setTimeout(laden, 200);
-  });
+  suche.addEventListener("input", zeichnen);
   const aktualisieren = h("button", { type: "button", class: "klein-knopf", onclick: async () => {
     try { await api.katalogNeuLesen(); await laden(); }
     catch (fehler) { if (!beendet) stand.textContent = fehler.meldung; }
@@ -204,7 +279,7 @@ export function songsAnsicht(el) {
     h("header", { class: "library-header" }, h("h1", {}, "Songbibliothek"),
       h("a", { class: "knopf", href: "#/mastern" }, "Vorhandenen Song bearbeiten")),
     h("div", { class: "library-desktop" },
-      h("aside", { class: "library-sidebar" }, h("div", { class: "library-toolbar" }, suche, aktualisieren), stand, navigation),
+      h("aside", { class: "library-sidebar" }, h("div", { class: "library-toolbar" }, suche, aktualisieren), filterBox, stand, navigation),
       inhalt)));
   laden();
   api.liste().then(daten => {

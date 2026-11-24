@@ -118,3 +118,14 @@
 .songs-library .library-song-actions button { padding: .3rem .6rem; white-space: nowrap; background: transparent; border-color: transparent; }
 .songs-library .library-song-actions button:hover, .songs-library .library-song-actions button:focus-visible { border-color: var(--linie); }
 .library-song-play .abspielen { border-color: transparent; }
+
+.library-filters { padding: .45rem 0; }
+.library-filters summary { cursor: pointer; font-weight: 650; }
+.library-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .55rem; }
+.library-filter-grid label { display: grid; gap: .15rem; min-width: 0; font-size: .78rem; }
+.library-filter-grid select { min-width: 0; padding: .27rem; }
+.library-filters p { margin: .45rem 0; }
+.library-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .25rem; }
+.library-tags button { border: 0; border-radius: 4px; background: var(--mulde); color: var(--leise);
+  font-size: .75rem; padding: .14rem .35rem; cursor: pointer; }
+.library-tags button:hover { color: var(--akzent); }

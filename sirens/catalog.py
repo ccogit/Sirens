@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shlex
 import threading
 from pathlib import Path
 
@@ -78,6 +79,32 @@ def _e_mastered_zuordnen(dateien):
                          song_cover=original["song_cover"], track_nummer=original["track_nummer"])
 
 
+def _soundcloud_infos(root):
+    """Nur belegte Pfade oder exakte Titel im zugeordneten Ordner erhalten Metadaten."""
+    try:
+        daten = json.loads((root / "_soundcloud" / "cco_music.json").read_text(encoding="utf-8-sig"))
+        lokal = daten["local"]["tracks"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}, {}
+    pfade, titel = {}, {}
+    for track in daten.get("tracks", []):
+        eintrag = lokal.get(str(track["id"]), {})
+        try:
+            tags = shlex.split(track.get("tag_list") or "")
+        except ValueError:
+            tags = []
+        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url")}
+        kandidaten = [*eintrag.get("audio_candidates", []), *eintrag.get("musicmaker_audio_candidates", [])]
+        if eintrag.get("confirmed_audio"):
+            kandidaten.append(eintrag["confirmed_audio"])
+        for pfad in kandidaten:
+            pfade.setdefault(pfad.replace(chr(92), "/").casefold(), []).append(info)
+        for platz in eintrag.get("placements", []):
+            ordner = platz["folder"].replace(chr(92), "/").casefold()
+            titel.setdefault((ordner, _titel_schluessel(track["title"])), []).append(info)
+    return pfade, titel
+
+
 def _release_bilder(ordner):
     bilder = {}
     for datei in sorted(ordner.iterdir()):
@@ -152,6 +179,11 @@ class Katalog:
                                 "release_titel": daten.get("titel"),
                                 "single": ist_single(pfad), "unterordner": "/".join(unterpfad)})
         _e_mastered_zuordnen(dateien)
+        sc_pfade, sc_titel = _soundcloud_infos(root)
+        for datei in dateien:
+            links = list(sc_pfade.get(datei["pfad"].casefold(), []))
+            links += sc_titel.get((datei["release_pfad"].casefold(), _titel_schluessel(datei["titel"])), [])
+            datei["soundcloud"] = links
         alben = []
         album_ordner = root / "Alben"
         if album_ordner.is_dir():
@@ -214,7 +246,10 @@ class Katalog:
                 "cover": d["album_cover"],
             })
             song = release["songs"].setdefault(d["titel"], {"titel": d["titel"], "dateien": [],
-                "cover": d["song_cover"], "track_nummer": d["track_nummer"]})
+                "cover": d["song_cover"], "track_nummer": d["track_nummer"], "soundcloud": []})
+            for info in d["soundcloud"]:
+                if info not in song["soundcloud"]:
+                    song["soundcloud"].append(info)
             song["dateien"].append(datei)
         artists = []
         for artist in sorted(baum):
