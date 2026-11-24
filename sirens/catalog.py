@@ -125,7 +125,7 @@ def _soundcloud_infos(root):
         daten = json.loads((root / "_soundcloud" / "cco_music.json").read_text(encoding="utf-8-sig"))
         lokal = daten["local"]["tracks"]
     except (OSError, ValueError, KeyError, TypeError):
-        return {}, {}
+        return {}, {}, {}
     try:
         updates = json.loads((root / "_soundcloud" / "metadata-sync.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -141,7 +141,11 @@ def _soundcloud_infos(root):
             tags = shlex.split(track.get("tag_list") or "")
         except ValueError:
             tags = []
-        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"), "beschreibung": _beschreibung(track.get("description"))}
+        cover = next((ort.get("cover") for ort in eintrag.get("placements", [])
+                      if ort.get("cover") and (root / ort["cover"]).is_file()), None)
+        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"),
+                "beschreibung": _beschreibung(track.get("description")),
+                "cover": cover.replace(chr(92), "/") if cover else None}
         kandidaten = [*eintrag.get("audio_candidates", []), *eintrag.get("musicmaker_audio_candidates", [])]
         if eintrag.get("confirmed_audio"):
             kandidaten.append(eintrag["confirmed_audio"])
@@ -150,7 +154,10 @@ def _soundcloud_infos(root):
         for platz in eintrag.get("placements", []):
             ordner = platz["folder"].replace(chr(92), "/").casefold()
             titel.setdefault((ordner, _titel_schluessel(track["title"])), []).append(info)
-    return pfade, titel
+    album_cover = {eintrag["folder"].replace(chr(92), "/").casefold(): eintrag["cover"].replace(chr(92), "/")
+                   for eintrag in daten["local"].get("albums", [])
+                   if eintrag.get("cover") and (root / eintrag["cover"]).is_file()}
+    return pfade, titel, album_cover
 
 
 def _release_bilder(ordner):
@@ -228,11 +235,12 @@ class Katalog:
                                 "release_titel": daten.get("titel"),
                                 "single": ist_single(pfad), "unterordner": "/".join(unterpfad)})
         _e_mastered_zuordnen(dateien)
-        sc_pfade, sc_titel = _soundcloud_infos(root)
+        sc_pfade, sc_titel, sc_album_cover = _soundcloud_infos(root)
         for datei in dateien:
             links = list(sc_pfade.get(datei["pfad"].casefold(), []))
             links += sc_titel.get((datei["release_pfad"].casefold(), _titel_schluessel(datei["titel"])), [])
             datei["soundcloud"] = links
+            datei["album_cover"] = datei["album_cover"] or sc_album_cover.get(datei["release_pfad"].casefold())
         alben = []
         album_ordner = root / "Alben"
         if album_ordner.is_dir():
@@ -245,7 +253,7 @@ class Katalog:
                 alben.append({"pfad": basis, "slug": daten.get("slug") or ordner.name,
                               "titel": daten.get("titel") or ordner.name.replace("-", " "),
                               "stilreferenz": daten.get("stilreferenz", ""), "single": False,
-                              "cover": f"{basis}/{bilder['']}" if "" in bilder else None,
+                              "cover": f"{basis}/{bilder['']}" if "" in bilder else sc_album_cover.get(basis.casefold()),
                               "beschreibung": assets[basis][2] if basis in assets else _release_texte(ordner)[0]})
         with self._lock:
             self._dateien, self._alben, self.zustand, self.gelesen_am = dateien, alben, "bereit", jetzt()
@@ -324,8 +332,10 @@ class Katalog:
             songs = release["songs"].values()
             release["songs"] = sorted(songs, key=lambda song: (song["track_nummer"] or 999, song["titel"].casefold()))
             for song in release["songs"]:
-                if not song["beschreibung"] and len(song["soundcloud"]) == 1:
-                    song["beschreibung"] = song["soundcloud"][0]["beschreibung"]
+                if len(song["soundcloud"]) == 1:
+                    info = song["soundcloud"][0]
+                    song["beschreibung"] = song["beschreibung"] or info["beschreibung"]
+                    song["cover"] = song["cover"] or info["cover"]
                 song["dateien"].sort(key=lambda d: (d["version"] or 0, d["unterordner"], d["fassung"], d["pfad"]))
                 song["kurzprofil"] = kurzprofil(release, song)
             katalog_releases.append(release)

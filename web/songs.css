@@ -145,3 +145,4 @@
 .library-profile { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem 1rem; }
 .library-profile dt { font-weight: 650; }
 .library-profile dd { margin: 0; }
+.library-song:has(.library-description[open]) { align-items: start; }
