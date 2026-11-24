@@ -32,10 +32,11 @@ async function zeigen() {
 
 const themeSwitch = document.getElementById("theme-switch");
 const theme = (() => { try { return localStorage.getItem("sirens.theme"); } catch { return null; } })();
-// Ohne gespeicherte Wahl gilt die Einstellung des Systems.
-if (theme === "dark" || (!theme && window.matchMedia?.("(prefers-color-scheme: dark)").matches)) document.documentElement.dataset.theme = "dark";
+// Signal Room ist der Standard; eine ausdrücklich gespeicherte helle Wahl bleibt erhalten.
+document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
 function updateTheme() {
   const dark = document.documentElement.dataset.theme === "dark";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0c0d10" : "#f4f3ed");
   themeSwitch.textContent = dark ? "☀" : "☾";
   themeSwitch.setAttribute("aria-pressed", String(dark));
   themeSwitch.setAttribute("aria-label", dark ? "Helles Erscheinungsbild einschalten" : "Dunkles Erscheinungsbild einschalten");
