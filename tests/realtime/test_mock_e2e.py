@@ -252,12 +252,18 @@ class MockHTTP(ServerFall):
         instance = self.server.app.rt_sessions.get(s["id"])
         with self.assertRaises(Ablehnung):
             instance.sidecar.request(b"P" + s["id"].encode("ascii") + b"invalid")
-        req = urllib.request.Request(self.basis+self.PREFIX+"sessions",
-                                     data=b"x"*(MAX_BODY+1), method="POST",
-                                     headers={"Content-Type":"application/json"})
-        # Der Server darf schon anhand der Länge ablehnen, ohne Body zu lesen.
-        with self.assertRaises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(req, timeout=5)
-        self.assertEqual(exc.exception.code, 413)
-        exc.exception.close()
+        # Der Server lehnt schon anhand der Länge ab, ohne den Body zu lesen. Deshalb nur den Kopf senden:
+        # Ein Client, der danach noch 1 MB schreibt, bekäme je nach Betriebssystem "Broken pipe" statt der Antwort.
+        import http.client
+        from urllib.parse import urlsplit
+        teile = urlsplit(self.basis)
+        verbindung = http.client.HTTPConnection(teile.hostname, teile.port, timeout=5)
+        try:
+            verbindung.putrequest("POST", self.PREFIX + "sessions")
+            verbindung.putheader("Content-Type", "application/json")
+            verbindung.putheader("Content-Length", str(MAX_BODY + 1))
+            verbindung.endheaders()
+            self.assertEqual(verbindung.getresponse().status, 413)
+        finally:
+            verbindung.close()
         self.request("POST", "sessions/"+s["id"]+"/close", {})
