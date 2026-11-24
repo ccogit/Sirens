@@ -19,15 +19,16 @@ export function acidTransformer({rate,length,bass,notes=[],onsets=[],grid,preset
     const start=g?g.quantize(f,p.quantize):f;
     return {frame:start,end:start+end-f,midi:finite(n.midi,0,127,"MIDI"),velocity:finite(n.velocity,0,1,"Velocity")};
   }).sort((a,b)=>a.frame-b.frame);
-  let phase=0,prevFreq=0,z1=0,z2=0;
+  let phase=0,prevFreq=0,z1=0,z2=0,prevEnd=-1;
   const omega=2*Math.PI*Math.min(p.cutoff,rate*.4)/rate,alpha=Math.sin(omega)/(2*p.resonance),a0=1+alpha;
   const b0=(1-Math.cos(omega))/(2*a0),b1=2*b0,b2=b0,a1=-2*Math.cos(omega)/a0,a2=(1-alpha)/a0;
   for(let k=0;k<events.length;k++){
     const n=events[k],end=Math.min(n.end,events[k+1]?.frame??length,length);
     if(end<=n.frame)continue;
     const freq=Math.min(rate*.4,440*2**((n.midi+12*p.octave-69)/12));
-    const linked=k>0&&events[k-1].end>=n.frame;
-    if(!linked){phase=0;prevFreq=freq;z1=z2=0;}
+    // Nur tatsächlich gerenderte Stimmen dürfen einen Slide auslösen.
+    const linked=prevFreq>0&&prevEnd===n.frame;
+    if(!linked){phase=0;prevFreq=freq;prevEnd=end;z1=z2=0;}
     for(let i=n.frame;i<end;i++){
       const t=(i-n.frame)/rate,slide=linked&&p.slide?Math.min(1,t/p.slide):1;
       const hz=prevFreq*(freq/prevFreq)**slide;
