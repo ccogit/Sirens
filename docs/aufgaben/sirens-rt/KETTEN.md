@@ -11,7 +11,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 
 | Kette | Titel | Aufgaben | Voraussetzung | Stand |
 |---|---|---|---|---|
-| KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | vergeben (24.11.2026) |
+| KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | gemergt |
 | KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | offen |
 | KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | offen |
 | KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | offen |
