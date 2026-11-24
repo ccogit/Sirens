@@ -39,6 +39,8 @@ def run_mix(job, work, cancelled):
                   target_lufs=target, ceiling_dbtp=ceiling, headroom_dbtp=-6,
                   effects=dict(sidechain=dict(ratio=2, attack_ms=5, release_ms=110,
                                                threshold_linear=.06),
+                               bass_compression=dict(threshold_linear=.125, ratio=2,
+                                                     attack_ms=20, release_ms=100, makeup=1),
                                reverb="short filtered multitap return",
                                delay_ms=[240, 480], sub_crossover_hz=120, fade_ms=5),
                   dependencies=dict(ffmpeg=subprocess.check_output(
