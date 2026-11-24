@@ -1,0 +1,7 @@
+# DEMON 1.5.0: 96acc905204d54bfd3055084ca8e9df8a6d9a33f
+# https://github.com/daydreamlive/DEMON/blob/96acc905204d54bfd3055084ca8e9df8a6d9a33f/pyproject.toml
+# Originale CUDA-Pins; nicht auf 2.7.1 herabsetzen. Weitere Auflösung offen.
+torch==2.9.1+cu128
+torchvision==0.24.1+cu128
+torchaudio==2.9.1+cu128
+torchao==0.17.0
