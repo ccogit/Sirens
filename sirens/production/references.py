@@ -33,7 +33,11 @@ def _text(value):
 
 
 def _json(path):
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    return json.loads(path.read_text(encoding="utf-8-sig"), parse_constant=_invalid_constant)
+
+
+def _invalid_constant(value):
+    raise ValueError("Non-finite JSON number: " + value)
 
 
 def _axes(values):
@@ -96,10 +100,17 @@ def collect(cfg, *, amm_export=None):
     catalog.scan()
     tree = catalog.baum(bekannte_bewertungen(cfg, store))
     raw = defaultdict(list)
+    order_metadata = defaultdict(list)
     for order in orders:
+        plan = {t["nr"]: t for t in (order.get("plan") or {}).get("tracks", [])}
+        for stand in order.get("tracks_stand", []):
+            metadata = plan.get(stand["nr"], {})
+            for relative in stand.get("dateien", []):
+                order_metadata[relative].append(metadata)
         for row in order.get("bewertungen", []):
             item = _raw(row, "store")
             if item is not None:
+                item["order_id"] = order["id"]
                 raw[row["pfad"]].append(item)
     index = _export_index(amm_export)
     tracks = []
@@ -146,7 +157,12 @@ def collect(cfg, *, amm_export=None):
                 score = _rating(aggregate.get("score"))
                 if score is None:
                     score = max((r["score"] for r in ratings), default=None)
-                lyrics = _text(amm.get("lyrics")) or _sidecar(cfg.music_root, release["pfad"], title)
+                metadata = order_metadata[relative]
+                def unique_text(field):
+                    values = {_text(m.get(field)) for m in metadata} - {None}
+                    return next(iter(values)) if len(values) == 1 else None
+                lyrics = (_text(amm.get("lyrics")) or unique_text("text") or
+                          _sidecar(cfg.music_root, release["pfad"], title))
                 short = song.get("kurzprofil") or {}
                 tracks.append({
                     "id": _id(relative), "song_family": family, "relative_path": relative,
@@ -156,7 +172,7 @@ def collect(cfg, *, amm_export=None):
                     "axes": axes, "style_text": _text(amm.get("style_prompt")),
                     "lyrics": lyrics, "description": _text(song.get("beschreibung")),
                     "negative_tags": amm.get("negative_tags"), "parameters": amm.get("parameters"),
-                    "style_hint": release.get("stilreferenz") or None,
+                    "style_hint": unique_text("stil_kurz") or release.get("stilreferenz") or None,
                     "bpm_text": short.get("tempo_bpm"), "bpm_measured": None,
                     "bpm_confidence": None, "key": None, "key_confidence": None,
                     "features": {}, "source": {"sha256": digest, "version": file.get("version"),
@@ -177,6 +193,8 @@ def collect(cfg, *, amm_export=None):
                 "positive": sum(t["rating"] in (1, 2) for t in tracks),
                 "with_axes": sum(bool(t["axes"]) for t in tracks),
                 "with_prompts": sum(t["style_text"] is not None for t in tracks),
+                "amm_resolved": sum(t["source"]["amm_resolved"] for t in tracks),
+                "with_measured_bpm": 0,
                 "with_lyrics": sum(t["lyrics"] is not None for t in tracks)}
     coverage["favorite_status"] = ("found" if coverage["favorites"] else
                                     "none_found_in_available_sources")
@@ -246,8 +264,16 @@ def build_references(tracks, coverage, brief, *, measure=None):
     rated = sorted(family for family, members in groups.items()
                    if any(t["rating"] in (-2, -1, 1, 2) for t in members))
     # Fixed split independent of brief; preserve at least one training family.
-    held = set(sorted(rated, key=lambda f: _id("holdout-v1", f))[:max(1, len(rated)//5)]
-               if len(rated) >= 3 else [])
+    held = set()
+    remaining = {sign: {f for f in rated if any(t["rating"] * sign > 0
+                 for t in groups[f] if t["rating"] is not None)} for sign in (-1, 1)}
+    limit = max(1, len(rated)//5) if len(rated) >= 3 else 0
+    for family in sorted(rated, key=lambda f: _id("holdout-v1", f)):
+        if len(held) >= limit:
+            break
+        if any(family in members and len(members - held) <= 1 for members in remaining.values()):
+            continue
+        held.add(family)
     training = {f: members for f, members in groups.items() if f not in held}
     if measure:
         for members in training.values():
@@ -286,14 +312,14 @@ def build_references(tracks, coverage, brief, *, measure=None):
                 pairs.append({"original": matching[0]["id"], "master": master["id"]})
     coverage = dict(coverage, holdout_families=len(held), conflicting_families=conflicts,
                     selected=len(selected), contrasts=len(contrasts),
-                    measured=sum(t["bpm_measured"] is not None for t in tracks))
+                    with_measured_bpm=sum(t["bpm_measured"] is not None for t in tracks))
     def summary(t):
         return {"id": t["id"], "title": t["source"]["title"], "rating": t["rating"],
                 "style": t["style_text"] or t["style_hint"],
                 "bpm_measured": t["bpm_measured"], "bpm_text": t["bpm_text"],
                 "axes": t["axes"], "description": t["description"]}
 
-    return {"schema_version": 1, "tracks": tracks, "selected": [t["id"] for t in selected],
+    result = {"schema_version": 1, "tracks": tracks, "selected": [t["id"] for t in selected],
             "holdout": [t["id"] for t in tracks if t["song_family"] in held],
             "profile": {"music": {"positive_examples": [t["id"] for t in selected],
                                   "negative_examples": [t["id"] for t in contrasts],
@@ -301,6 +327,37 @@ def build_references(tracks, coverage, brief, *, measure=None):
                                   "producer_contrasts": [summary(t) for t in contrasts]},
                         "production": {"original_master_pairs": pairs},
                         "coverage": coverage}}
+    validate_references(result)
+    return result
+
+
+def validate_references(value):
+    """Local V1 guard until K00 provides a shared references validator."""
+    from .contracts import validate_relative_path
+    if value.get("schema_version") != 1:
+        raise ValueError("references schema_version")
+    tracks = {t["id"]: t for t in value["tracks"]}
+    if len(tracks) != len(value["tracks"]):
+        raise ValueError("duplicate reference id")
+    for track in tracks.values():
+        validate_relative_path(track["relative_path"])
+        if track["usage"] != "analysis_only":
+            raise ValueError("reference usage")
+        if track["rating"] is not None and _rating(track["rating"]) is None:
+            raise ValueError("reference rating")
+    held = set(value["holdout"])
+    selected = set(value["selected"]) | set(value["profile"]["music"]["negative_examples"])
+    for pair in value["profile"]["production"]["original_master_pairs"]:
+        selected.update((pair["original"], pair["master"]))
+    if not (selected | held) <= tracks.keys():
+        raise ValueError("unknown reference id")
+    families = {tracks[i]["song_family"] for i in held}
+    if any(tracks[i]["song_family"] in families for i in selected):
+        raise ValueError("holdout family leak")
+    if any(t["song_family"] in families and t["id"] not in held for t in tracks.values()):
+        raise ValueError("incomplete holdout family")
+    json.dumps(value, allow_nan=False)
+    return value
 
 
 def main(argv=None):
