@@ -24,7 +24,7 @@ def main(make_model=factory):
     lock = threading.Lock()
     done, cancel = threading.Event(), threading.Event()
     model = None
-    active = None
+    working = threading.Event()
     progress = 0.0
 
     def send(kind, rid, payload):
@@ -68,13 +68,15 @@ def main(make_model=factory):
                 raise ValueError("Unbekannte Arbeit")
             if cancel.is_set():
                 raise Cancelled()
-            send("result", rid, result)
+            response = ("result", result)
         except Cancelled:
-            send("error", rid, {"code": "unavailable"})
+            response = ("error", {"code": "unavailable"})
         except (ValueError, TypeError, KeyError):
-            send("error", rid, {"code": "invalid"})
+            response = ("error", {"code": "invalid"})
         except Exception:
-            send("error", rid, {"code": "unavailable"})
+            response = ("error", {"code": "unavailable"})
+        working.clear()
+        send(response[0], rid, response[1])
 
     threading.Thread(target=heartbeat, daemon=True).start()
     try:
@@ -94,7 +96,7 @@ def main(make_model=factory):
             kind, rid, payload = msg["type"], msg["request_id"], msg["payload"]
             if not isinstance(payload, dict) or not isinstance(rid, str) or "audio_bytes" in payload:
                 break
-            busy = active is not None and active.is_alive()
+            busy = working.is_set()
             if kind == "cancel":
                 cancel.set()
                 send("result", rid, {})
@@ -109,8 +111,8 @@ def main(make_model=factory):
                 cancel.clear()
                 send("result", rid, {})
             elif kind in {"load", "warmup", "file_job"}:
-                active = threading.Thread(target=run, args=(kind, rid, payload), daemon=True)
-                active.start()
+                working.set()
+                threading.Thread(target=run, args=(kind, rid, payload), daemon=True).start()
             else:
                 send("error", rid, {"code": "invalid"})
     finally:
