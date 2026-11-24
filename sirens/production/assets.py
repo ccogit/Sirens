@@ -139,14 +139,14 @@ class Worker:
     No network or GPU is used for PCM conversion.
     """
     def __init__(self, python, *, lease=None, model_dir=None, stable_cache=None,
-                 timeout=180, cancelled=lambda: False, stable_python=None):
+                 timeout=180, cancelled=lambda: False, stable_python=None, tts_model=None):
         # Keep the venv entrypoint path, not its symlink target (POSIX venvs).
         self.python = Path(python).absolute()
         self.stable_python = Path(stable_python).absolute() if stable_python else self.python
         if not self.python.is_file() or not self.stable_python.is_file():
             raise AssetError("worker interpreter unavailable")
         self.lease = lease
-        self.model_dir = model_dir
+        self.model_dir = tts_model if tts_model is not None else model_dir
         self.stable_cache = stable_cache
         self.timeout = timeout
         self.cancelled = cancelled
@@ -164,15 +164,41 @@ class Worker:
     def stopped(self):
         return self._child is None or self._child.poll() is not None
 
+    def _speech_model(self):
+        model_dir = self.model_dir
+        if model_dir is None:
+            # K08 currently passes the legacy tts_snapshot option. Read the
+            # same trusted local configuration for the new tts_model key.
+            from .integration import settings
+            model_dir = settings().get("tts_model")
+        if not isinstance(model_dir, (str, Path)) or not str(model_dir).strip():
+            raise AssetError("local tts_model (Qwen3-TTS VoiceDesign) is not configured")
+        try:
+            path = Path(model_dir).resolve(strict=True)
+            config = json.loads((path / "config.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise AssetError("local tts_model snapshot/config.json is missing or invalid") from exc
+        if not isinstance(config, dict) or config.get("tts_model_type") != "voice_design":
+            raise AssetError("tts_model must be a Qwen3-TTS VoiceDesign model")
+        if not re.fullmatch(r"[0-9a-f]{40}", path.name):
+            raise AssetError("tts_model requires a pinned local snapshot")
+        return path
+
     def verify_source(self, request, source):
         if request["kind"] == "speech":
-            if self.model_dir is None or not (Path(self.model_dir) / "config.json").is_file():
-                raise AssetError("local Qwen3-TTS model is missing")
-            revision = Path(self.model_dir).resolve().name
-            if (not re.fullmatch(r"[0-9a-f]{40}", revision) or
-                    source.get("revision") != revision or source.get("backend") != "qwen3-tts-customvoice"):
-                raise AssetError("Qwen3-TTS requires a pinned local snapshot and matching provenance")
-            source.update(voice_preset="Ryan", voice_language="English", voice_clone=False)
+            model = self._speech_model()
+            revision = model.name
+            if (source.get("revision") != revision or
+                    source.get("backend") != "qwen3-tts-voicedesign" or
+                    source.get("license") != "Apache-2.0"):
+                raise AssetError("VoiceDesign requires matching backend, snapshot revision and Apache-2.0 provenance")
+            if not isinstance(request.get("prompt"), str) or not request["prompt"].strip():
+                raise AssetError("VoiceDesign requires a nonempty voice description prompt")
+            language = request.get("language", "English")
+            if not isinstance(language, str) or not language.strip():
+                raise AssetError("invalid speech language")
+            source.update(model="Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+                          voice_language=language, voice_clone=False)
         else:
             revision = "8bdfb53c6b0fbc62113cd571fd37373efe15fa14"
             if source.get("backend") != "stable-audio-3-small-music" or source.get("revision") != revision:
@@ -190,7 +216,7 @@ class Worker:
         with tempfile.TemporaryDirectory() as tmp:
             job = Path(tmp) / "job.json"
             job.write_bytes(_json_bytes(payload))
-            interpreter = self.stable_python if payload["kind"] not in ("speech", "convert") else self.python
+            interpreter = self.stable_python if payload["kind"] not in ("speech", "speech_batch", "convert") else self.python
             with subprocess.Popen([str(interpreter), str(self.script), str(job)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                   env=env, shell=False) as child:
@@ -213,16 +239,27 @@ class Worker:
     def convert(self, source, dest):
         self._invoke({"kind": "convert", "input": str(source.resolve())}, dest)
 
-    def generate(self, request, dest):
+    def generate_speech_batch(self, jobs):
+        if not jobs:
+            return
         if self.lease is None:
             raise AssetError("coordinator GPU lease not supplied")
-        if request["kind"] == "speech" and self.model_dir is None:
-            raise AssetError("local Qwen3-TTS model is not configured")
-        if request["kind"] != "speech" and self.stable_cache is None:
+        model_dir = self._speech_model()
+        payload = {"kind": "speech_batch", "model_dir": str(model_dir),
+                   "jobs": [{"request": req, "output": str(dest.resolve())}
+                            for req, dest in jobs]}
+        with self.lease():
+            self._invoke(payload, jobs[0][1])
+
+    def generate(self, request, dest):
+        if request["kind"] == "speech":
+            self.generate_speech_batch([(request, dest)])
+            return
+        if self.lease is None:
+            raise AssetError("coordinator GPU lease not supplied")
+        if self.stable_cache is None:
             raise AssetError("verified Stable Audio cache is not configured")
         payload = {"kind": request["kind"], "request": request}
-        if request["kind"] == "speech":
-            payload["model_dir"] = str(Path(self.model_dir).resolve(strict=True))
         with self.lease():
             self._invoke(payload, dest)
 
@@ -260,8 +297,7 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
         cache_root = Path(cache_dir).resolve()
         cache_root.mkdir(parents=True, exist_ok=True)
         cache = HashCache(cache_root)
-    entries = []
-    for original in plan["asset_requests"]:
+    def render_one(original):
         request = dict(original)
         identifier = asset_id(request["id"])
         target = safe_path(root, "assets/" + identifier + ".wav")
@@ -320,6 +356,8 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                             worker.convert(candidate.path, pending)
                         if sha256_file(candidate.path) != input_hash:
                             raise AssetError("source changed during copy")
+                    elif request["kind"] == "speech" and isinstance(worker, Worker):
+                        yield request, pending
                     else:
                         worker.generate(request, pending)
                 if cancelled():
@@ -344,14 +382,44 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                 if cache is not None and not cache_hit:
                     cache.publish(key, Path(tmp), ["asset.wav"])
                 os.replace(pending, target)
-            entries.append(dict(id=identifier, kind=request["kind"],
-                                file="assets/" + target.name, source=source,
-                                cache_hit=cache_hit, **info))
+            return dict(id=identifier, kind=request["kind"],
+                        file="assets/" + target.name, source=source,
+                        cache_hit=cache_hit, **info)
         except (AssetError, ValueError, OSError, KeyError, TypeError) as exc:
             # Do not leak absolute paths, local user text or service responses in errors.
             target.unlink(missing_ok=True)
-            entries.append(dict(id=identifier, kind=request["kind"],
-                                error=str(exc) if isinstance(exc, AssetError) else type(exc).__name__))
+            return dict(id=identifier, kind=request["kind"],
+                        error=str(exc) if isinstance(exc, AssetError) else type(exc).__name__)
+    entries = [None] * len(plan["asset_requests"])
+    deferred = []
+    try:
+        for index, original in enumerate(plan["asset_requests"]):
+            task = render_one(original)
+            try:
+                job = next(task)
+            except StopIteration as done:
+                entries[index] = done.value
+            else:
+                deferred.append((index, task, job))
+        if deferred:
+            batch_error = None
+            try:
+                if cancelled():
+                    raise Cancelled("asset run cancelled")
+                worker.generate_speech_batch([job for _, _, job in deferred])
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                batch_error = exc
+            for index, task, _ in deferred:
+                try:
+                    if batch_error is None:
+                        next(task)
+                    else:
+                        task.throw(batch_error)
+                except StopIteration as done:
+                    entries[index] = done.value
+    finally:
+        for _, task, _ in deferred:
+            task.close()
     manifest = dict(schema_version=1, assets=entries)
     validate_assets(manifest, plan=plan, root=root)
     _write_json(safe_path(root, "asset_provenance.json"),
