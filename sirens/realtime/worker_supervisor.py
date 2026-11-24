@@ -131,9 +131,10 @@ class _Process:
         self.monitor.start()
 
     def _reader(self):
+        p = self.process
         try:
             while not self.closed.is_set():
-                msg, audio = _read(self.process.stdout)
+                msg, audio = _read(p.stdout)
                 if msg["type"] == "heartbeat":
                     self.last_heartbeat = time.monotonic()
                 elif msg["request_id"] == self.cancel_id:
@@ -144,17 +145,19 @@ class _Process:
             self.closed.set()
 
     def _monitor(self):
+        p = self.process
         while not self.closed.wait(0.1):
-            if self.process.poll() is not None or time.monotonic()-self.last_heartbeat > 3:
+            if p.poll() is not None or time.monotonic()-self.last_heartbeat > 3:
                 break
         self.stop()
 
     def write(self, data):
         try:
             with self.write_lock:
-                if not self.closed.is_set():
-                    self.process.stdin.write(data)
-                    self.process.stdin.flush()
+                p = self.process
+                if p is not None and not self.closed.is_set():
+                    p.stdin.write(data)
+                    p.stdin.flush()
         except (OSError, ValueError):
             self.closed.set()
 
