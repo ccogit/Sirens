@@ -142,7 +142,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
       if(!active || polling)return;
       polling=true;
       try{
-        const next=await remote.capabilities(abort.signal);
+        let next;
+        try { next=await remote.capabilities(abort.signal); } catch(e) { caps=null; throw e; }
         if(!active)return;
         const nextMock=next.capabilities.some(c=>c.mock && c.available && c.id==="mock");
         if(nextMock!==mock){
@@ -157,14 +158,16 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
         if(caps.capabilities.some(c=>c.id===previous))capability.value=previous;
         else if(mock)capability.value="mock";
         capsInfo.replaceChildren(...caps.capabilities.map(c=>h("li",{},c.id+": "+modeLabel(c.mode)+" · "+(c.available?"gemeldet verfügbar":"nicht freigegeben")+(c.mock?" · Testmodus":""))));
-        gpu=await client.gpu(abort.signal);
+        const nextGpu=await client.gpu(abort.signal);
+        if(active)gpu=nextGpu;
       }catch(e){
         if(active){
           // 503 beim ersten GET ist der ausgeschaltete oder nicht verfügbare Dienst.
           error=e;gpu=null;
           if(controller){await controller.destroy().catch(()=>{});controller=null;}
           mock=false;client=remote;
-          caps=null;capsInfo.replaceChildren();capability.replaceChildren();fillSongs();
+          if(!caps){capsInfo.replaceChildren();capability.replaceChildren();}
+          fillSongs();
         }
       }finally{polling=false;paint();}
     }
@@ -184,7 +187,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
       if(!controller)return;
       muted=true;preset={...preset,wet:0,bypass:true};paint();
       // Close stoppt die Sitzung auch dann, wenn gerade ein Befehl aussteht.
-      controller.reset().catch(e=>{if(active){error=e;paint();}});
+      controller.reset().then(()=>{muted=true;preset={...preset,wet:0,bypass:true};paint();}).catch(e=>{if(active){error=e;paint();}});
     };
     const getStorage=()=>{try{return storage ?? globalThis.localStorage;}catch{return null;}};
     const actions={
@@ -203,7 +206,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
     on(save,"click",()=>{if(!savePreset(getStorage(),slot,preset))status.textContent="Preset konnte nicht gespeichert werden.";});
     on(restore,"click",()=>{preset=normalizePreset(readPresets(getStorage())[slot]);run(apply);paint();});
     on(song,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();paint();});
-    on(model,"change",loadStems);on(stem,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});});
+    on(model,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();});on(stem,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});});
     on(capability,"change",paint);on(refresh,"click",refreshStatus);
     if(keyboard)on(keyboard,"keydown",event=>{
       const action=keyAction(event);
