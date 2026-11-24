@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import csv
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -261,7 +262,8 @@ def export_bundle(run_dir, exports_root, run_id, export_id=None, *,
 
 
 def _stable(paths, seconds):
-    _require(seconds >= 0, "negative stability interval")
+    _require(type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0,
+             "invalid stability interval")
     def snapshot():
         result = []
         for p in paths:
@@ -272,6 +274,7 @@ def _stable(paths, seconds):
     old = snapshot()
     time.sleep(seconds)
     _require(old == snapshot(), "return still changing")
+    return [entry[-1] for entry in old]
 
 
 def import_return(exports_root, export_id, runs_root, *, confirm=False,
@@ -284,6 +287,9 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
     original = validate_ableton(read_manifest(safe_path(exported, "ableton.json")),
                                root=exported)
     _require(original["export_id"] == export_id, "export ID mismatch")
+    reference = safe_path(exported, original["reference_mix"])
+    _require(original.get("reference_mix_sha256") == sha256_file(reference),
+             "reference mix hash mismatch")
     parent = _id(original["run_id"])
     runs = Path(runs_root)
     _require(safe_path(runs, parent).is_dir(), "parent run missing")
@@ -300,9 +306,15 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
     validate_return(data, root=inbox)
     _require(data["export_id"] == export_id and data["parent_run_id"] == parent,
              "return/export binding mismatch")
+    bpm = data.get("bpm")
+    _require(bpm is None or (type(bpm) in (int, float) and math.isfinite(bpm) and bpm > 0),
+             "invalid return tempo")
     files = [("master", data["master_file"], data.get("master_sha256"))]
+    metadata = {}
     for kind in ("stems", "midi"):
         for item in data.get(kind, []):
+            if isinstance(item, dict) and item.get("track_id") is not None:
+                metadata[item["file"]] = _id(item["track_id"])
             files.append((kind, item if isinstance(item, str) else item["file"],
                           None if isinstance(item, str) else item.get("sha256")))
     if data.get("project_file") is not None:
@@ -316,8 +328,10 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
     else:
         paths_for_check = paths
         manifest_digest = None
-    _stable(paths_for_check, stability_seconds)
-    before = [sha256_file(p) for p in paths]
+    stable_digests = _stable(paths_for_check, stability_seconds)
+    before = stable_digests[:len(paths)]
+    _require(manifest_digest is None or manifest_digest == stable_digests[-1],
+             "return manifest changed")
     if manual:
         data["master_sha256"] = before[0]
     revision_id = _id(revision_id or uuid4().hex)
@@ -338,7 +352,10 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
                 elif kind == "midi":
                     _midi_header(path, instrument=False)
             digest = _copy(path, stage / dest, before[i])
-            records.append(dict(kind=kind, file=dest, original_file=rel, sha256=digest))
+            record = dict(kind=kind, file=dest, original_file=rel, sha256=digest)
+            if rel in metadata:
+                record["track_id"] = metadata[rel]
+            records.append(record)
         _require(before == [sha256_file(p) for p in paths], "return changed during import")
         _require(manifest_digest is None or manifest_digest == sha256_file(manifest_path),
                  "return manifest changed during import")
@@ -348,7 +365,8 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
                       stereo_only=not any(f[0] == "stems" for f in files),
                       duration_changed=info["frames"] != original["frames"],
                       original_frames=original["frames"], original_bpm=original["bpm"],
-                      bpm=data.get("bpm"), notes=data["notes"], files=records,
+                      bpm=bpm, tempo_changed=None if bpm is None else bpm != original["bpm"],
+                      notes=data["notes"], files=records,
                       mastering_required=False, published=False)
         _json(stage / "return.json", result)
         # A prepared revision is not a completed production run: K08 measures
