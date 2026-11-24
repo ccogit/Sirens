@@ -295,7 +295,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const resources=createResources(timerHost), abort=new AbortController();
     let active=true, caps=null, gpu=null, mock=false, client=remote, controller=null, error=null,
       entries=[], stemGeneration=0, polling=false, busy=false, preset={...DEFAULT_PRESET}, muted=false, slot="A";
-    let profile=null, profileBusy=false, profileEpoch=0, profileError="";
+    let profile=null, profileBusy=false, profileEpoch=0, profileError="", diagnostics=null;
     const status=h("p",{role:"status","aria-live":"polite"},"Fähigkeiten werden geladen");
     const catalogStatus=h("p",{role:"status"},"Bibliothek wird geladen");
     const gpuInfo=h("p",{},"GPU-Telemetrie wird geladen");
@@ -326,20 +326,28 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const refresh=btn("Status erneut laden");
     const hookHost=h("div",{"class":"rt-grid"}), advancedHost=h("div",{});
     const previewButton=btn("Offline-Mix vorhören"), previewStatus=h("p",{role:"status"},"Kein Offline-Mix");
-    let unmountAdvanced=null, operationEpoch=0;
+    let unmountAdvanced=null, operationEpoch=0, advancedClosing=null;
     const hookCards=mountHookTools(hookHost,{document:root.ownerDocument||globalThis.document});
     const preview=createOfflinePreview({beforePlay:async()=>{await controller?.reset();},onStatus:()=>paint()});
     const stopPreview=(clear=false)=>preview.stop(clear).catch(e=>{if(active){error=e;paint();}});
     const clearAdvanced=()=>{
       operationEpoch++;
       const old=unmountAdvanced;unmountAdvanced=null;
+      const previous=advancedClosing;
+      // Sperre setzen, bevor stopPreview synchron paint auslöst.
+      advancedClosing=Promise.resolve();
       const closing=old?.();
       advancedHost.replaceChildren();
-      return Promise.all([Promise.resolve(closing),stopPreview(true)]);
+      const pending=Promise.all([previous,Promise.resolve(closing),stopPreview(true)]);
+      advancedClosing=pending;
+      const finished=()=>{if(advancedClosing===pending){advancedClosing=null;paint();}};
+      pending.then(finished,finished);
+      return pending;
     };
     const canSeparate=name=>active&&!!caps&&!error&&!!song.value&&song.value!=="fixture"&&
-      (name==="htdemucs"||caps.capabilities.some(c=>c.id==="separation"&&c.available));
+      (name==="htdemucs"||(diagnostics?.separation?.available&&diagnostics.separation.interpreter_present&&diagnostics.separation.gate_report_present&&caps.capabilities.some(c=>c.id==="separation"&&c.available)));
     function paintAdvanced(){
+      if(advancedClosing)return;
       if(!caps||error||!song.value||song.value==="fixture"){
         if(unmountAdvanced)void clearAdvanced().catch(()=>{});
         advancedHost.textContent="Advanced Stem Studio · Offline – Song und RT-Dienst erforderlich";
@@ -397,8 +405,10 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       exportButton.disabled=!enabled||!controller?.export||!!detail?.recording||!["ready","playing","paused"].includes(controller?.state);
       exportInfo.textContent=(detail?.recorded??0)+" Aufnahmesegmente · "+(detail?.lastExport?"Sitzungsdatei gespeichert: "+detail.lastExport:"noch kein Sitzungsexport")+" · kein vollständiges Replay";
       beatInfo.textContent=detail?.grid?"BeatGrid vorhanden (Quantisierung noch gesperrt)":"BeatGrid: unsicher / nicht verfügbar";
-      hookCards.paint(caps?.capabilities,error);
+      hookCards.paint(caps?.capabilities,error,diagnostics);
       paintAdvanced();
+      panic.disabled=!controller&&!unmountAdvanced&&!preview.ready&&!advancedClosing;
+      stop.disabled=panic.disabled;
       previewButton.disabled=busy||!preview.ready||!!error;
       previewButton.textContent=preview.playing?"Offline-Vorschau stoppen":"Offline-Mix vorhören";
       previewStatus.textContent=preview.playing?"Offline-Vorschau läuft":preview.ready?"Offline-Mix vorbereitet":"Kein Offline-Mix";
@@ -476,6 +486,9 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
           fillSongs();
         }
         caps=next;error=null;
+        try{diagnostics=remote.hookStatus?(await remote.hookStatus(abort.signal)).models:null;}
+        catch{diagnostics=null;}
+        if(!active)return;
         const previous=capability.value;
         capability.replaceChildren(...caps.capabilities.map(c=>h("option",{value:c.id,disabled:!c.available},c.id+" · "+modeLabel(c.mode)+(c.mock?" · Testmodus":"")+(c.available?"":" · gesperrt"))));
         if(caps.capabilities.some(c=>c.id===previous))capability.value=previous;
@@ -487,7 +500,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       }catch(e){
         if(active){
           // 503 beim ersten GET ist der ausgeschaltete oder nicht verfügbare Dienst.
-          error=e;gpu=null;
+          error=e;gpu=null;diagnostics=null;
           if(controller){await controller.destroy().catch(()=>{});controller=null;}
           mock=false;client=remote;
           if(!caps){capsInfo.replaceChildren();capability.replaceChildren();}
