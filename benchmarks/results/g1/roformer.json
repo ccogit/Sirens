@@ -1,0 +1,87 @@
+{
+  "wp": "WP02",
+  "kandidat": "roformer-drumsep",
+  "gate": "nicht_gemessen",
+  "modus": "offline",
+  "zeitpunkt": "2026-11-24T18:09:02.828289+00:00",
+  "rechner": {
+    "os": {
+      "system": "Windows",
+      "release": "10"
+    },
+    "python": "3.11.9",
+    "node": "24.20.0",
+    "ffmpeg": "9.0.2",
+    "gpus": [
+      {
+        "driver": "621.24",
+        "name": "NVIDIA GeForce RTX 5080",
+        "vram_total_mib": 16303,
+        "vram_free_mib": 12395
+      }
+    ],
+    "wsl": true,
+    "disk": {
+      "drive": "C:",
+      "free_bytes": 1092474474496
+    },
+    "git": {
+      "sha": "316a225fddddc618adc7e84d14056806d559483f",
+      "clean": true
+    },
+    "audio_device": null,
+    "notes": [
+      "Audio-Gerät und Treiber separat am Zielrechner erfassen (nicht gemessen)"
+    ]
+  },
+  "messwerte": {
+    "kalt": {
+      "p50_ms": 23843.328499991912,
+      "p95_ms": 23843.328499991912,
+      "p99_ms": 23843.328499991912,
+      "peak_vram_mib": null,
+      "rtf": 0.7947776166663971,
+      "underruns": null,
+      "rtf_p50": 0.7947776166663971,
+      "rtf_p95": 0.7947776166663971,
+      "rtf_p99": 0.7947776166663971,
+      "anzahl": 1,
+      "load_ms": 6163.684200000716,
+      "first_inference_ms": 17679.644299991196,
+      "gpu_total_sampled_peak_mib": 3581,
+      "torch_peak_reserved_mib": 2134.0
+    },
+    "warm": {
+      "p50_ms": 1146.7643000069074,
+      "p95_ms": 1153.230579997762,
+      "p99_ms": 1153.7393959978363,
+      "peak_vram_mib": null,
+      "rtf": 0.038225476666896914,
+      "underruns": null,
+      "rtf_p50": 0.038225476666896914,
+      "rtf_p95": 0.03844101933325874,
+      "rtf_p99": 0.03845797986659454,
+      "anzahl": 5,
+      "gpu_total_sampled_peak_mib": 3583,
+      "torch_peak_reserved_mib": 2136.0
+    }
+  },
+  "befehl": "python -m benchmarks.spikes.roformer-drumsep.messen (lokale Modellpfade separat)",
+  "notizen": [
+    "Device: cuda",
+    "VRAM per nvidia-smi abgetastet, kurze Peaks ggf. verfehlt.",
+    "Keine hörbare End-to-End-Latenz, kein Gate; Audio außerhalb des Timings gespeichert.",
+    "Seeds: kalt 0, warm fortlaufend ab 1."
+  ],
+  "profil": {
+    "device": "cuda",
+    "signal": "click120",
+    "rate": 44100,
+    "block": 4096,
+    "duration": 30.0,
+    "seconds": 0,
+    "repeats": 5,
+    "torch": "2.7.1+cu128",
+    "cuda": "12.8"
+  }
+}
