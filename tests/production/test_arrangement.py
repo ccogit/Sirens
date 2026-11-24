@@ -103,6 +103,62 @@ class ArrangementTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             a.amm_notes_to_events([dict(start=1, duration=.00001, pitch=60, velocity=100)])
 
+    def test_reuse_proposal_interfaces(self):
+        harmony = SimpleNamespace(voice_chords=lambda chords: {"voicings": chords})
+        groove = SimpleNamespace(propose_relational_groove=lambda *args: list(args))
+        phrase = SimpleNamespace(propose_phrase_variations=lambda *args: list(args))
+        motif = SimpleNamespace(propose_motif_developments=lambda *args: list(args))
+        evidence = a.amm_proposals(harmony=harmony, chords=["Dm7"],
+                                   groove=groove, groove_args=(1, 2, 3, 4),
+                                   phrase=phrase, phrase_args=(1, 2, 3),
+                                   motif=motif, motif_args=(1, 2, 3, 4))
+        self.assertEqual(evidence, {"harmony": {"voicings": ["Dm7"]},
+                                    "groove": [1, 2, 3, 4], "phrase": [1, 2, 3],
+                                    "motif": [1, 2, 3, 4]})
+
+    def test_revision_protects_speech_and_sub(self):
+        p = a.clear_head_plan(brief())
+        voice = track(p, "voice")
+        with self.assertRaises(ValueError):
+            a.revise_window(p, "voice", voice["events"][1:])
+        sub = track(p, "sub")
+        events = copy.deepcopy(sub["events"])
+        events[0]["tick"] += 1
+        with self.assertRaises(ValueError):
+            a.revise_window(p, "sub", events)
+        beam = track(p, "beam")
+        hi = p["sections"][0]["bars"] * a.BAR
+        automation = [dict(e) for e in beam["automation"] if e["tick"] < hi]
+        automation[1]["value"] = 0.2
+        revised, _ = a.revise_window(p, "beam",
+                                     [e for e in beam["events"] if e["tick"] < hi],
+                                     section_id="intro", automation=automation)
+        self.assertEqual(track(revised, "beam")["automation"][1]["value"], 0.2)
+        self.assertEqual([e for e in track(revised, "beam")["automation"] if e["tick"] >= hi],
+                         [e for e in beam["automation"] if e["tick"] >= hi])
+
+    def test_documented_clear_head_brief(self):
+        # Read the existing committed brief, no new reference data in Git.
+        from pathlib import Path
+        path = Path(__file__).resolve().parents[2] / "docs/aufgaben/sirens-production/BRIEF-CLEAR-HEAD.md"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        cues = []
+        for index, line in enumerate(lines):
+            if line in ("Chorus spoken:", "Verse spoken:", "Bridge spoken:"):
+                passage = []
+                for following in lines[index+1:]:
+                    if not following.strip():
+                        break
+                    passage.append(following)
+                cues.append("\n".join(passage))
+        self.assertEqual(len(cues), 4)
+        b = brief(lyrics="\n\n".join(cues))
+        for variant in ("ratchet", "counterweight", "undertow"):
+            p = a.clear_head_plan(b, variant)
+            self.assertEqual([r["text"] for r in p["asset_requests"] if r["kind"] == "speech"],
+                             cues)
+            a.validate_arrangement(b, p)
+
 
 if __name__ == "__main__":
     unittest.main()
