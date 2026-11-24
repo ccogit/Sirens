@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as L from "../web/js/logic.js";
 import { katalogEintraege } from "../web/js/live_lab.js";
+import { labWerkzeugWahl, labWerkzeugAktivieren } from "../web/js/lab_library.js";
 import * as DJ from "../web/js/auto_logic.js";
 
 const lage = (dran, extra = {}) => ({ dran, claude_auch_dran: dran === "claude", station: 1, offene_bewertungen: 0, ...extra });
@@ -229,4 +230,29 @@ test("Auto-DJ: Tempoübernahme über mehrere Tracks hält reale Taktlängen kons
   assert.ok(Math.abs(cue.bpm-129.6)<.01);
   assert.ok(Math.abs(cue.rateB-129.6/125)<.01);
   assert.ok(Math.abs(cue.dauer*1.08-16)<.01);
+});
+
+test("Live Lab: gespeicherte und neue Werkzeuge werden aus dem Register gewählt", () => {
+  const tools = [{ id: "pult" }, { id: "auto" }, { id: "neu" }];
+  assert.equal(labWerkzeugWahl(tools, "auto"), "auto");
+  assert.equal(labWerkzeugWahl(tools, "neu"), "neu");
+  assert.equal(labWerkzeugWahl(tools, "entfernt"), "pult");
+  assert.equal(labWerkzeugWahl(tools, null), "pult");
+});
+
+test("Live Lab: nur ein Tool aktiv; erneutes Öffnen unterbricht nicht", () => {
+  const events = [];
+  const tools = ["pult", "auto", "neu"].map(id => ({
+    id, panel: { hidden: true },
+    anhalten: () => events.push("stop:" + id),
+    aktivieren: () => events.push("start:" + id)
+  }));
+  labWerkzeugAktivieren(tools, "auto");
+  assert.deepEqual(tools.map(t => t.panel.hidden), [true, false, true]);
+  assert.deepEqual(events, ["stop:pult", "stop:neu", "start:auto"]);
+  labWerkzeugAktivieren(tools, "auto", "auto");
+  assert.equal(events.length, 3);
+  labWerkzeugAktivieren(tools, "neu", "auto");
+  assert.deepEqual(tools.map(t => t.panel.hidden), [true, true, false]);
+  assert.deepEqual(events.slice(3), ["stop:pult", "stop:auto", "start:neu"]);
 });
