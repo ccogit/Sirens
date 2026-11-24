@@ -166,7 +166,9 @@ class HTTP(ServerFall):
         validate("error",body)
         self.server.app.cfg = replace(self.cfg,rt_enabled=True)
         status, body, _ = self.http("GET",path)
-        self.assertEqual((status,body),(200,{"protocol_version":1,"capabilities":[]}))
+        # Ohne installierte Worker: echte Modelle stehen nur als nicht verfügbar da, kein Mock.
+        self.assertEqual((status,body["protocol_version"]),(200,1))
+        self.assertTrue(all(not c["mock"] and not c["available"] for c in body["capabilities"]))
         validate("capabilities",body)
         self.server.app.cfg = replace(self.cfg,rt_enabled=True,rt_mock=True)
         status, body, _ = self.http("GET",path)
