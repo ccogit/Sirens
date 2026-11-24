@@ -18,22 +18,33 @@ SKRIPT = PROJEKT / "scripts" / "soundcloud_upload.py"
 EIGEN = Path(__file__).resolve().parents[1]  # Ordner von Sirens
 
 
+def _projekt():
+    pfad = os.environ.get("SIRENS_SOUNDCLOUD_PROJECT")
+    return Path(pfad) if pfad else PROJEKT
+
+
 def bereit(env_datei=None):
-    """Ist SoundCloud eingerichtet? (Zugangstoken in der .env neben diesem Paket, sonst in der .env des Projekts)"""
-    eigene = EIGEN / ".env"
+    """Prüft das Zugangstoken an denselben Orten wie das konfigurierte Upload-Skript."""
+    basis = _projekt()
+    kandidaten = [basis / "sirens" / ".env", basis / "song-auftrag" / ".env", basis / ".env"]
+    if not os.environ.get("SIRENS_SOUNDCLOUD_PROJECT"):
+        kandidaten.insert(0, EIGEN / ".env")
+    datei = Path(env_datei) if env_datei else next((p for p in kandidaten if p.is_file()), kandidaten[-1])
     try:
-        zeilen = (env_datei or (eigene if eigene.exists() else PROJEKT / ".env")).read_text(encoding="utf-8-sig").splitlines()
+        zeilen = datei.read_text(encoding="utf-8-sig").splitlines()
     except OSError:
         return False
-    werte = dict(z.split("=", 1) for z in zeilen if "=" in z and not z.lstrip().startswith("#"))
-    return werte.get("SOUNDCLOUD_ACCESS_TOKEN", "").strip() not in ("", "change-me")
+    werte = {name.strip(): wert.strip() for z in zeilen if "=" in z and not z.lstrip().startswith("#")
+             for name, wert in [z.split("=", 1)]}
+    return werte.get("SOUNDCLOUD_ACCESS_TOKEN", "") not in ("", "change-me")
 
 
 def _skript(ordner, *argumente, erfolg):
     """Upload-Skript ausführen. Liefert "" oder den Grund des Scheiterns."""
     eigen = os.environ.get("SIRENS_SOUNDCLOUD_CMD")  # für Tests: JSON-Liste statt des echten Skripts
     try:
-        befehl = json.loads(eigen) if eigen else [sys.executable, str(SKRIPT)]
+        upload = _projekt() / "scripts" / SKRIPT.name
+        befehl = json.loads(eigen) if eigen else [sys.executable, str(upload)]
         lauf = subprocess.run([*befehl, str(ordner), *argumente],
                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

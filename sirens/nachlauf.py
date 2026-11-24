@@ -108,7 +108,7 @@ class NachlaufAktionen:
         if not safe_audio_path(self.cfg.music_root, pfad).is_file():
             raise Ablehnung("missing_file", "Die Datei gibt es nicht.", "pfad")
         pfad = pfad.strip()
-        teile = parse_pfad(pfad)
+        teile = parse_pfad(pfad, self.cfg.music_root)
         wunsch = validate_wunsch({"weg": "referenz", "artist_slug": teile["artist_slug"], "referenzen": [{"pfad": pfad}],
                                   "optionen": {"titelwunsch": f"Fertig machen: {teile['titel']}"}},
                                  self.cfg.music_root, vollstaendig=False)
