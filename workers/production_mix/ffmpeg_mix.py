@@ -70,8 +70,20 @@ def measure(exe, path):
 
 
 def encode(exe, source, destination, frames, gain=0):
-    run(exe, ["-i", source, "-af", f"volume={gain:.8f}dB,apad,atrim=end_sample={frames}",
-              "-ar", RATE, "-ac", 2, "-c:a", "pcm_s24le", "-n", destination])
+    # ffmpeg writes WAVE_FORMAT_EXTENSIBLE for PCM24; Python 3.11 wave
+    # (the shared contract validator) requires ordinary WAVE_FORMAT_PCM.
+    raw = destination.with_suffix(".pcm")
+    try:
+        run(exe, ["-i", source, "-af", f"volume={gain:.8f}dB,apad,atrim=end_sample={frames}",
+                  "-ar", RATE, "-ac", 2, "-f", "s24le", "-c:a", "pcm_s24le", "-n", raw])
+        if raw.stat().st_size != frames * 6:
+            raise RuntimeError("unexpected PCM frame count")
+        with wave.open(str(destination), "wb") as wav, raw.open("rb") as stream:
+            wav.setparams((2, 3, RATE, frames, "NONE", ""))
+            while chunk := stream.read(65536 * 6):
+                wav.writeframesraw(chunk)
+    finally:
+        raw.unlink(missing_ok=True)
 
 
 def sum_filter(labels, output):
