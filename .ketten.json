@@ -5,5 +5,5 @@
   "register": "docs/aufgaben/sirens-rt/KETTEN.md",
   "task_dir": "docs/aufgaben/sirens-rt",
   "stack": "Python 3.11 (nur Standardbibliothek im Hauptprozess), ES-Module ohne Build, Node 22 für Tests",
-  "rules": "Zielzweig ist integration/sirens-rt (nicht main); sofort nach dem ersten Commit pushen und den Draft-PR öffnen, die CI des PR ist die maßgebliche Prüfung (lokale Tests nur, soweit deine Umgebung es erlaubt; nie deswegen nicht pushen); nie ohne PR enden: bei Blockade Stand pushen, Abschnitt „Übergabe“ in die Ergebnisdatei, PR mit Titelanfang ÜBERGABE auf Ready for review; kein Torch-/Modell-Import im Paket sirens/; keine Modellgewichte, Musikdateien oder Downloads im Repo; gemeinsame Dateien nur ändern, wenn die Aufgabe es ausdrücklich erlaubt"
+  "rules": "Zielzweig ist integration/sirens-rt (nicht main); nur die Dateien der eigenen Kette anlegen (Tabelle „Dateien je Kette“ in KETTEN.md), docs/realtime/board.md nicht anfassen; kein Torch-/Modell-Import im Paket sirens/; keine Modellgewichte, Musikdateien oder Downloads im Repo"
 }
