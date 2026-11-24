@@ -44,17 +44,19 @@ def main(argv=None, *, cfg=None, backend=None):
     cfg = load(umgebung()) if cfg is None else cfg
     try:
         if args.action == "inventory":
+            options = integration.settings()
             result = {"schema_version": 1, "music_root_available": cfg.music_root.is_dir(),
                       "data_dir_available": cfg.data_dir.is_dir(),
                       "render_available": True if backend is not None else None,
-                      "configured": bool(integration.settings()),
+                      "configured": bool(options),
                       "gpu_available": None, "ableton_available": None}
             if cfg.music_root.is_dir():
                 from .references import collect
-                _, coverage = collect(cfg)
+                projection = read_manifest(options["amm_export"]) if options.get("amm_export") else None
+                _, coverage = collect(cfg, amm_export=projection)
                 result["references"] = coverage
         elif args.action == "references":
-            result = integration.references(cfg, read_manifest(args.brief))
+            result = integration.references(cfg, read_manifest(args.brief), options=integration.settings())
         elif args.action == "benchmark":
             from .quality import benchmark
             result = benchmark(args.manifest)
