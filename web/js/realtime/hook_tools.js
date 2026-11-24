@@ -6,12 +6,21 @@ export const HOOK_TOOLS = Object.freeze([
   ["dsp","DSP Rack"],["drum","Drum Architect"],["crossover","Stem Crossover"],
   ["acid","Acid Transformer"],["mutation","Infinite Mutation"]
 ]);
-export function hookState(id, descriptors, {error=null, wired=false, measured=false}={}) {
-  const cap=descriptors?.find(c=>c.id===id);
+export function hookState(id, descriptors, {error=null, wired=false, measured=false, diagnostics=null}={}) {
+  const registryId=id==="roformer"?"separation":id;
+  const cap=descriptors?.find(c=>c.id===registryId);
+  const diagnostic=diagnostics?.[registryId];
   if(error)return {enabled:false,text:"Fehler: "+(error.message||"API nicht verfügbar"),controls:cap?.controls||[]};
   if(!descriptors)return {enabled:false,text:"Fähigkeiten werden geladen",controls:[]};
+  if(diagnostic){
+    const reasons=[];
+    if(!diagnostic.interpreter_present)reasons.push("Nicht installiert (Interpreter fehlt)");
+    if(!diagnostic.gate_report_present)reasons.push("Nicht gemessen (G1-Bericht fehlt)");
+    if(reasons.length)return {enabled:false,text:reasons.join(" · "),controls:cap?.controls||[]};
+  }
   if(!cap)return {enabled:false,text:"Nicht installiert / nicht gemessen",controls:[]};
   if(!cap.available)return {enabled:false,text:"Nicht installiert oder nicht gemessen / freigegeben",controls:cap.controls||[]};
+  if(id==="roformer"&&diagnostic?.available)return {enabled:false,text:"Registry: verfügbar · Bedienung im Advanced Stem Studio (Offline)",controls:cap.controls||[]};
   if(!wired||!measured)return {enabled:false,text:"Registry: verfügbar · Bedienpfad oder Hörprüfung nicht freigegeben",controls:cap.controls||[]};
   return {enabled:true,text:"Verfügbar",controls:cap.controls||[]};
 }
@@ -42,9 +51,9 @@ export function mountHookTools(host, {document=host.ownerDocument}={}) {
     cards.set(id,{status,fields,actions,signature:null});
   }
   return {
-    paint(descriptors,error=null){
+    paint(descriptors,error=null,diagnostics=null){
       for(const [id,card] of cards){
-        const state=hookState(id,descriptors,{error});
+        const state=hookState(id,descriptors,{error,diagnostics});
         card.status.textContent=state.text;
         const controls=descriptorControls(state.controls);
         const signature=JSON.stringify(controls);
