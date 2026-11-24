@@ -1,6 +1,6 @@
 // Songbibliothek mit Alben, gemeinsamen Singles und abspielbaren Fassungen.
 import { api } from "./api.js";
-import { h, leeren, meldung, neueId } from "./dom.js";
+import { h, leeren, meldung } from "./dom.js";
 import { abspielKnopf, knoepfeAktualisieren } from "./player.js";
 
 function auftragOeffnen(datei, treffer, mastern = false) {
@@ -88,73 +88,93 @@ function songZeile(song, stil, auftraege, gewaehlt) {
 
 export function songsAnsicht(el) {
   let beendet = false;
-  let katalog = null;
-  const auftraege = new Map();
-  const fassungen = new Map();
+  let katalog;
+  let aktiv;
   let lauf = 0;
   let wartezeit;
-  const suchId = neueId();
-  const suche = h("input", { id: suchId, type: "search", placeholder: "Song, Album oder Stilreferenz" });
-  const gruppierung = h("select", { id: neueId(), onchange: () => zeichnen() },
-    h("option", { value: "alphabet" }, "Alphabetisch"),
-    h("option", { value: "stil" }, "Nach Stilreferenz"));
+  const auftraege = new Map();
+  const fassungen = new Map();
+  const suche = h("input", { type: "search", placeholder: "Bibliothek durchsuchen", "aria-label": "Bibliothek durchsuchen" });
   const stand = h("p", { class: "klein library-catalog-status", "aria-live": "polite" });
-  const inhalt = h("div", { class: "library-groups" });
-  const geoeffnet = new Set();
+  const navigation = h("nav", { class: "library-navigation", "aria-label": "Alben und Singles" });
+  const inhalt = h("section", { class: "library-detail", "aria-label": "Titelliste" });
+  const gruppierung = h("select", { "aria-label": "Singles gruppieren", onchange: () => {
+    gruppe.value = "";
+    detailZeichnen();
+    gruppierung.focus();
+  } }, h("option", { value: "alphabet" }, "Alphabetisch"), h("option", { value: "stil" }, "Nach Stilreferenz"));
+  const gruppe = h("select", { "aria-label": "Single-Gruppe auswählen", onchange: () => { detailZeichnen(); gruppe.focus(); } });
 
-  function gruppe(id, titel, anzahl, stil, render, offen, cover = null) {
-    const body = h("ul", { class: "library-song-list" });
-    const details = h("details", { class: "library-group", open: offen || geoeffnet.has(id) },
-      h("summary", {}, cover ? h("img", { class: "library-album-cover", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : null,
-        h("span", {}, titel), stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null,
-        h("span", { class: "mini-count" }, String(anzahl))), body);
-    const fuellen = () => { if (!body.childElementCount) body.append(...render()); knoepfeAktualisieren(); };
-    details.addEventListener("toggle", () => {
-      if (!details.isConnected) return;
-      if (details.open) { geoeffnet.add(id); fuellen(); } else geoeffnet.delete(id);
-    });
-    if (details.open) fuellen();
-    return details;
+  function auswahl() {
+    const releases = katalog?.releases || [];
+    const alben = releases.filter(release => !release.single);
+    const singles = releases.filter(release => release.single)
+      .flatMap(release => release.songs.map(song => ({ song, stil: release.stilreferenz })))
+      .sort((a, b) => a.song.titel.localeCompare(b.song.titel, "de"));
+    return { alben, singles };
   }
 
-  function singlesCluster(singles, gesucht) {
-    const clusters = new Map();
-    const nachStil = gruppierung.value === "stil";
-    for (const eintrag of singles) {
-      const anfang = eintrag.song.titel.normalize("NFD").replace(/\p{M}/gu, "").charAt(0).toUpperCase();
-      const titel = nachStil ? (eintrag.stil || "Ohne Stilreferenz") : (/^[A-Z]$/.test(anfang) ? anfang : "#");
-      if (!clusters.has(titel)) clusters.set(titel, []);
-      clusters.get(titel).push(eintrag);
+  function detailZeichnen() {
+    const { alben, singles } = auswahl();
+    const album = alben.find(eintrag => eintrag.pfad === aktiv);
+    leeren(inhalt);
+    if (!album && aktiv !== "Singles") return;
+    const istSingles = !album;
+    const titel = album?.titel || "Singles";
+    const stil = album?.stilreferenz;
+    const songs = album ? album.songs.map(song => ({ song, stil: "" })) : singles;
+    const kopf = h("header", { class: "library-release-header" },
+      album?.cover ? h("img", { src: api.bildUrl(album.cover), alt: "" }) : null,
+      h("div", {}, h("h2", {}, titel),
+        h("p", { class: "klein" }, [stil && "Stilreferenz " + stil, songs.length + (songs.length === 1 ? " Song" : " Songs")]
+          .filter(Boolean).join(" · "))));
+    let sichtbar = songs;
+    if (istSingles) {
+      const schluessel = ({ song, stil }) => gruppierung.value === "stil" ? stil || "Ohne Stilreferenz"
+        : song.titel.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase().match(/^[A-Z]/)?.[0] || "#";
+      const gruppen = [...new Set(songs.map(schluessel))].sort((a, b) => a.localeCompare(b, "de"));
+      const bisher = gruppe.value;
+      gruppe.replaceChildren(h("option", { value: "" }, "Alle Singles"),
+        ...gruppen.map(name => h("option", { value: name }, name)));
+      gruppe.value = gruppen.includes(bisher) ? bisher : "";
+      if (gruppe.value) sichtbar = songs.filter(song => schluessel(song) === gruppe.value);
+      kopf.append(h("div", { class: "library-single-controls" }, gruppierung, gruppe));
     }
-    return [...clusters].sort(([a], [b]) => a.localeCompare(b, "de")).map(([titel, eintraege]) =>
-      h("li", {}, gruppe("single:" + gruppierung.value + ":" + titel, titel, eintraege.length, "",
-        () => eintraege.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen)), gesucht)));
+    inhalt.append(kopf, sichtbar.length ? h("ul", { class: "library-song-list" },
+      sichtbar.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen)))
+      : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
+    knoepfeAktualisieren();
+  }
+
+  function navigationAktualisieren() {
+    for (const knopf of navigation.querySelectorAll("button")) {
+      if (knopf.dataset.release === aktiv) knopf.setAttribute("aria-current", "true");
+      else knopf.removeAttribute("aria-current");
+    }
+  }
+
+  function navigationZeile(id, titel, anzahl, cover) {
+    return h("button", { type: "button", "data-release": id, onclick: () => {
+      aktiv = id;
+      navigationAktualisieren();
+      detailZeichnen();
+    } }, cover ? h("img", { src: api.bildUrl(cover), alt: "", loading: "lazy" })
+      : h("span", { class: "library-navigation-art", "aria-hidden": "true" }, "♫"),
+    h("span", { class: "library-navigation-name" }, titel), h("span", { class: "klein" }, String(anzahl)));
   }
 
   function zeichnen() {
-    if (!katalog) return;
-    leeren(inhalt);
-    const releases = katalog.releases || [];
-    const singles = releases.filter(r => r.single).flatMap(r => r.songs.map(song => ({ song, stil: r.stilreferenz })))
-      .sort((a, b) => a.song.titel.localeCompare(b.song.titel, "de"));
-    const alben = releases.filter(r => !r.single);
-    const sonst = alben.reduce((zahl, r) => zahl + r.songs.length, 0);
-    const gesucht = Boolean(suche.value.trim());
+    const { alben, singles } = auswahl();
+    if (!alben.some(album => album.pfad === aktiv) && !(aktiv === "Singles" && singles.length))
+      aktiv = alben.find(album => album.songs.length)?.pfad || alben[0]?.pfad || (singles.length ? "Singles" : null);
     stand.textContent = katalog.meldung || (katalog.zustand !== "bereit" ? "Der Musikordner wird gelesen …"
-      : singles.length + sonst + alben.length
-        ? (singles.length + sonst) + " Songs · " + alben.length + " Alben"
-        : gesucht ? "Keine passenden Songs gefunden." : "Der Musikordner enthält keine Songs.");
-    for (const album of alben) {
-      inhalt.append(gruppe(album.pfad, album.titel, album.songs.length, album.stilreferenz,
-        () => album.songs.length ? album.songs.map(s => songZeile(s, "", auftraege, fassungen))
-          : [h("li", { class: "library-album-empty klein" }, "In diesem Albumordner liegt derzeit keine Audiodatei.")],
-        gesucht && releases.length < 8, album.cover));
-    }
-    if (singles.length) inhalt.append(gruppe("Singles", "Singles", singles.length, "",
-      () => [h("li", { class: "library-single-grouper" },
-        h("label", { for: gruppierung.id }, "Singles gruppieren"), gruppierung),
-        ...singlesCluster(singles, gesucht)], gesucht || !alben.length));
-    knoepfeAktualisieren();
+      : !alben.length && !singles.length ? "Keine passenden Songs oder Alben gefunden."
+      : alben.length + " Alben · " + singles.length + " Singles");
+    leeren(navigation).append(
+      singles.length ? navigationZeile("Singles", "Singles", singles.length) : h("span", { hidden: true }),
+      ...alben.map(album => navigationZeile(album.pfad, album.titel, album.songs.length, album.cover)));
+    navigationAktualisieren();
+    detailZeichnen();
   }
 
   async function laden() {
@@ -176,16 +196,16 @@ export function songsAnsicht(el) {
     ++lauf;
     wartezeit = setTimeout(laden, 200);
   });
-  const aktualisieren = h("button", { type: "button", class: "library-toggle", onclick: async () => {
+  const aktualisieren = h("button", { type: "button", class: "klein-knopf", onclick: async () => {
     try { await api.katalogNeuLesen(); await laden(); }
     catch (fehler) { if (!beendet) stand.textContent = fehler.meldung; }
   } }, "Neu einlesen");
   el.append(h("div", { class: "songs-library" },
     h("header", { class: "library-header" }, h("h1", {}, "Songbibliothek"),
       h("a", { class: "knopf", href: "#/mastern" }, "Vorhandenen Song bearbeiten")),
-    h("section", { class: "library-panel" },
-      h("div", { class: "library-toolbar" }, h("label", { for: suchId }, "Suchen"), suche, aktualisieren),
-      stand, inhalt)));
+    h("div", { class: "library-desktop" },
+      h("aside", { class: "library-sidebar" }, h("div", { class: "library-toolbar" }, suche, aktualisieren), stand, navigation),
+      inhalt)));
   laden();
   api.liste().then(daten => {
     if (beendet) return;
@@ -194,7 +214,7 @@ export function songsAnsicht(el) {
         if (!auftraege.has(song.pfad)) auftraege.set(song.pfad, { auftrag, song });
       }
     }
-    zeichnen();
+    detailZeichnen();
   }).catch(() => {});
   return () => { beendet = true; clearTimeout(wartezeit); };
 }
