@@ -1,0 +1,4 @@
+# Identischer Inferenz-Pin wie WP23; nur Wheels. Transitive Pins: installed.lock lokal.
+# https://download.pytorch.org/whl/cu128
+# Revision 21298c907f469d6c7787c60dd38d46f98981b75c
+torch==2.7.1+cu128

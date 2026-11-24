@@ -1,7 +1,7 @@
 // Signal Room: discovery shell and real, exclusive audio sessions.
 import { api } from "./api.js";
 import { h, meldung } from "./dom.js";
-import { werkzeuge } from "./signal_tools.js";
+import { werkzeuge, rtZustand } from "./signal_tools.js";
 import { signalArt } from "./signal_art.js";
 import { toolWahl, recentAdd, filterTools, readList, validateTools, createSession } from "./signal_model.js";
 export { katalogEintraege } from "./lab_pult.js";
@@ -12,6 +12,12 @@ function lesen(key) { try { return localStorage.getItem(key); } catch { return n
 function speichern(key,value) { try { localStorage.setItem(key,value); } catch { /* private mode */ } }
 function listeLesen(key,tools) { try { return readList(localStorage,key,tools); } catch { return []; } }
 function button(text,attrs={}) { return h("button",{type:"button",...attrs},text); }
+
+// Verwendet die bestehende Drosselung (Auflösung und Bildrate), ohne einen zweiten Renderer anzulegen.
+// Ohne RT-Profil gilt die bisherige Regel (nur während einer Claude-Produktion).
+export function visualGpuDrosseln(producing, profile) {
+  return Boolean(producing || profile === "Neural" || profile === "Eco" || profile === "Training/Render");
+}
 
 export function liveLabAnsicht(el) {
   const tools=validateTools(werkzeuge);
@@ -67,7 +73,7 @@ export function liveLabAnsicht(el) {
       h("div",{class:"sr-session-actions"},back,focus,full)),host);
   const footer=h("footer",{class:"sr-footer"},"LOCAL AUDIO / ORIGINALDATEIEN BLEIBEN UNVERÄNDERT",h("span",{},"SIRENS · SIGNAL ROOM"));
   root.append(header,discovery,sessionPanel,footer);el.append(root);
-  const runtime=createSession(host,{isProducing:()=>produktion});
+  const runtime=createSession(host,{isProducing:()=>visualGpuDrosseln(produktion,rtZustand.profil)});
   const filterDefs=[["all","Alle"],["favorites","★ Favoriten"],["recent","Zuletzt"],
     ...[...new Set(tools.map(t=>t.gruppe))].map(g=>["group:"+g,g]),
     ...(tools.some(t=>t.experimental)?[["experimental","Experimental"]]:[])];

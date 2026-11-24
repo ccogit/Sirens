@@ -1,0 +1,9 @@
+{
+  "name": "Sirens",
+  "repo": "ccogit/Sirens",
+  "branch": "integration/sirens-rt",
+  "register": "docs/aufgaben/sirens-rt/KETTEN.md",
+  "task_dir": "docs/aufgaben/sirens-rt",
+  "stack": "Python 3.11 (nur Standardbibliothek im Hauptprozess), ES-Module ohne Build, Node 22 für Tests",
+  "rules": "Zielzweig ist integration/sirens-rt (nicht main); nur die Dateien der eigenen Kette anlegen (Tabelle „Dateien je Kette“ in KETTEN.md), docs/realtime/board.md nicht anfassen; kein Torch-/Modell-Import im Paket sirens/; keine Modellgewichte, Musikdateien oder Downloads im Repo"
+}

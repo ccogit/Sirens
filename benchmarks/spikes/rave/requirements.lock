@@ -1,0 +1,4 @@
+# Nur TorchScript-Inferenz; kein RAVE-Trainingspaket nötig.
+# https://download.pytorch.org/whl/cu128/torch/
+# Modellrevision 8471a1691f659ce52fcb2bb393afcc6f80187b17 (IIL, CC-BY-NC-4.0)
+torch==2.7.1+cu128

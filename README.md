@@ -346,3 +346,10 @@ Performance-Steuerung steht in [docs/stem-studio.md](docs/stem-studio.md).
 - Schreibrechte sind getrennt: Die Seite schreibt nur Wunsch, Antworten und Bewertungen; Plan, Fortschritt,
   Ergebnis und „übernommen“ schreibt nur Claude über die CLI.
 - Jede Änderung verlangt die aktuelle Revision; bei gleichzeitiger Änderung wird abgelehnt, nichts überschrieben.
+
+
+## RTX Neural Lab (Testmodus)
+
+In der lokalen `.env` `SIRENS_RT_ENABLED=1` und `SIRENS_RT_MOCK=1` setzen und den Dienst neu starten. Im Live Lab **RTX Neural Lab** wählen, synthetisches Testsignal oder eine unterstützte lokale WAV-Quelle auswählen und explizit Abspielen drücken. Der Testpfad nutzt einen CPU-Mock (Gain/Delay), einen lokalen Sidecar und den AudioWorklet-Kern. Keine KI, keine Downloads, keine Echtzeitfreigabe. Bei Ausfall des Wet-Pfads fällt der Core auf Dry zurück. Panic/Stop und Verlassen des Bereichs schließen die Sitzung und ihre eigenen Prozesse. Die bisherige CUDA-Sperre bleibt unverändert.
+
+Der Referenzpfad akzeptiert PCM16-WAV, 48 kHz, mono/stereo, 256 Frames bis 120 Sekunden; ein 48-kHz-AudioContext ist erforderlich. Andere Formate, RT-Stems, zeitadressierte Befehle, vollständiges Session-Replay und DSP-Bedienung sind noch nicht freigegeben. Aufnahme und Export landen unter dem separaten RT-Verzeichnis, nie im Musikordner. Die Quellen bleiben unverändert. DSP bleibt standardmäßig deaktiviert; BeatGrid ohne belastbares Raster bleibt unsicher. G2-Zielrechner-Messung: siehe `benchmarks/g2/README.md`; bis zur Messung keine produktive Freigabe. `SIRENS_RT_ENABLED=0` sperrt sämtliche RT-Adressen.

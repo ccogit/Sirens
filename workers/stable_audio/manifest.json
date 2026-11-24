@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "name": "stable_audio",
+  "interpreter_env": "SIRENS_RT_STABLE_AUDIO_PYTHON",
+  "script": "worker.py",
+  "args": [],
+  "capability": {
+    "id": "stable_audio",
+    "mock": false,
+    "available": false,
+    "mode": "lookahead",
+    "sample_rates": [
+      44100
+    ],
+    "channels": 2,
+    "context_frames": 0,
+    "hop_frames": 256,
+    "latency_frames": 0,
+    "controls": [
+      {
+        "name": "strength",
+        "min": 0,
+        "max": 1,
+        "default": 1
+      },
+      {
+        "name": "pad_type",
+        "min": 0,
+        "max": 5,
+        "default": 1
+      },
+      {
+        "name": "bars",
+        "min": 1,
+        "max": 8,
+        "default": 1
+      },
+      {
+        "name": "bpm",
+        "min": 1,
+        "max": 1000,
+        "default": 120
+      },
+      {
+        "name": "key",
+        "min": 0,
+        "max": 24,
+        "default": 0
+      },
+      {
+        "name": "seed",
+        "min": 0,
+        "max": 9007199254740991,
+        "default": 0
+      },
+      {
+        "name": "duration",
+        "min": 0.25,
+        "max": 30,
+        "default": 2
+      }
+    ],
+    "vram_peak_bytes": 2362232013,
+    "device": "cuda",
+    "license": "Stability AI Community License",
+    "model_revision": "8bdfb53c6b0fbc62113cd571fd37373efe15fa14"
+  }
+}

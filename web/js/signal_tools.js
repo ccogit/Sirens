@@ -5,6 +5,10 @@ import { autoDjAnsicht } from "./auto_dj.js";
 import { kickTausch } from "./kicktausch.js";
 import { stemSpiel } from "./stems.js";
 import { deckArt, morphArt, transitionArt, kickArt, stemArt } from "./signal_art.js";
+import { createLabShell } from "./realtime/shell.js";
+
+// Gewähltes GPU-Profil des RTX Neural Lab; der Signal Room drosselt danach die Visualisierung.
+export const rtZustand = { profil: null };
 
 export const werkzeuge = [
   {
@@ -56,6 +60,21 @@ export const werkzeuge = [
     mount: ({ isProducing }) => {
       const tool = stemSpiel(isProducing);
       return { el: tool.el, destroy: tool.beenden };
+    },
+  },
+  {
+    id: "rt", titel: "RTX Neural Lab", kurz: "RTX Neural Lab", gruppe: "KI / Analyse",
+    slogan: "NEURAL\nPERFORMANCE.", sub: "KI-Transformation, Pads, Effekte und Aufnahme in Echtzeit.",
+    kategorie: "REALTIME / LOCAL GPU", farbe: "#76b900",
+    text: "Stems, DSP-Rack, Performance-Pads und neuronale Klangveränderung auf der lokalen GPU. Nicht installierte oder nicht gemessene Modelle bleiben abgeschaltet und sind benannt.",
+    tags: ["GPU-PROFILE", "PADS", "STEMS", "AUFNAHME"], voraussetzung: "SIRENS_RT_ENABLED · Modelle einzeln installiert",
+    preview: { label: "Dry / Wet", links: "Original", rechts: "Neural", start: 40, zeichnen: stemArt },
+    mount: () => {
+      const el = document.createElement("div");
+      el.className = "lab-toy";
+      const shell = createLabShell({ onProfile: profil => { rtZustand.profil = profil; } });
+      shell.mount(el);
+      return { el, destroy: () => shell.destroy() };
     },
   },
 ];

@@ -3,6 +3,9 @@ import json
 import os
 import re
 import sys
+import threading
+import time
+from types import SimpleNamespace
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -130,6 +133,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise Ablehnung("forbidden_host", "Diese Adresse ist nicht erlaubt.", status=403)
             teile = urlsplit(self.path)
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
+            if pfad == "/api/rt/v1/profile":
+                return self._rt_profile()
+            if pfad.startswith("/api/rt/v1/"):
+                from .realtime.routes import dispatch
+                return dispatch(self, pfad, self._body() if schreibend and self.command != "PUT" else None)
             if schreibend:
                 self._schreiben(pfad, self._body())
             else:
@@ -141,6 +149,31 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:  # noqa: BLE001 – der Dienst soll weiterlaufen
             traceback.print_exc(file=sys.stderr)
             self._json(500, {"error": "internal", "meldung": "Unerwarteter Fehler im Dienst.", "feld": None})
+
+    def _rt_profile(self):
+        # Eigene Integrationsadresse: bestehende v1-Antworten und parallele
+        # Dateijob-Routen bleiben unverändert.
+        from .realtime.contracts import error, invalid
+        from .realtime.model_registry import PROFILES
+        from .realtime.routes import service
+        if self.command == "PUT":
+            self.close_connection = True
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in {f"http://{h}" for h in self._erlaubte_hosts()}:
+            raise Ablehnung("forbidden_origin", "Anfragen von fremden Seiten werden abgelehnt.", status=403)
+        if self.command == "POST":
+            body = self._body()
+        elif self.command != "GET":
+            raise invalid("method")
+        if not self.app.cfg.rt_enabled:
+            raise error("unavailable")
+        if self.command == "GET":
+            sessions = getattr(self.app, "rt_sessions", None)
+            return self._json(200, {"profile": sessions.gpu.profile if sessions else "Performance"})
+        if (not isinstance(body, dict) or set(body) != {"profile"}
+                or type(body["profile"]) is not str or body["profile"] not in PROFILES):
+            raise invalid("profile")
+        return self._json(200, {"profile": service(self).gpu.set_profile(body["profile"])})
 
     def do_GET(self):
         self._bearbeiten(False)
@@ -229,12 +262,37 @@ class Handler(BaseHTTPRequestHandler):
                 raise Ablehnung("invalid", "Die Stem-Anfrage muss ein Objekt sein.")
             if data.get("device", "cpu") == "cuda" and app.starter.zustand()["laeuft"]:
                 raise Ablehnung("busy_gpu", "Claude produziert gerade. Bitte CPU wählen oder später CUDA starten.", "device", 409)
-            stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("device", "cpu"))
+            if data.get("device", "cpu") == "cuda" and app.cfg.rt_enabled:
+                with app.cuda_admission:
+                    if app.starter.zustand()["laeuft"]:
+                        raise Ablehnung("busy_gpu", "Claude produziert gerade. Bitte CPU wählen.", "device", 409)
+                    manager = app.rt_gpu_provider()
+                    lease = manager.acquire_external("legacy_cuda")
+                    try:
+                        stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"), "cuda")
+                    except BaseException:
+                        manager.release(lease)
+                        raise
+                    if stand["zustand"] == "laeuft":
+                        def release_after_stems():
+                            while True:
+                                with app.stems._sperre:
+                                    if app.stems._laeuft is None:
+                                        break
+                                time.sleep(0.1)
+                            manager.release(lease)
+                        threading.Thread(target=release_after_stems, daemon=True).start()
+                    else:
+                        manager.release(lease)
+            else:
+                stand = app.stems.starten(data.get("pfad"), data.get("modell", "htdemucs"), data.get("device", "cpu"))
             return self._json(202 if stand["zustand"] == "laeuft" else 200, stand)
         if self.command == "POST" and pfad == "/api/catalog/refresh":
             app.katalog.scan_im_hintergrund()
             return self._json(202, {"zustand": "laeuft"})
         if self.command == "POST" and pfad == "/api/claude/start":
+            if app.cfg.rt_enabled and hasattr(app, "rt_gpu_provider"):
+                return self._json(202, app.starter.starten("Knopf auf der Seite", raise_busy=True))
             return self._json(202, app.starter.starten("Knopf auf der Seite"))
         if self.command == "POST" and pfad == "/api/ablauf":
             return self._json(200, {"schritte": ablauf.plan(data if isinstance(data, dict) else {})})
@@ -267,7 +325,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'self'; media-src 'self' blob:; object-src 'none'")
+        # connect-src: der PCM-Sidecar läuft auf einem eigenen Loopback-Port (ws://127.0.0.1:<port>/pcm).
+        self.send_header("Content-Security-Policy", "default-src 'self' https: data:; media-src 'self' https: data: blob:; "
+                         "connect-src 'self' https: ws://127.0.0.1:*; object-src 'none'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -327,13 +387,33 @@ class Handler(BaseHTTPRequestHandler):
                 laenge -= len(block)
 
 
+class SirensHTTPServer(ThreadingHTTPServer):
+    def server_close(self):
+        try:
+            sessions = getattr(getattr(self, "app", None), "rt_sessions", None)
+            if sessions is not None:
+                sessions.close()
+        finally:
+            super().server_close()
+
+
 def make_server(cfg, port=None):
     """Server anlegen (noch nicht gestartet). Jede Bind-Adresse außer 127.0.0.1 wird abgelehnt."""
     if cfg.host != LOOPBACK:
         raise Ablehnung("invalid_bind", f"Der Dienst bindet nur an {LOOPBACK}, nicht an „{cfg.host}“.", "host")
-    server = ThreadingHTTPServer((LOOPBACK, cfg.port if port is None else port), Handler)
+    server = SirensHTTPServer((LOOPBACK, cfg.port if port is None else port), Handler)
     server.daemon_threads = True
     server.app = App(cfg)
+    if cfg.rt_enabled:
+        # Dieselbe GPU-Instanz wie die regulären RT-Routen, auch bei Claude zuerst.
+        from .realtime.gpu_manager import ManagedClaudeStarter
+        from .realtime.routes import service
+        app = server.app
+        app.cuda_admission = threading.RLock()
+        context = SimpleNamespace(app=app, _erlaubte_hosts=lambda: {
+            f"127.0.0.1:{server.server_port}", f"localhost:{server.server_port}"})
+        app.rt_gpu_provider = lambda: service(context).gpu
+        app.starter = ManagedClaudeStarter(cfg, app.rt_gpu_provider, app.cuda_admission)
     server.app.katalog.scan_im_hintergrund()
     return server
 

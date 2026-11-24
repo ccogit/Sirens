@@ -1,0 +1,30 @@
+{
+  "os": {
+    "system": "Windows",
+    "release": "10"
+  },
+  "python": "3.11.9",
+  "node": "24.20.0",
+  "ffmpeg": "9.0.2",
+  "gpus": [
+    {
+      "driver": "621.24",
+      "name": "NVIDIA GeForce RTX 5080",
+      "vram_total_mib": 16303,
+      "vram_free_mib": 14900
+    }
+  ],
+  "wsl": true,
+  "disk": {
+    "drive": "C:",
+    "free_bytes": 1104718897152
+  },
+  "git": {
+    "sha": "e3f22c72a88340c6404ec26269853991b9ebd530",
+    "clean": true
+  },
+  "audio_device": null,
+  "notes": [
+    "Audio-Gerät und Treiber separat am Zielrechner erfassen (nicht gemessen)"
+  ]
+}

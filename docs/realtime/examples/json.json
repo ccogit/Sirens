@@ -1,0 +1,357 @@
+{
+  "schemas": {
+    "no_body": {
+      "valid": null,
+      "invalid": {}
+    },
+    "empty": {
+      "valid": {},
+      "invalid": null
+    },
+    "capability": {
+      "valid": {
+        "id": "mock",
+        "mock": true,
+        "available": true,
+        "mode": "offline",
+        "sample_rates": [
+          48000
+        ],
+        "channels": 2,
+        "context_frames": 0,
+        "hop_frames": 256,
+        "latency_frames": 0,
+        "controls": [
+          {
+            "name": "gain",
+            "min": 0,
+            "max": 2,
+            "default": 1
+          },
+          {
+            "name": "delay_frames",
+            "min": 0,
+            "max": 48000,
+            "default": 0
+          }
+        ],
+        "vram_peak_bytes": "unknown",
+        "device": "cpu",
+        "license": "repository",
+        "model_revision": "mock-v1"
+      },
+      "invalid": null
+    },
+    "capabilities": {
+      "valid": {
+        "protocol_version": 1,
+        "capabilities": [
+          {
+            "id": "mock",
+            "mock": true,
+            "available": true,
+            "mode": "offline",
+            "sample_rates": [
+              48000
+            ],
+            "channels": 2,
+            "context_frames": 0,
+            "hop_frames": 256,
+            "latency_frames": 0,
+            "controls": [
+              {
+                "name": "gain",
+                "min": 0,
+                "max": 2,
+                "default": 1
+              },
+              {
+                "name": "delay_frames",
+                "min": 0,
+                "max": 48000,
+                "default": 0
+              }
+            ],
+            "vram_peak_bytes": "unknown",
+            "device": "cpu",
+            "license": "repository",
+            "model_revision": "mock-v1"
+          }
+        ]
+      },
+      "invalid": null
+    },
+    "session_create": {
+      "valid": {
+        "capability_id": "mock",
+        "sample_rate": 48000
+      },
+      "invalid": null
+    },
+    "session": {
+      "valid": {
+        "id": "11111111111111111111111111111111",
+        "state": "created",
+        "epoch": 0,
+        "seq": null,
+        "capability_id": "mock",
+        "sample_rate": 48000,
+        "job_id": null
+      },
+      "invalid": null
+    },
+    "command": {
+      "valid": {
+        "command": "load",
+        "epoch": 0,
+        "seq": 0,
+        "args": {
+          "asset_id": "33333333333333333333333333333333"
+        }
+      },
+      "invalid": null
+    },
+    "job": {
+      "valid": {
+        "id": "22222222222222222222222222222222",
+        "session_id": "11111111111111111111111111111111",
+        "state": "queued",
+        "progress": 0,
+        "asset_id": null,
+        "error": null
+      },
+      "invalid": null
+    },
+    "asset": {
+      "valid": {
+        "id": "33333333333333333333333333333333",
+        "kind": "source",
+        "sample_rate": 48000,
+        "channels": 2,
+        "nframes": 256
+      },
+      "invalid": null
+    },
+    "error": {
+      "valid": {
+        "error": "unavailable",
+        "meldung": "Echtzeit-Funktion nicht verfügbar.",
+        "feld": null
+      },
+      "invalid": null
+    },
+    "beatgrid": {
+      "valid": {
+        "bpm": 120,
+        "beat0": 0,
+        "bar0": 0,
+        "confidence": 1
+      },
+      "invalid": null
+    },
+    "telemetry": {
+      "valid": {
+        "available": false,
+        "device": null,
+        "vram_total_bytes": null,
+        "vram_used_bytes": null,
+        "compute_percent": null,
+        "temperature_c": null,
+        "queue_depth": 0,
+        "deadline_misses": 0,
+        "underruns": 0
+      },
+      "invalid": null
+    }
+  },
+  "http": [
+    {
+      "method": "GET",
+      "path": "/api/rt/v1/capabilities",
+      "request_schema": "no_body",
+      "request": null,
+      "response_schema": "capabilities",
+      "status": 200,
+      "response": {
+        "protocol_version": 1,
+        "capabilities": [
+          {
+            "id": "mock",
+            "mock": true,
+            "available": true,
+            "mode": "offline",
+            "sample_rates": [
+              48000
+            ],
+            "channels": 2,
+            "context_frames": 0,
+            "hop_frames": 256,
+            "latency_frames": 0,
+            "controls": [
+              {
+                "name": "gain",
+                "min": 0,
+                "max": 2,
+                "default": 1
+              },
+              {
+                "name": "delay_frames",
+                "min": 0,
+                "max": 48000,
+                "default": 0
+              }
+            ],
+            "vram_peak_bytes": "unknown",
+            "device": "cpu",
+            "license": "repository",
+            "model_revision": "mock-v1"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/rt/v1/gpu",
+      "request_schema": "no_body",
+      "request": null,
+      "response_schema": "telemetry",
+      "status": 200,
+      "response": {
+        "available": false,
+        "device": null,
+        "vram_total_bytes": null,
+        "vram_used_bytes": null,
+        "compute_percent": null,
+        "temperature_c": null,
+        "queue_depth": 0,
+        "deadline_misses": 0,
+        "underruns": 0
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rt/v1/sessions",
+      "request_schema": "session_create",
+      "request": {
+        "capability_id": "mock",
+        "sample_rate": 48000
+      },
+      "response_schema": "session",
+      "status": 201,
+      "response": {
+        "id": "11111111111111111111111111111111",
+        "state": "created",
+        "epoch": 0,
+        "seq": null,
+        "capability_id": "mock",
+        "sample_rate": 48000,
+        "job_id": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/rt/v1/sessions/11111111111111111111111111111111",
+      "request_schema": "no_body",
+      "request": null,
+      "response_schema": "session",
+      "status": 200,
+      "response": {
+        "id": "11111111111111111111111111111111",
+        "state": "created",
+        "epoch": 0,
+        "seq": null,
+        "capability_id": "mock",
+        "sample_rate": 48000,
+        "job_id": null
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rt/v1/sessions/11111111111111111111111111111111/commands",
+      "request_schema": "command",
+      "request": {
+        "command": "load",
+        "epoch": 0,
+        "seq": 0,
+        "args": {
+          "asset_id": "33333333333333333333333333333333"
+        }
+      },
+      "response_schema": "session",
+      "status": 200,
+      "response": {
+        "id": "11111111111111111111111111111111",
+        "state": "loading",
+        "epoch": 0,
+        "seq": 0,
+        "capability_id": "mock",
+        "sample_rate": 48000,
+        "job_id": "22222222222222222222222222222222"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rt/v1/sessions/11111111111111111111111111111111/close",
+      "request_schema": "empty",
+      "request": {},
+      "response_schema": "session",
+      "status": 200,
+      "response": {
+        "id": "11111111111111111111111111111111",
+        "state": "closed",
+        "epoch": 1,
+        "seq": null,
+        "capability_id": "mock",
+        "sample_rate": 48000,
+        "job_id": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/rt/v1/jobs/22222222222222222222222222222222",
+      "request_schema": "no_body",
+      "request": null,
+      "response_schema": "job",
+      "status": 200,
+      "response": {
+        "id": "22222222222222222222222222222222",
+        "session_id": "11111111111111111111111111111111",
+        "state": "queued",
+        "progress": 0,
+        "asset_id": null,
+        "error": null
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rt/v1/jobs/22222222222222222222222222222222/cancel",
+      "request_schema": "empty",
+      "request": {},
+      "response_schema": "job",
+      "status": 200,
+      "response": {
+        "id": "22222222222222222222222222222222",
+        "session_id": "11111111111111111111111111111111",
+        "state": "cancelled",
+        "progress": 0,
+        "asset_id": null,
+        "error": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/rt/v1/assets/33333333333333333333333333333333",
+      "request_schema": "no_body",
+      "request": null,
+      "response_schema": "asset",
+      "status": 200,
+      "response": {
+        "id": "33333333333333333333333333333333",
+        "kind": "source",
+        "sample_rate": 48000,
+        "channels": 2,
+        "nframes": 256
+      }
+    }
+  ]
+}

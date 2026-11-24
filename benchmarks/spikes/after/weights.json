@@ -1,0 +1,13 @@
+{
+  "models": [
+    {
+      "filename": "after-audio-to-audio.ts",
+      "url": "https://nubo.ircam.fr/index.php/s/8NFD5gWwbkT4G5P",
+      "size_bytes": null,
+      "sha256": null,
+      "license": "Ungeklärt: separate Gewichtslizenz vor Bezug bestätigen; Code CC-BY-NC-4.0",
+      "approved": false,
+      "note": "Lokaler vertrauenswürdiger vollständiger v2 Audio-to-Audio-Export erforderlich, kein reiner Codec; Share nicht auslesbar, Dateiname lokaler Zielname."
+    }
+  ]
+}
