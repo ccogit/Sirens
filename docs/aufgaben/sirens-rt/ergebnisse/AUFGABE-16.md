@@ -39,7 +39,9 @@ CPU-Parameter-Replay. Kein MediaRecorder, keine Fremdbibliotheken.
    Lauf 45453374006 (ac2fb2a): **grün**, 115 Tests, OK (skipped=4),
    einschließlich aller Recorder-Python-Tests und des rekursiven Node-Laufs.
    Anschließend Integration 329db19 und Audio-Kern 8b58186 erneut gemergt;
-   Lauf 45453507588 für diesen Stand gestartet. Kein lokaler Checkout:
+   Lauf 45453507588 (2337180): **grün**, 116 Tests, OK (skipped=4),
+   alle Recorder-Tests und Node-Lauf erfolgreich. Nachfolgend ausschließlich
+   Dokumentation des Prüfbelegs. Kein lokaler Checkout:
    git ls-remote scheiterte mit "Could not resolve host: github.com".
    Board und Register nicht eigenständig bearbeitet.
 
@@ -65,10 +67,8 @@ Eigene WP16-Dateien entfernen bzw. eigene Commits revertieren; keine
 Abhängigkeits-Merge-Commits zurückrollen. Keine Aktivierung ohne Hook.
 Exportdaten im separaten Aufnahmeordner bleiben erhalten.
 
-## Übergabe
+## Einbau durch WP06 und Koordinator
 
-Fertig: eigenständige Module, CPU-/Node-Tests, Hook und zwei Messskripte gepusht.
-Offen: CI-Nachweis des letzten Abhängigkeits-Merges, Produktions-Session/HTTP-Einbau
-und Hardwaremessung. Nächster Schritt: letzte PR-CI prüfen, Hook durch WP06
- einbauen und Soak am Zielrechner ausführen.
-Fehlerausgaben: siehe CI-Läufe oben; lokales Git: Could not resolve host: github.com.
+Eigenständige Module, CPU-/Node-Tests, Hook und zwei Messskripte gepusht.
+Nächste Schritte außerhalb dieser Kette: Hook durch WP06 einbauen und Soak
+am Zielrechner ausführen. Fehlerausgaben und korrigierte CI-Läufe siehe oben.
