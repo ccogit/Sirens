@@ -29,6 +29,12 @@ export function katalogEintraege(daten) {
   return alle;
 }
 
+// Verwendet die bestehende Drosselung (Auflösung und Bildrate), ohne
+// einen zweiten Renderer anzulegen. Ohne RT-Profil unveränderte Legacy-Regel.
+export function visualGpuDrosseln(producing, profile) {
+  return Boolean(producing || profile === "Neural" || profile === "Eco" || profile === "Training/Render");
+}
+
 export function liveLabAnsicht(el) {
   const engine = new LiveAudio();
   let beendet = false, modus = "cosmic", katalogTimer = null, produktionLaeuft = false;
@@ -159,7 +165,8 @@ export function liveLabAnsicht(el) {
   const kick = kickTausch();
   const stems = stemSpiel(() => produktionLaeuft);
   const kisten = {};
-  const rt = createLabShell();
+  let rtProfile = null;
+  const rt = createLabShell({onProfile: profile => {rtProfile = profile;}});
   const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"], ["stems", "🎚 KI Stem Studio & Warp Stage"], ["rt", "RTX Neural Lab"]].map(([key, label]) =>
     h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
   function waehlen(key) {
@@ -224,7 +231,8 @@ export function liveLabAnsicht(el) {
   window.addEventListener("keydown", removeKeyboard);
   // Bestehenden Sirens-Player nicht gleichzeitig überlagern.
   document.getElementById("player-audio")?.pause();
-  const stopVisual = visualisieren(canvas, hud, () => engine.analyser, () => modus, () => produktionLaeuft);
+  const stopVisual = visualisieren(canvas, hud, () => engine.analyser, () => modus,
+    () => visualGpuDrosseln(produktionLaeuft, rtProfile));
 
   async function katalogLaden() {
     if (beendet) return;

@@ -64,7 +64,9 @@ class Workers(unittest.TestCase):
             self.supervisor.request("load", {"path": "../model"})
         with self.assertRaises(Ablehnung):
             WorkerSupervisor(self.registry, "../mock")
-        self.assertEqual(ModelRegistry(env={}, mock_enabled=False).capabilities(), [])
+        # Ohne Interpreter-Einstellungen ist kein Worker verfügbar und kein Mock gelistet.
+        self.assertTrue(all(not c["mock"] and not c["available"]
+                            for c in ModelRegistry(env={}, mock_enabled=False).capabilities()))
         other = WorkerSupervisor(self.registry, "mock")
         self.addCleanup(other.close)
         with self.assertRaises(Ablehnung):
