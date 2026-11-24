@@ -37,8 +37,8 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
 | KETTE-43 | Welle 4: Produktintegration Teil 2 | 26 | KETTE-41 gemergt | gemergt |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
-| KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 gemergt | offen |
-| KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | offen |
+| KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 gemergt | vergeben (24.11.2026) |
+| KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | vergeben (24.11.2026) |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt, Gate G4 bestanden, Freigabe des Repo-Eigentümers | gesperrt (wartet auf G4 und Freigabe) |
 
