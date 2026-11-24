@@ -48,7 +48,10 @@ class ContractTests(unittest.TestCase):
                     c.safe_path(tmp, path)
             self.assertEqual(c.safe_path(tmp, "assets/x.wav"), Path(tmp).resolve() / "assets/x.wav")
             root = Path(tmp)
-            (root / "link").symlink_to(root / "missing")
+            try:
+                (root / "link").symlink_to(root / "missing")
+            except OSError:  # Windows ohne Symlink-Recht (WinError 1314)
+                self.skipTest("Symlinks nicht erlaubt")
             with self.assertRaises(c.ContractError):
                 c.safe_path(root, "link/x")
 
