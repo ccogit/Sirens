@@ -217,7 +217,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
         try{
           recorder=await Recorder.attach(core,
             async(start,bytes)=>(await api.recordBlock(current,record.id,start,bytes)).next_frame,
-            async()=>{const result=await api.recordClose(current,record.id);recorded.push(...result.assets);});
+            async()=>{const result=await api.recordClose(current,record.id);recorded.push(...result.assets.map(item=>item.id));});
           recorder.start();
         }catch(e){await api.recordClose(current,record.id).catch(()=>{});throw e;}
         inform();
@@ -281,6 +281,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const play=btn("Abspielen / Pause"), stop=btn("Stop"), panic=btn("Panic · stumm / Dry"),
       bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten"), exportButton=btn("Sitzungsdatei exportieren");
     const exportInfo=h("p",{role:"status"},"Aufnahmen werden getrennt vom Musikordner gespeichert.");
+    const pad=btn("Mock-Pad · Gain ½");
     const range=(label,min,max,value,step=1)=>h("input",{type:"range","aria-label":label,min,max,value:String(value),step});
     const wet=range("Dry/Wet",0,100,0), gain=range("Mock Gain",0,2,1,0.01);
     const wetValue=h("output",{},"0 %"), gainValue=h("output",{},"1");
@@ -299,7 +300,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
           h("p",{},"RoFormer · Offline: freigegeben für G1, produktiver Jobpfad noch nicht installiert / angebunden."),
           h("ul",{},unavailableTools.map(name=>h("li",{},name+" · nicht installiert / nicht freigegeben"))))),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
-      h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record,exportButton),exportInfo,
+      h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record,exportButton,pad),exportInfo,
         label("Quellframe (48 kHz im Mock)",seek),seekButton,label("Dry/Wet",wet),wetValue,label("Gain (Mock)",gain),gainValue,
         h("p",{},"Tastatur: Leertaste = Transport, Esc = Panic, B = Bypass, A = A/B. MIDI-Zuordnung vorbereitet; kein Gerät verbunden.")),
       h("details",{},h("summary",{},"Installationshilfe"),h("p",{},
@@ -314,7 +315,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const enabled=state.enabled && Boolean(song.value) && !busy && !!controller;
       for(const b of buttons)b.disabled=!enabled;
       // Panic darf während eines ausstehenden Befehls angefordert werden.
-      panic.disabled=!controller || !state.enabled;
+      panic.disabled=!controller;
+      stop.disabled=!controller;
       song.disabled=!entries.length && !mock;
       model.disabled=!song.value || song.value==="fixture";
       stem.disabled=model.disabled || stem.options.length<=1;
@@ -327,6 +329,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const detail=controller?.detail;
       record.disabled=!enabled||!detail||controller.state!=="playing";
       record.textContent=detail?.recording?"Aufnahme stoppen":"Aufnahme starten";
+      pad.disabled=!enabled||controller?.state!=="playing";
       exportButton.disabled=!enabled||!controller?.export||!!detail?.recording||!["ready","playing","paused"].includes(controller?.state);
       exportInfo.textContent=(detail?.recorded??0)+" Aufnahmesegmente · "+(detail?.lastExport?"Sitzungsdatei gespeichert: "+detail.lastExport:"noch kein Sitzungsexport")+" · kein vollständiges Replay";
       beatInfo.textContent=detail?.grid?"BeatGrid vorhanden (Quantisierung noch gesperrt)":"BeatGrid: unsicher / nicht verfügbar";
@@ -424,6 +427,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     };
     const on=(el,event,fn)=>resources.listen(el,event,fn);
     on(search,"input",fillSongs);
+    on(pad,"click",()=>{if(controller?.state!=="playing")return;preset={...preset,gain:0.5,wet:100,bypass:false};run(apply);paint();});
     on(exportButton,"click",()=>{controller?.export?.(preset).then(paint).catch(e=>{if(active){exportInfo.textContent=e.message;}});});
     on(record,"click",()=>{controller?.record?.().then(paint).catch(e=>{if(active){error=e;paint();}});});
     on(play,"click",actions.transport);on(panic,"click",actions.panic);on(bypass,"click",actions.bypass);on(ab,"click",actions.ab);
