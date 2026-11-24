@@ -29,7 +29,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
 | KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, KETTE-14 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, KETTE-15 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
-| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | offen |
 | KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, KETTE-16 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
 | KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | vergeben (24.11.2026) |
@@ -49,8 +49,8 @@ Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. St
 | Engpass | Wer | Schaltet frei | Stand |
 |---|---|---|---|
 | G1 RoFormer messen | Claude | KETTE-26 | erledigt: grün (offline) |
-| Hugging-Face-Zugang SAM Audio, Stable Audio 3 | Nutzer | Messung → KETTE-27, KETTE-35 | Token angelegt, Anmeldung lokal offen |
-| G1 SAM Audio, Stable Audio 3 messen | Claude | KETTE-27, KETTE-35 | wartet auf Zugang; Umgebungen vorab anlegen |
+| Hugging-Face-Zugang SAM Audio, Stable Audio 3 | Nutzer | Messung → KETTE-27, KETTE-35 | Stable Audio: erledigt; SAM: Freigabe durch Meta ausstehend (403) |
+| G1 SAM Audio, Stable Audio 3 messen | Claude | KETTE-27, KETTE-35 | Stable Audio: grün (lookahead); SAM wartet auf Zugang |
 | Messpfade DEMON, RAVE/AFTER, Magenta | Externe | Messung → KETTE-33, 34, 36 | KETTE-14, 15, 16 |
 | G1 DEMON, RAVE/AFTER, Magenta messen | Claude | KETTE-33, 34, 36 | nach KETTE-14/15/16; Magenta braucht vermutlich WSL2 |
 | C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
