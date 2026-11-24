@@ -149,7 +149,7 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
     h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
-      titel, soundcloudSymbol(song), status), soundcloudZahlen(song),
+      titel, soundcloudSymbol(song), soundcloudZahlen(song), status),
       profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
     fassung, aktionen);
 }

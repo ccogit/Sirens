@@ -199,3 +199,5 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .library-sc-glyph { display: inline-flex; justify-content: center; width: .95rem; font-size: .88rem; line-height: 1; color: var(--akzent); }
 .library-sc-glyph.likes_count { color: #e787a1; }
 .library-sc-metric.leer .library-sc-glyph { color: inherit; }
+
+.library-song-heading > .library-sc-numbers { margin: 0 0 0 .2rem; }
