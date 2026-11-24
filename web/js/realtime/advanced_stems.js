@@ -156,7 +156,7 @@ export function createSeparationApi(fetcher = globalThis.fetch) {
 // Einbaupunkt für die Lab Shell; kein Start bei Mount, nur auf Klick.
 // Die Shell liefert die aktuelle Katalogauswahl und optional ihren Player.
 export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
-        api = createSeparationApi()} = {}) {
+        api = createSeparationApi(), canStart = () => true} = {}) {
     const doc = host.ownerDocument, panel = doc.createElement("section");
     const heading = doc.createElement("h3"); heading.textContent = "Advanced Stem Studio · Offline";
     const model = doc.createElement("select");
@@ -182,7 +182,8 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
         b.addEventListener("click", fn); return b;
     };
     const error = e => { if (active) status.textContent = e.message || "Dateijob fehlgeschlagen"; };
-    const idle = () => { running = false; start.disabled = false; cancel.disabled = true; };
+    const paint = () => { start.disabled = running || !canStart(model.value); cancel.disabled = !current; };
+    const idle = () => { running = false; paint(); };
     const cancelJob = async () => {
         if (!current) return;
         const id = current;
@@ -241,7 +242,7 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
         finally { if (job.id === current) { current = null; idle(); } }
     };
     const start = button("Offline trennen", async () => {
-        if (!active || running) return;
+        if (!active || running || !canStart(model.value)) return;
         const path = selectedPath?.();
         if (!path || path === "fixture") { status.textContent = "Zuerst einen Song auswählen"; return; }
         clearMix(); running = true; start.disabled = true; status.textContent = "Job wird angelegt";
@@ -253,9 +254,13 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
         } catch (e) { error(e); if (active) idle(); }
     });
     const cancel = button("Abbrechen", cancelJob); cancel.disabled = true;
-    panel.append(heading, note, model, start, cancel, status, preview, mixer); host.append(panel);
-    return () => {
+    model.addEventListener("change", paint);
+    panel.append(heading, note, model, start, cancel, status, ...(onMix ? [] : [preview]), mixer); host.append(panel);
+    paint();
+    const destroy = () => {
         active = false; clearTimeout(timer); clearMix(); panel.remove();
-        if (current) void cancelJob();
+        if (current) return cancelJob();
     };
+    destroy.paint = paint;
+    return destroy;
 }
