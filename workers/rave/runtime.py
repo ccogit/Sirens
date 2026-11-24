@@ -15,7 +15,13 @@ class Unavailable(Exception):
 
 
 def descriptor(directory):
-    return json.loads((Path(directory) / "manifest.json").read_text(encoding="utf-8"))["capability"]
+    directory = Path(directory)
+    path = directory / "manifest.json"
+    pending = not path.is_file()
+    cap = json.loads((directory / "manifest.pending.json" if pending else path).read_text(encoding="utf-8"))["capability"]
+    if pending:
+        cap["available"] = False
+    return cap
 
 
 def preset(cap, values):
@@ -65,7 +71,7 @@ class Adapter:
                 raise Unavailable("Gate nicht freigegeben")
             try:
                 self.model = self.factory()
-            except (OSError, ImportError, ValueError, RuntimeError) as exc:
+            except (OSError, ImportError, ValueError, RuntimeError, TypeError, KeyError, AttributeError) as exc:
                 raise Unavailable("Modell nicht installiert oder nicht verifiziert") from exc
             self.params = params
             self.cancelled.clear()
@@ -97,7 +103,7 @@ def serve(adapter):
     """IPC v1. Während Inferenz bleiben Heartbeat und Cancel erreichbar."""
     inp, out = sys.stdin.buffer, sys.stdout.buffer
     write_lock, done = threading.Lock(), threading.Event()
-    active = None
+    busy = threading.Event()
 
     def send(kind, rid, payload, audio=b""):
         raw = json.dumps(dict(version=1, type=kind, request_id=rid, payload=payload),
@@ -120,12 +126,16 @@ def serve(adapter):
                 raise ValueError("Ausgabeblock zu groß")
             with adapter.lock:
                 adapter.check()
+                busy.clear()
                 send("result", rid, {"audio_bytes": len(raw)}, raw)
         except Unavailable:
+            busy.clear()
             send("error", rid, {"code": "unavailable"})
         except (ValueError, TypeError, struct.error):
+            busy.clear()
             send("error", rid, {"code": "invalid"})
         except Exception:
+            busy.clear()
             send("error", rid, {"code": "unavailable"})
 
     threading.Thread(target=heartbeat, daemon=True).start()
@@ -153,11 +163,11 @@ def serve(adapter):
                 audio = inp.read(size)
                 if len(audio) != size:
                     break
-                if set(payload) != {"audio_bytes"} or (active and active.is_alive()):
+                if set(payload) != {"audio_bytes"} or busy.is_set():
                     send("error", rid, {"code": "unavailable"})
                     continue
-                active = threading.Thread(target=process, args=(rid, audio), daemon=True)
-                active.start()
+                busy.set()
+                threading.Thread(target=process, args=(rid, audio), daemon=True).start()
                 continue
             try:
                 if kind != "load" and payload:
@@ -169,7 +179,7 @@ def serve(adapter):
                     result = adapter.probe()
                 elif kind == "health":
                     result = adapter.health()
-                elif active and active.is_alive():
+                elif busy.is_set():
                     raise Unavailable("Inferenz läuft")
                 elif kind == "load":
                     result = adapter.load(**payload)

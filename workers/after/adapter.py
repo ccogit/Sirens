@@ -12,17 +12,22 @@ CHUNK = 2048
 
 def factory(device="cuda"):
     from benchmarks.spikes.after.messen import verify_local
+    if Path(sys.prefix).name != ".venv-spike-after":
+        raise Unavailable("Isolierte AFTER-Umgebung fehlt")
     directory = Path(sys.prefix) / "weights"
     path = directory / "after-audio-to-audio.ts"
     receipt = json.loads((directory / "local-weight.json").read_text(encoding="utf-8"))
-    if not isinstance(receipt.get("sha256"), str) or not isinstance(receipt.get("license"), str):
+    if not isinstance(receipt.get("sha256"), str) or not isinstance(receipt.get("license"), str) or not receipt["license"].strip():
         raise ValueError("Gewichtsquittung fehlt")
     verify_local(SimpleNamespace(model=path, sha256=receipt["sha256"]))
     import torch
     if device == "cuda" and not torch.cuda.is_available():
         raise Unavailable("CUDA fehlt")
     # Pro Job neu laden: zustandsbehaftete Encoder dürfen Presets nicht verändern.
-    return TorchAfter(lambda: torch.jit.load(str(path), map_location=device).eval(), torch, device)
+    def loader():
+        verify_local(SimpleNamespace(model=path, sha256=receipt["sha256"]))
+        return torch.jit.load(str(path), map_location=device).eval()
+    return TorchAfter(loader, torch, device)
 
 
 class TorchAfter:
@@ -76,6 +81,12 @@ class AfterAdapter(Adapter):
 
     def health(self):
         return {**super().health(), "frames": self.model.frames if self.model else 0}
+
+    def warmup(self):
+        with self.lock:
+            self.check()
+            zero = [0.0] * (self.model.frames*2)
+            self.transform(zero, zero)
 
     def transform(self, structure, timbre):
         with self.lock:

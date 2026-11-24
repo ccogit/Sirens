@@ -2,6 +2,11 @@
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import subprocess
+import sys
+import json
+import struct
+import tempfile
 
 from sirens.realtime.model_registry import ModelRegistry
 from workers.rave.adapter import RaveAdapter, FRAMES
@@ -28,13 +33,17 @@ class AfterModel:
 
 class NeuralMutationTest(unittest.TestCase):
     def test_registry_gated(self):
-        registry = ModelRegistry()
-        caps = {cap["id"]: cap for cap in registry.capabilities()}
-        for name in ("rave", "after"):
-            self.assertIn(name, caps)
-            self.assertFalse(caps[name]["available"])
-            self.assertFalse(caps[name]["mock"])
-            self.assertNotEqual(caps[name]["mode"], "streaming")
+        # Alt-Registry erwartet ohne Mock weiterhin keine Einträge.
+        # Die beiden Deskriptoren sind bis zum Integrationshook explizit pending.
+        registry = ModelRegistry(env={}, mock_enabled=False)
+        from sirens.realtime.schemas import validate
+        for cls in (RaveAdapter, AfterAdapter):
+            cap = cls().probe()
+            validate("capability", cap)
+            self.assertNotIn(cap["id"], [item["id"] for item in registry.capabilities()])
+            self.assertFalse(cap["available"])
+            self.assertFalse(cap["mock"])
+            self.assertNotEqual(cap["mode"], "streaming")
 
     def test_rave_lifecycle_and_preset(self):
         adapter = RaveAdapter(RaveModel, allow_unmeasured=True)
@@ -83,3 +92,29 @@ class NeuralMutationTest(unittest.TestCase):
                 cls(missing).load()
             with self.assertRaises(ValueError):
                 cls(missing, allow_unmeasured=True).load(seed=0.5)
+
+    def test_real_factory_missing_weights(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for cls, name in ((RaveAdapter, "rave"), (AfterAdapter, "after")):
+                with patch("sys.prefix", str(Path(tmp) / (".venv-spike-"+name))):
+                    with self.assertRaises(Unavailable):
+                        cls(allow_unmeasured=True).load()
+
+    def test_ipc_unavailable_without_gate(self):
+        root = Path(__file__).resolve().parents[2]
+        def frame(kind):
+            data = json.dumps({"version": 1, "type": kind, "request_id": kind,
+                               "payload": {}}).encode()
+            return struct.pack("<I", len(data)) + data
+        for name in ("rave", "after"):
+            result = subprocess.run([sys.executable, "-u", str(root / "workers" / name / "worker.py")],
+                                    input=frame("probe")+frame("load"), capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            raw, messages = result.stdout, {}
+            while raw:
+                n, = struct.unpack("<I", raw[:4])
+                message = json.loads(raw[4:4+n])
+                raw = raw[4+n:]
+                messages[message["request_id"]] = message
+            self.assertFalse(messages["probe"]["payload"]["available"])
+            self.assertEqual(messages["load"]["payload"]["code"], "unavailable")

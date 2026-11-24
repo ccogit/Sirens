@@ -12,6 +12,8 @@ def factory(device="cuda"):
     # Kein Import oder Download beim Probe; ausschließlich lokal geprüfter Export.
     from benchmarks.spikes.rave.install import manifest, verify
     item = manifest()
+    if Path(sys.prefix).name != ".venv-spike-rave":
+        raise Unavailable("Isolierte RAVE-Umgebung fehlt")
     directory = Path(sys.prefix) / "weights"
     path = directory / item["filename"]
     verify(path, item)
@@ -27,9 +29,12 @@ def factory(device="cuda"):
 class TorchRave:
     def __init__(self, model, torch, device):
         self.model, self.torch, self.device = model, torch, device
+        self.block_index = 0
 
     def transform(self, samples, params):
         torch = self.torch
+        torch.manual_seed((params["seed"] + self.block_index) % (2**63))
+        self.block_index += 1
         with torch.inference_mode():
             x = torch.tensor(samples, device=self.device).reshape(-1, 2).mean(1).reshape(1, 1, -1)
             z = self.model.encode(x)
@@ -47,6 +52,15 @@ class TorchRave:
 class RaveAdapter(Adapter):
     def __init__(self, factory=factory, **kw):
         super().__init__(HERE, factory, **kw)
+
+    def warmup(self):
+        with self.lock:
+            self.check()
+            self.model.transform([0.0]*(FRAMES*2), self.params)
+            self.check()
+            # Causal-Caches dürfen nicht von der Aufwärmprobe in den Song reichen.
+            params = dict(self.params)
+            self.load(**params)
 
     def process(self, samples, *, controls=None):
         with self.lock:
