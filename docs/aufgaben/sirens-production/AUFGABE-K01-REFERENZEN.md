@@ -8,3 +8,5 @@ Lies PLAN.md, CONTRACT.md, KETTEN.md. Branch/Datei-Ownership laut Register; PR a
 Abnahme: Fixtures mit widersprüchlichen Bewertungen, Dubletten, fehlenden Metadaten, unbewerteten Songs, Holdout ohne Familienleak; lokaler Inventurbericht ohne private Daten in Git. Echte Lieblingssongs automatisch gefunden oder fehlende Verfügbarkeit explizit.
 
 Ergebnisbericht: ergebnisse/K01.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
+
+Ableton: Eigene vorhandene, bereits im Katalog registrierte Ableton-Fassungen als Referenz berücksichtigen, sofern Herkunft erkennbar; kein automatisches Scannen beliebiger Live-Projekte oder Templates. Manuelle Returns sind neue Versionen derselben Songfamilie; keine Holdout-Leaks.

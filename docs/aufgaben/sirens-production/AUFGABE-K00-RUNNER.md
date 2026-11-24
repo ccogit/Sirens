@@ -8,3 +8,6 @@ Lies PLAN.md, CONTRACT.md, KETTEN.md. Branch/Datei-Ownership laut Register; PR a
 Abnahme: Mock-CI, reale Jobkette, negative Pfad-/Schema-/Crash-/Cancel-/Lease-Tests, zwei unterschiedliche Seeds, Teilerneuerung ohne Änderung alter Runs. G0/G2; G3 separat.
 
 Ergebnisbericht: ergebnisse/K00.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
+
+## Ableton und Einfachheit
+K07-Adapter aus CONTRACT.md in CLI/Jobstatus integrieren; keine zusätzliche DAW-Engine im Runner. Ein Klick „Song erstellen“ orchestriert Preview/Prüfung/Vollsong ohne Pflicht-Zwischenschritte. Host/Referenzen automatisch. Ableton-Probe, Export und bestätigter Return als neue Revision; niemals fremdes Live-Set verändern. Bei unavailable unabhängig rendern. Exklusive Live-Job-Sperre und vorhandene GPU-Leases. Gemeinsam mit K06 End-to-End-Test der drei einfachen Nutzeraktionen; bestehende Nachlauf-Ableton-Funktion unverändert.

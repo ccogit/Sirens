@@ -8,3 +8,5 @@ Lies PLAN.md, CONTRACT.md, KETTEN.md. Branch/Datei-Ownership laut Register; PR a
 Abnahme: Offline-Mock-Tests, mindestens drei reale Klangbausteine und ein vollständiger Spoken-Cue auf Zielhardware oder dokumentierter Blocker; WAV-/Hash-/Lizenzprüfung, keine ungewollte Cloud. G1.
 
 Ergebnisbericht: ergebnisse/K04.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
+
+Ableton: Assets als einzeln austauschbare, lizenzierte WAV-Dateien mit stabilen IDs liefern; K07 kann sie ohne Modellinstallation in Live nutzbar machen. Keine Live-spezifische Parallelentwicklung.

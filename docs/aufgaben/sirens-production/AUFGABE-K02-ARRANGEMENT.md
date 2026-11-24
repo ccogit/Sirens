@@ -8,3 +8,5 @@ Lies PLAN.md, CONTRACT.md, KETTEN.md. Branch/Datei-Ownership laut Register; PR a
 Abnahme: Validierung, taktgenaue Events/Automation, keine abgeschnittenen Lyrics, reproduzierbarer Plan und Varianten, Render mit K3/K4 nach Integration; musikalische Qualität per G1/G3, nicht nur Testpass.
 
 Ergebnisbericht: ergebnisse/K02.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
+
+Ableton: stabile Trackrollen, MIDI-Events, Locator-Abschnitte und Automation so planen, dass K07 sie ohne Neuinterpretation exportieren kann. Semantische Patches statt Ableton-spezifischer Pfade; vorhandene Live-Instrumente bevorzugen, wenn K07 sie nachgewiesen hat. Die Nutzerentscheidung bleibt musikalisch (Klartext), nie technisch.

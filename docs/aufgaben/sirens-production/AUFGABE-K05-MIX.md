@@ -8,3 +8,5 @@ Lies PLAN.md, CONTRACT.md, KETTEN.md. Branch/Datei-Ownership laut Register; PR a
 Abnahme: künstliche Impuls-/Sinus-Stems, Länge/Alignment, keine NaN/Clipping, Mono-Sub und Peak-Test, realer 30–60-s-Groove und Vollsong; lautheitsangepasster Vergleich mit Referenz, tatsächlicher Hörbericht.
 
 Ergebnisbericht: ergebnisse/K05.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
+
+Ableton: vorhandene verifizierte Rack-/Effektketten optional via K07 nutzen, sofern automatisierbar. Premaster, Master und trockene bzw. tatsächlich verarbeitete Spuren klar unterscheiden; kein doppeltes Mastering bei Ableton-Return. Stereo-Return als neue Variante analysieren, keine erfundenen Stems. Benutzer muss keine Effekte wählen.

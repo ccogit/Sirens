@@ -29,6 +29,16 @@ stems.json (K3, kombiniert durch K0 mit K4-Assets): {"schema_version":1,"sample_
 
 K5 liest stems.json + plan.mix und schreibt mix.wav (Premaster), master.wav und mix_report.json (Pegel, Einstellungen, Headroom, Effekte, measured true peak, LUFS, LRA, Warnungen). K6 liest alle Manifeste, erzeugt report.json mit technical:{}, music:{}, production:{}, gates:{}, missing:[], provenance:{}, listening:{blind_pairs:[], results:[]}; keine subjektiven Scores ohne tatsächliches Hörurteil. K0 führt status.json: queued/running/succeeded/failed/cancelled, stage, progress nullable, error nullable, timestamps; atomar schreiben, Recovery und Abbruch. Erst erfolgreiche validierte Run-Ausgabe als fertig kennzeichnen. Ausgeführte Befehle/Versionen/Seeds, GPU-/CPU-Zeit und Warnungen loggen, keine Secrets.
 
+## Ableton-Austausch (K07, optionaler Backendpfad, obligatorischer Exportvertrag)
+
+Keine Änderung am Songplan oder Stem-Zeitformat. K07 erzeugt unter eigenem versioniertem Exportverzeichnis:
+- ableton.json: schema_version, run_id, export_id, bpm, meter, ppq, sample_rate, frames, sections:[{id,start_bar,bars,label}], tracks:[{track_id,role,audio_file,midi_file|null,patch,automation_file|null,sha256}], reference_mix, project_file:null|relative .als, mode:"set"|"import_bundle", capabilities:{live_version:null|string,edition:null|string,max_for_live:null|boolean,open_set:boolean,render:boolean,reason:null|string}, warnings:[].
+- audio/ WAVs ab Sample 0, 48k/24bit, MIDI/ Typ-1-SMF (pro Instrument oder klar benannter Multitrack-MIDI, Tempo/Meter, absolute Position und 960 PPQ), sections.json/CSV, automation.json, kurze IMPORT.md für Fallback, optional tatsächliches .als mit Medienkopie. Kein unbestätigtes Set als fertig melden. Ein Track nutzt entweder MIDI-Instrument oder Audiofallback bei Playback, nicht beides übereinander. Warp aus/verifiziert, Tempo und Cue-Anker bei 1.1.1. Fehlt ein Device, bleibt Audiofallback. Rechte/Provenienz beibehalten, keine Plugin-Binaries/Lizenzdaten kopieren.
+- return/<export_id>/ als isolierter Eingang: return.json (schema_version, export_id, parent_run_id, master_file, optional stems[], optional midi[], optional project_file, notes), stabile abgeschlossene WAVs mit Hashes; Nutzer bestätigt Zuordnung. Validate relative Pfade, Länge und Sample-Rate, keine symlinks/Traversal, atomare Kopie in neuen Run mit parent_run_id und source="ableton_return"; Original und exportiertes Set unverändert. Abweichende Dauer/Tempo als Nutzeränderung protokollieren statt still korrigieren. Keine weitere Masteringstufe standardmäßig; optional als neuer Schritt. Stereo-only Return als solcher kennzeichnen. Wenn Benutzer nur Lives Exportdialog nutzen kann, K07 legt return.json aus eindeutig zugeordnetem Ordner nach Stabilitätsprüfung an, kein manuelles JSON nötig.
+- Optionale Renderadapter-Schnittstelle (K07 implementiert nur nach Spike): probe() → Capabilities, render(plan, asset_manifest, isolated_project, out_dir) → vorhandener stems.json-Vertrag + backend/revision/provenance. Keine Behauptung, Live habe eine dokumentierte Headless-Render-API. K03 entscheidet gemeinsam mit K0 anhand probe; falls unavailable, eigener Host. K05 kann bei echten Live-Render-Ergebnissen deren Mix übernehmen, keine doppelte Effekt-/Masteringkette. Exklusive Live-Session/Lock und bestehende GPU-Regeln.
+- Kein Live-Start/Close/Save fremder Sets, kein automatischer Zugriff auf beliebige Nutzerprojekte. Live-Version/Edition, Max-for-Live/Plugin-Verfügbarkeit tatsächlich prüfen, unbekannt bleibt null. Kein eigener generischer GUI-Automator.
+
+
 ## Aufrufe (Ziel-CLI, noch nicht implementiert)
 
 python -m sirens.production inventory
@@ -39,8 +49,13 @@ python -m sirens.production inspect --run <id>
 python -m sirens.production revise --run <id> --plan <file> 
 python -m sirens.production benchmark --manifest <file>
 python -m sirens.production export --run <id> --destination <approved-root-relative-path>
+python -m sirens.production ableton probe
+python -m sirens.production ableton export --run <id>
+python -m sirens.production ableton import --export <id> --confirm
+
+Diese Ableton-Kommandos sind intern; UI bietet nur „In Ableton öffnen“ / „Ableton-Fassung übernehmen“. Ein Standard-Render funktioniert ohne Ableton. 
 
 Agent erhält JSON-Bericht aus CLI und schreibt neuen validierten Plan. revise erzeugt neue Run-ID; Cache nur bei identischem Input+Backend+Version+Seed. Kein GPU-Job ohne Lease / explizite Nutzeraktion. Signal-Room nutzt später exakt denselben Runner, keine zweite Implementierung. Mock-Backend nur für Tests, klar gekennzeichnet.
 
 ## Tests
-A0 erstellt Beispiel-Fixtures und Validatoren. K1–K6 dürfen bis dahin eigene lokale Minimal-Fixtures aus diesen Beispielen nutzen, keine konkurrierenden Änderungen am gemeinsamen Contract. Tests mit temporären Verzeichnissen, stummen/Impuls-WAVs, künstlichen Bewertungen und ohne Netzwerk, Plugins oder GPU. 
+A0 erstellt Beispiel-Fixtures und Validatoren. K1–K7 dürfen bis dahin eigene lokale Minimal-Fixtures aus diesen Beispielen nutzen, keine konkurrierenden Änderungen am gemeinsamen Contract. Tests mit temporären Verzeichnissen, stummen/Impuls-WAVs, künstlichen Bewertungen und ohne Netzwerk, Plugins oder GPU. 

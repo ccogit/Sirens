@@ -34,3 +34,5 @@ Cracked-open heart.
 A sober view.
 
 Outro ~5 s: dawn, lamp clicks off, groove stops. 
+
+Ableton-Qualitätstest: Kick/Sub/gear bass/Boje/Mandoline/Cello/Atmosphäre/Sprache als ausgerichtete Einzelspuren, MIDI für spielbare Instrumente, 126 BPM, Locators für Chorus/Verse/Bridge/Interludes. Standardrender ohne Live-Bedienung, optional editierbares Set oder Importpaket. Teste eine eigene Mix-/Arrangementänderung in Live und bestätigte Rückübernahme als neue Version. Keine manuelle Änderung für Standardproduktion voraussetzen.
