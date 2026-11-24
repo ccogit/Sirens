@@ -132,9 +132,28 @@ class MixingTests(unittest.TestCase):
             for variant in ("master", "reference"):
                 self.assertLessEqual(comparison[variant]["true_peak_dbtp"], -1)
             before = (first / "master.wav").read_bytes()
-            same = mix(second_plan, second_stems, second)
-            self.assertEqual(before, (second / "master.wav").read_bytes())
-            self.assertEqual(same["measured"], report["measured"])
+            version = report["dependencies"]["ffmpeg"]
+            self.assertTrue(version.startswith("ffmpeg version"), version)
+            # Complete (non-truncated) K05 graph, measured with FFmpeg 7.1.5.
+            # A deterministic but incomplete sidechain must not pass merely
+            # because its hashes agree. This fixture ends mid-1024-sample block.
+            self.assertAlmostEqual(report["measured"]["lufs"], -12.01,
+                                   delta=.1, msg=version)
+            self.assertAlmostEqual(report["measured"]["true_peak_dbtp"], -4.18,
+                                   delta=.1, msg=version)
+            for repeat in range(5):
+                with self.subTest(repeat=repeat + 1, ffmpeg=version):
+                    if repeat:
+                        second = Path(tmp) / f"repeat-{repeat}"
+                        second.mkdir()
+                        second_plan, second_stems = fixture(second)
+                    same = mix(second_plan, second_stems, second)
+                    for name in ("dry.wav", "mix.wav", "master.wav"):
+                        expected = hashlib.sha256((first / name).read_bytes()).hexdigest()
+                        actual = hashlib.sha256((second / name).read_bytes()).hexdigest()
+                        self.assertEqual(expected, actual, f"{name}: {version}")
+                    self.assertEqual(same["measured"], report["measured"], version)
+                    self.assertEqual(same["dependencies"]["ffmpeg"], version)
             third = Path(tmp) / "third"
             third.mkdir()
             revised_plan, revised_stems = fixture(third)

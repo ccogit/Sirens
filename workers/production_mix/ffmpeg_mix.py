@@ -125,6 +125,14 @@ def render_graph(exe, paths, settings, frames, destination, *, dry=False):
                 filters += [f"equalizer=f={s['eq_hz']}:t=q:w=1:g={s['eq_db']}"]
             if s["sub"] or s["kick"]:
                 filters += ["pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"]
+            # PCM24 mono/stereo decoding can yield different frame lengths.
+            # sidechaincompress may forward EOF while the other input still
+            # has queued samples. Align both sides (including the last block)
+            # before the kick split, so neither side gets ahead at EOF.
+            # Padding is after the track DSP; the existing final atrim removes
+            # it. Keep all original gains, filters, sends and quantization.
+            if kick is not None and bass and (i == kick or i in bass):
+                filters.append("asetnsamples=n=1024:p=1")
         graph.append(f"[{i}:a]" + ",".join(filters) + f"[{label}]")
     if not dry and kick is not None and bass:
         graph.append(f"[track{kick}]asplit={len(bass)+1}[kickmain]" +
