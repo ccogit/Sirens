@@ -48,6 +48,9 @@ class GPU29(unittest.TestCase):
             lease = gpu.acquire(GIB, Priority.AUDIO, lambda: False, user_action=True)
             self.assertFalse(starter.starten()["laeuft"])
             self.assertTrue(starter.zustand()["letzter"]["fehler"])
+            with self.assertRaises(Ablehnung) as exc:
+                starter.starten(raise_busy=True)
+            self.assertEqual(exc.exception.code, "busy_gpu")
             gpu.release(lease)
             self.assertTrue(starter.starten()["laeuft"])
             first = gpu.leases[0]
