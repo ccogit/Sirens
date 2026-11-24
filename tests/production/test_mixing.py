@@ -66,7 +66,7 @@ class MixingTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("ffmpeg"), "local ffmpeg required")
     def test_mix_sinus_and_impulse(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(prefix="mix Umlaute ä ") as tmp:
             root = Path(tmp)
             plan, stems = fixture(root)
             report = mix(plan, stems, root)
@@ -167,4 +167,27 @@ class MixingTests(unittest.TestCase):
                 run_mix(plan, stems, root, ffmpeg=sys.executable,
                         worker_python=root / "missing-python")
             self.assertFalse((root / "master.wav").exists())
+            self.assertFalse(list(root.glob(".mix-*")))
+
+
+    def test_cancel_worker_no_publication(self):
+        class Cancelled(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, stems = fixture(root, with_bass=False)
+            calls = 0
+
+            def cancelled():
+                nonlocal calls
+                calls += 1
+                if calls >= 2:
+                    raise Cancelled()
+
+            with self.assertRaises(Cancelled):
+                mix(plan, stems, root, cancelled, ffmpeg=sys.executable)
+            self.assertGreaterEqual(calls, 2)
+            self.assertFalse((root / "master.wav").exists())
+            self.assertFalse((root / "mix_report.json").exists())
             self.assertFalse(list(root.glob(".mix-*")))

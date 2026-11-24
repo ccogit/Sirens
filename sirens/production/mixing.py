@@ -85,7 +85,7 @@ def _run_worker(work, payload, worker_python, cancelled):
     cancelled()
     deadline = time.monotonic() + 3600
     with (work / "worker.log").open("wb") as log:
-        with subprocess.Popen([str(python), str(script), str(job)],
+        with subprocess.Popen([str(python), "-X", "utf8", str(script), str(job)],
                               stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                               shell=False) as child:
             try:
@@ -120,6 +120,7 @@ def mix(plan, stems, root, cancelled=lambda: None, *, ffmpeg=None,
 
     Writes new outputs only; revise in a new run, never modify an earlier run.
     AMM Mode C is optional and only called for an explicit target loudness.
+    worker_python is trusted configuration, not a plan parameter; no in-process fallback.
     """
     from .contracts import (safe_path, validate_plan, validate_stems, validate_wav,
                             validate_mix_report, sha256_file)
@@ -136,7 +137,7 @@ def mix(plan, stems, root, cancelled=lambda: None, *, ffmpeg=None,
     if target is not None:
         _number(target, -35, -5, "target_lufs")
     settings = _settings(plan, stems)
-    exe = ffmpeg or shutil.which("ffmpeg")
+    exe = shutil.which(str(ffmpeg) if ffmpeg is not None else "ffmpeg")
     if not exe:
         raise RuntimeError("ffmpeg not installed")
     exe = str(Path(exe).resolve(strict=True))
@@ -188,7 +189,7 @@ def analyze_return(path, *, ffmpeg=None, worker_python=None, cancelled=lambda: N
     from .contracts import validate_wav, validate_mix_report
     path = Path(path).resolve(strict=True)
     validate_wav(path, channels=2)
-    exe = ffmpeg or shutil.which("ffmpeg")
+    exe = shutil.which(str(ffmpeg) if ffmpeg is not None else "ffmpeg")
     if not exe:
         raise RuntimeError("ffmpeg not installed")
     with tempfile.TemporaryDirectory(prefix="sirens-mix-measure-") as tmp:

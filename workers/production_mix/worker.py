@@ -59,6 +59,7 @@ def run_mix(job, work, cancelled):
     master_source = work / "mix.wav"
     method = "ffmpeg static peak-constrained gain"
     if amm_python is not None and target is not None:
+        cancelled()
         candidate = work / "amm.wav"
         completed = subprocess.run(
             [str(Path(amm_python).absolute()), "-m", "mastering_engine.cli",
@@ -66,6 +67,7 @@ def run_mix(job, work, cancelled):
              "--true-peak", str(ceiling), "--output-format", "wav",
              "--out", str(candidate)], cwd=Path(amm_root).resolve(strict=True),
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
+        cancelled()
         if completed.returncode:
             raise RuntimeError("AMM mastering failed: " + completed.stderr[-1500:])
         # AMM may emit extensible PCM24 (not readable by wave on 3.11).
@@ -146,6 +148,7 @@ def main():
         if (work / "cancel").exists():
             raise RuntimeError("mix job cancelled")
 
+    audio.cancel_check = cancelled
     cancelled()
     if job["operation"] == "mix":
         result = run_mix(job, work, cancelled)
