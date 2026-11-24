@@ -11,8 +11,8 @@ export function filterTools(tools, { query="", filter="all", favorites=[], recen
   const terms = norm(query).trim().split(/\s+/).filter(Boolean);
   const list = tools.filter(t => {
     const matchesFilter = filter === "all" || (filter === "favorites" ? favorites.includes(t.id) :
-      filter === "recent" ? recent.includes(t.id) : filter === "group:"+t.gruppe);
-    const haystack = norm([t.titel,t.kurz,t.gruppe,t.sub,t.kategorie,t.slogan,t.text,t.voraussetzung,...(t.tags||[])].join(" "));
+      filter === "recent" ? recent.includes(t.id) : filter === "experimental" ? Boolean(t.experimental) : filter === "group:"+t.gruppe);
+    const haystack = norm([t.titel,t.kurz,t.gruppe,t.sub,t.kategorie,t.slogan,t.text,t.voraussetzung,t.experimental?"Experimental":"",...(t.tags||[])].join(" "));
     return matchesFilter && terms.every(term=>haystack.includes(term));
   });
   if (filter === "recent") list.sort((a,b)=>recent.indexOf(a.id)-recent.indexOf(b.id));
