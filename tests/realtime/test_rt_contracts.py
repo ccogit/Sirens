@@ -103,7 +103,16 @@ class Contracts(unittest.TestCase):
                 else:
                     continue
                 for name in names:
-                    self.assertIn(name.split(".")[0], sys.stdlib_module_names | {"sirens"}, str(path))
+                    module = name.split(".")[0]
+                    # Unveränderter Kick-DSP ist ein eigenständiges CLI im Bestand,
+                    # kein Import im Hauptprozess. Nur seine drei Altimporte erlauben.
+                    if path == ROOT / "sirens/kick_dsp.py" and module in {"numpy", "scipy", "soundfile"}:
+                        continue
+                    self.assertIn(module, sys.stdlib_module_names | {"sirens"}, str(path))
+                    self.assertNotIn(name, {"sirens.kick_dsp", "kick_dsp"}, str(path))
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertNotEqual(node.module, "kick_dsp", str(path))
+                    self.assertNotIn("kick_dsp", [alias.name for alias in node.names], str(path))
 
 class PCM(unittest.TestCase):
     def test_fixtures_and_roundtrip(self):
