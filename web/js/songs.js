@@ -129,7 +129,17 @@ const filterFelder = [
   ["wertung", "Bewertung", ["Positiv", "Bewertet", "Ohne Bewertung"]],
   ["sc", "SoundCloud", ["Öffentlich zugeordnet", "Privat", "Keine Zuordnung"]],
   ["cover", "Songcover", ["Mit Cover", "Ohne Cover"]],
+  ["lyrics", "Lyrics", ["Lokal vorhanden", "Lokal nicht zugeordnet"]],
+  ["tempo", "Tempo", ["Unter 100 BPM", "100–119 BPM", "120–139 BPM", "140 BPM und mehr", "Nicht belegt"]],
 ];
+
+function tempoGruppe(bpm) {
+  if (!bpm) return "Nicht belegt";
+  if (bpm < 100) return "Unter 100 BPM";
+  if (bpm < 120) return "100–119 BPM";
+  if (bpm < 140) return "120–139 BPM";
+  return "140 BPM und mehr";
+}
 
 function songMerkmale(release, song) {
   const soundcloud = song.soundcloud || [];
@@ -143,6 +153,8 @@ function songMerkmale(release, song) {
     wertung: scores.length ? (scores.some(score => score > 0) ? ["Positiv", "Bewertet"] : ["Bewertet"]) : ["Ohne Bewertung"],
     sc: [song.kurzprofil?.soundcloud_status || "Keine Zuordnung"],
     cover: [song.cover ? "Mit Cover" : "Ohne Cover"],
+    lyrics: [song.lyrics_vorhanden ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
+    tempo: [tempoGruppe(song.kurzprofil?.tempo_bpm)],
   };
 }
 
