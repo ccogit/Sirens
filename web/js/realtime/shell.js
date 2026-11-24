@@ -11,27 +11,36 @@ import { createResources, keyAction, DEFAULT_PRESET, readPresets, savePreset, no
 
 // Der Mock akzeptiert ausschließlich sein synthetisches Asset. Keine Katalogpfade als RT-IDs.
 export function createSessionController(api) {
-  let session=null, tail=Promise.resolve(), closed=false;
+  let session=null, tail=Promise.resolve(), closed=false, generation=0;
   const enqueue = fn => {
     const result=tail.then(fn);
     tail=result.catch(()=>{});
     return result;
   };
-  const command = async (name,args={}) => {
+  const cancelled=Symbol("Sitzung gestoppt");
+  const command = async (current,name,args={}) => {
+    if (closed || current!==generation) throw cancelled;
     session=await api.command(session,name,args);
+    if (closed || current!==generation) throw cancelled;
     return session;
   };
   return {
     get state() { return session?.state || "created"; },
-    run(fn) { return enqueue(async()=>{
-      if (closed) return;
-      if (!session) {
-        session=await api.create("mock");
-        if (!closed) await command("load",{asset_id:MOCK_ASSET});
-      }
-      if (!closed) return fn(command,()=>session.state);
-    }); },
-    reset() { return enqueue(async()=>{ if(session) { await api.close(session); session=null; } }); },
+    run(fn) {
+      const current=generation;
+      return enqueue(async()=>{
+        if (closed || current!==generation) return;
+        const send=(name,args)=>command(current,name,args);
+        try {
+          if (!session) {
+            session=await api.create("mock");
+            await send("load",{asset_id:MOCK_ASSET});
+          }
+          return await fn(send,()=>session.state);
+        } catch(e) { if(e!==cancelled) throw e; }
+      });
+    },
+    reset() { generation++; return enqueue(async()=>{ if(session) { await api.close(session); session=null; } }); },
     destroy() {
       closed=true;
       return enqueue(async()=>{ if(session) { await api.close(session); session=null; } });
@@ -176,9 +185,14 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
       }
     }finally{pumping=false;}
   }
-  async function command(name,args={}){
+  const cancelled=Symbol("Sitzung gestoppt");
+  async function command(current,name,args={}){
+    if(closed||current!==generation)throw cancelled;
     const before=session;
     session=await api.command(session,name,args);
+    // Die HTTP-Antwort bleibt für Close erhalten, darf nach Panic aber
+    // weder eine lokale Wiedergabe starten noch weitere Befehle auslösen.
+    if(closed||current!==generation)throw cancelled;
     if(timeline.length<4096)timeline.push({frame:Math.max(timeline.at(-1)?.frame??0,core.frame()),command:{command:name,args:{...args},epoch:before.epoch,seq:before.seq===null?0:before.seq+1}});
     else historyFull=true;
     if(name==="play")begin(source);
@@ -202,30 +216,42 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
         try{
           await initialize();
           if(closed||current!==generation)return;
-          await fn(command,()=>session.state);
-        }catch(e){fault=e;silence();await cleanup().catch(()=>{});throw e;}
+          await fn((name,args)=>command(current,name,args),()=>session.state);
+        }catch(e){
+          if(e===cancelled||closed||current!==generation)return;
+          fault=e;silence();await cleanup().catch(()=>{});throw e;
+        }
       });
     },
     mix(value){mix=value;core?.param(1,{mix:fallback?0:mix,bypass});},
     silence,
     record(){
+      const currentGeneration=generation;
       return enqueue(async()=>{
+        if(closed||currentGeneration!==generation)return;
         if(recorder){await stopRecorder();return;}
         if(!session||!core||session.state!=="playing")throw new Error("Zuerst Testaudio abspielen");
         const current=session;
         const record=await api.record(current,"mock",core.rate);
         try{
+          if(closed||currentGeneration!==generation){
+            await api.recordClose(current,record.id);
+            return;
+          }
           recorder=await Recorder.attach(core,
             async(start,bytes)=>(await api.recordBlock(current,record.id,start,bytes)).next_frame,
             async()=>{const result=await api.recordClose(current,record.id);recorded.push(...result.assets.map(item=>item.id));});
+          if(closed||currentGeneration!==generation){await stopRecorder();return;}
           recorder.start();
         }catch(e){await api.recordClose(current,record.id).catch(()=>{});throw e;}
         inform();
       });
     },
     export(preset){
+      const current=generation;
       return enqueue(async()=>{
-        if(closed||!session||!asset||!core)throw new Error("Zuerst eine Quelle laden");
+        if(closed||current!==generation)return;
+        if(!session||!asset||!core)throw new Error("Zuerst eine Quelle laden");
         if(recorder)throw new Error("Zuerst Aufnahme stoppen");
         if(historyFull)throw new Error("Befehlsverlauf zu lang; neue Sitzung beginnen");
         const info=await api.exportSource(session);
