@@ -15,9 +15,9 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | gemergt |
 | KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | gemergt |
 | KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | gemergt |
-| KETTE-14 | Welle 1: Messpfad DEMON | 22 | KETTE-13 gemergt | offen |
-| KETTE-15 | Welle 1: Messpfad RAVE und AFTER | 23 | KETTE-13 gemergt | offen |
-| KETTE-16 | Welle 1: Messpfad Magenta RealTime | 24 | KETTE-13 gemergt | offen |
+| KETTE-14 | Welle 1: Messpfad DEMON | 22 | KETTE-13 gemergt | vergeben (24.11.2026) |
+| KETTE-15 | Welle 1: Messpfad RAVE und AFTER | 23 | KETTE-13 gemergt | vergeben (24.11.2026) |
+| KETTE-16 | Welle 1: Messpfad Magenta RealTime | 24 | KETTE-13 gemergt | vergeben (24.11.2026) |
 | KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | gemergt |
 | KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 gemergt | gemergt |
 | KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | gemergt |
