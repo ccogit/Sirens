@@ -18,12 +18,12 @@ Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinat
 | KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | gemergt |
 | KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | gemergt |
 | KETTE-P09 | Mix byte-reproduzierbar (Folge aus K05/K08) | K09 | – | gemergt |
-| KETTE-P10 | Instrument-Host unter Windows | 10 | – | offen |
-| KETTE-P11 | PCM24-Extensible und Sprache im Worker | 11 → 12 | – | offen |
-| KETTE-P12 | AMM-Export, Inventur, Benchmark-Messung | 13 → 14 → 15 | – | offen |
-| KETTE-P13 | Laufzeiten je Stufe | 16 | – | offen |
-| KETTE-P14 | Mix: Bass ist nicht Sub | 17 | – | offen |
-| KETTE-P15 | Preview-Plan aus Sprachdauern | 18 | – | offen |
+| KETTE-P10 | Instrument-Host unter Windows | 10 | – | vergeben (24.11.2026) |
+| KETTE-P11 | PCM24-Extensible und Sprache im Worker | 11 → 12 | – | vergeben (24.11.2026) |
+| KETTE-P12 | AMM-Export, Inventur, Benchmark-Messung | 13 → 14 → 15 | – | vergeben (24.11.2026) |
+| KETTE-P13 | Laufzeiten je Stufe | 16 | – | vergeben (24.11.2026) |
+| KETTE-P14 | Mix: Bass ist nicht Sub | 17 | – | vergeben (24.11.2026) |
+| KETTE-P15 | Preview-Plan aus Sprachdauern | 18 | – | vergeben (24.11.2026) |
 
 **Begriffe:** *Aufgabe* = Datei `AUFGABE-nn-….md` mit eigener Abnahme. *Kette* = eine oder mehrere Aufgaben in
 fester Reihenfolge, ein Branch, ein PR. Abhängigkeiten zwischen Aufgaben derselben Kette erledigt die Reihenfolge,
