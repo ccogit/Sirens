@@ -2,7 +2,7 @@
 import threading
 
 from ..contracts import Ablehnung
-from .contracts import error, invalid
+from .contracts import error, invalid, uint
 from .model_registry import ModelRegistry
 from .sessions import Sessions
 from .telemetry import read_gpu
@@ -18,7 +18,28 @@ def service(handler):
         return app.rt_sessions
 
 
+def recording_block(handler):
+    try:
+        length = int(handler.headers.get("Content-Length", "0"))
+    except ValueError:
+        length = 0
+    if (handler.headers.get("Transfer-Encoding") is not None
+            or handler.headers.get("Content-Type", "").lower() != "application/octet-stream"
+            or not 8 <= length <= 16384 or length % 8):
+        handler.close_connection = True
+        raise invalid("payload")
+    raw = handler.rfile.read(length)
+    if len(raw) != length:
+        handler.close_connection = True
+        raise invalid("payload")
+    return raw
+
+
 def dispatch(handler, path, body):
+    # Unbekannte oder abgelehnte PUTs dürfen keine ungelesenen Bytes für
+    # einen weiteren HTTP-Request auf derselben Verbindung hinterlassen.
+    if handler.command == "PUT":
+        handler.close_connection = True
     origin = handler.headers.get("Origin")
     if origin is not None and origin not in {f"http://{h}" for h in handler._erlaubte_hosts()}:
         raise Ablehnung("forbidden_origin", "Anfragen von fremden Seiten werden abgelehnt.", status=403)
@@ -45,6 +66,32 @@ def dispatch(handler, path, body):
     if len(parts) >= 2 and parts[0] == "sessions":
         s = service(handler).get(parts[1])
         tail = parts[2:]
+        recorder = s.manager.recordings
+        if tail and tail[0] == "recordings":
+            with s.lock:
+                sid = s.data["id"]
+                if method == "POST" and len(tail) == 1:
+                    if s.data["state"] not in ("ready", "playing", "paused"):
+                        raise error("unavailable")
+                    return handler._json(201, recorder.create(sid, body, s.data["sample_rate"]))
+                if len(tail) == 3 and tail[2] == "close" and method == "POST":
+                    if body != {}:
+                        raise invalid("body")
+                    return handler._json(200, recorder.close(sid, tail[1]))
+                if len(tail) == 4 and tail[2] == "blocks" and method == "PUT":
+                    if s.data["state"] not in ("ready", "playing", "paused"):
+                        raise error("unavailable")
+                    with recorder.lock:
+                        recorder._get(sid, tail[1])
+                    if not tail[3].isascii() or not tail[3].isdigit() or len(tail[3]) > 16:
+                        raise invalid("start_frame")
+                    start = uint(int(tail[3]), "start_frame")
+                    return handler._json(200, recorder.append(sid, tail[1], start, recording_block(handler)))
+        if tail and tail[0] == "exports":
+            if method == "POST" and len(tail) == 1:
+                return handler._json(201, recorder.export(s.data["id"], body))
+            if method == "GET" and len(tail) == 2:
+                return handler._json(200, recorder.load_export(s.data["id"], tail[1]))
         if method == "GET" and not tail:
             return handler._json(200, s.snapshot())
         if method == "POST" and tail == ["commands"]:
