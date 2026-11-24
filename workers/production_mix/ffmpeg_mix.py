@@ -111,7 +111,7 @@ def sum_filter(labels, output):
 def render_graph(exe, paths, settings, frames, destination, *, dry=False):
     graph, labels = [], []
     kick = next((i for i, s in enumerate(settings) if s["kick"]), None)
-    bass = [i for i, s in enumerate(settings) if s["sub"] and i != kick]
+    ducked = [i for i, s in enumerate(settings) if s["sidechain"] and not s["kick"]]
     for i, s in enumerate(settings):
         label = f"track{i}"
         pan = 0 if dry or s["sub"] or s["kick"] else s["pan"]
@@ -123,6 +123,8 @@ def render_graph(exe, paths, settings, frames, destination, *, dry=False):
             filters += [f"volume={s['gain_db']}dB", f"highpass=f={s['highpass_hz']}"]
             if s["eq_db"]:
                 filters += [f"equalizer=f={s['eq_hz']}:t=q:w=1:g={s['eq_db']}"]
+            if s["bass"]:
+                filters.append("acompressor=threshold=0.125:ratio=2:attack=20:release=100:makeup=1")
             if s["sub"] or s["kick"]:
                 filters += ["pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"]
             # PCM24 mono/stereo decoding can yield different frame lengths.
@@ -131,18 +133,18 @@ def render_graph(exe, paths, settings, frames, destination, *, dry=False):
             # before the kick split, so neither side gets ahead at EOF.
             # Padding is after the track DSP; the existing final atrim removes
             # it. Keep all original gains, filters, sends and quantization.
-            if kick is not None and bass and (i == kick or i in bass):
+            if kick is not None and ducked and (i == kick or i in ducked):
                 filters.append("asetnsamples=n=1024:p=1")
         graph.append(f"[{i}:a]" + ",".join(filters) + f"[{label}]")
-    if not dry and kick is not None and bass:
-        graph.append(f"[track{kick}]asplit={len(bass)+1}[kickmain]" +
-                     "".join(f"[key{i}]" for i in bass))
+    if not dry and kick is not None and ducked:
+        graph.append(f"[track{kick}]asplit={len(ducked)+1}[kickmain]" +
+                     "".join(f"[key{i}]" for i in ducked))
     for i, s in enumerate(settings):
         label = f"track{i}"
-        if not dry and kick is not None and bass:
+        if not dry and kick is not None and ducked:
             if i == kick:
                 label = "kickmain"
-            elif i in bass:
+            elif i in ducked:
                 graph.append(f"[{label}][key{i}]sidechaincompress=threshold=0.06:"
                              f"ratio=2:attack=5:release=110[duck{i}]")
                 label = f"duck{i}"
