@@ -3,6 +3,7 @@ import { api as catalogApi } from "../api.js";
 import { createRtApi, MOCK_ASSET } from "./api.js";
 import { AudioCore } from "./audio_core.js";
 import { Recorder } from "./recorder.js";
+import { filterCatalog, sessionExport, unavailableTools } from "./integration.js";
 import { createBeatGrid } from "./beat_grid.js";
 import { deriveState, modeLabel } from "./capabilities.js";
 import { gpuText, latencyText } from "./gpu_panel.js";
@@ -67,6 +68,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
   let session=null, core=null, asset=null, buffer=null, grid=null, recorder=null;
   let tail=Promise.resolve(), closed=false, generation=0, timer=null, pumping=false;
   let plan=null, source=0, mix=0, bypass=false, fallback=false, fault=null;
+  let recorded=[], timeline=[], lastExport=null, historyFull=false;
   const enqueue=fn=>{
     const result=tail.then(fn);
     tail=result.catch(()=>{});
@@ -93,7 +95,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     finally{
       const old=session;session=null;
       if(old)await api.close(old);
-      asset=null;buffer=null;grid=null;source=0;fallback=false;
+      asset=null;buffer=null;grid=null;source=0;fallback=false;recorded=[];timeline=[];lastExport=null;historyFull=false;
     }
   }
   async function initialize(){
@@ -103,8 +105,8 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     if(core.rate!==48000)throw new Error("Mock-Testmodus benötigt einen AudioContext mit 48 kHz");
     if(closed)throw new Error("Sitzung geschlossen");
     const selected=selection();
-    if(selected.stem)throw new Error("Stem-RT-Auflösung noch nicht freigegeben");
-    asset=selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
+    asset=selected.stem?await api.cachedStem(selected.path,selected.model,selected.stem):
+      selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
     session=await api.create("mock",core.rate);
     session=await api.command(session,"load",{asset_id:asset.id});
     const end=Date.now()+20000;
@@ -177,6 +179,8 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
   async function command(name,args={}){
     const before=session;
     session=await api.command(session,name,args);
+    if(timeline.length<4096)timeline.push({frame:Math.max(timeline.at(-1)?.frame??0,core.frame()),command:{command:name,args:{...args},epoch:before.epoch,seq:before.seq===null?0:before.seq+1}});
+    else historyFull=true;
     if(name==="play")begin(source);
     else if(name==="pause"){
       plan=null;source=Math.min(buffer.length,core.status?.source??source);core.pause();
@@ -190,7 +194,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
   }
   return {
     get state(){return session?.state||"created";},
-    get detail(){return {fallback,grid,recording:!!recorder,fault,underruns:core?.status?.streams?.[0]?.underruns};},
+    get detail(){return {fallback,grid,recording:!!recorder,recorded:recorded.length,lastExport,fault,underruns:core?.status?.streams?.[0]?.underruns};},
     run(fn){
       const current=generation;
       return enqueue(async()=>{
@@ -213,10 +217,22 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
         try{
           recorder=await Recorder.attach(core,
             async(start,bytes)=>(await api.recordBlock(current,record.id,start,bytes)).next_frame,
-            ()=>api.recordClose(current,record.id));
+            async()=>{const result=await api.recordClose(current,record.id);recorded.push(...result.assets.map(item=>item.id));});
           recorder.start();
         }catch(e){await api.recordClose(current,record.id).catch(()=>{});throw e;}
         inform();
+      });
+    },
+    export(preset){
+      return enqueue(async()=>{
+        if(closed||!session||!asset||!core)throw new Error("Zuerst eine Quelle laden");
+        if(recorder)throw new Error("Zuerst Aufnahme stoppen");
+        if(historyFull)throw new Error("Befehlsverlauf zu lang; neue Sitzung beginnen");
+        const info=await api.exportSource(session);
+        if(info.asset_id!==asset.id)throw new Error("Quelle gewechselt");
+        const data=sessionExport(info,core.rate,preset,recorded,timeline);
+        lastExport=(await api.exportSession(session,data)).id;
+        inform();return lastExport;
       });
     },
     reset(){
@@ -257,12 +273,15 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const beatInfo=h("p",{},"BeatGrid: unsicher");
     const select=(label,options=[])=>h("select",{"aria-label":label},options.map(([v,t])=>h("option",{value:v},t)));
     const song=select("Song",[["","Song auswählen"]]);
+    const search=h("input",{type:"search","aria-label":"Katalog durchsuchen",placeholder:"Titel, Künstler, Dateiname"});
     const model=select("Stem-Modell",[["htdemucs","Demucs · 4 Stems"],["htdemucs_6s","Demucs · 6 Stems"]]);
     const stem=select("Stem",[["","Original"]]);
     const capability=select("Fähigkeit");
     const btn=t=>h("button",{type:"button"},t);
     const play=btn("Abspielen / Pause"), stop=btn("Stop"), panic=btn("Panic · stumm / Dry"),
-      bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten");
+      bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten"), exportButton=btn("Sitzungsdatei exportieren");
+    const exportInfo=h("p",{role:"status"},"Aufnahmen werden getrennt vom Musikordner gespeichert.");
+    const pad=btn("Mock-Pad · Gain ½");
     const range=(label,min,max,value,step=1)=>h("input",{type:"range","aria-label":label,min,max,value:String(value),step});
     const wet=range("Dry/Wet",0,100,0), gain=range("Mock Gain",0,2,1,0.01);
     const wetValue=h("output",{},"0 %"), gainValue=h("output",{},"1");
@@ -273,13 +292,15 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const refresh=btn("Status erneut laden");
     root.replaceChildren(h("section",{class:"rt-shell","aria-label":"RTX Neural Lab"},
       h("h2",{},"RTX Neural Lab"),status,
-      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Stems noch nicht freigegeben."),
-      h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Song",song),
+      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Vorhandene Demucs-Cache-Stems (PCM16, 44,1/48 kHz) einzeln im Mock; keine neue Trennung."),
+      h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Suche",search),label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
-          h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh)),
+          h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh,
+          h("p",{},"RoFormer · Offline: freigegeben für G1, produktiver Jobpfad noch nicht installiert / angebunden."),
+          h("ul",{},unavailableTools.map(name=>h("li",{},name+" · nicht installiert / nicht freigegeben"))))),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
-      h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record),
+      h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record,exportButton,pad),exportInfo,
         label("Quellframe (48 kHz im Mock)",seek),seekButton,label("Dry/Wet",wet),wetValue,label("Gain (Mock)",gain),gainValue,
         h("p",{},"Tastatur: Leertaste = Transport, Esc = Panic, B = Bypass, A = A/B. MIDI-Zuordnung vorbereitet; kein Gerät verbunden.")),
       h("details",{},h("summary",{},"Installationshilfe"),h("p",{},
@@ -294,7 +315,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const enabled=state.enabled && Boolean(song.value) && !busy && !!controller;
       for(const b of buttons)b.disabled=!enabled;
       // Panic darf während eines ausstehenden Befehls angefordert werden.
-      panic.disabled=!controller || !state.enabled;
+      panic.disabled=!controller;
+      stop.disabled=!controller;
       song.disabled=!entries.length && !mock;
       model.disabled=!song.value || song.value==="fixture";
       stem.disabled=model.disabled || stem.options.length<=1;
@@ -307,6 +329,9 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const detail=controller?.detail;
       record.disabled=!enabled||!detail||controller.state!=="playing";
       record.textContent=detail?.recording?"Aufnahme stoppen":"Aufnahme starten";
+      pad.disabled=!enabled||controller?.state!=="playing";
+      exportButton.disabled=!enabled||!controller?.export||!!detail?.recording||!["ready","playing","paused"].includes(controller?.state);
+      exportInfo.textContent=(detail?.recorded??0)+" Aufnahmesegmente · "+(detail?.lastExport?"Sitzungsdatei gespeichert: "+detail.lastExport:"noch kein Sitzungsexport")+" · kein vollständiges Replay";
       beatInfo.textContent=detail?.grid?"BeatGrid vorhanden (Quantisierung noch gesperrt)":"BeatGrid: unsicher / nicht verfügbar";
       transport.textContent="Transport: "+(muted?"Panic / stumm":controller?.state || "bereit")+(detail?.fallback?" · Dry-Rückfall":"")+" · nicht gemessen"+(detail?.underruns===undefined?"":" · Underrun-Frames: "+detail.underruns)+(detail?.fault?" · "+detail.fault.message:"");
     }
@@ -314,7 +339,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const previous=song.value;
       song.replaceChildren(h("option",{value:""},"Song auswählen"));
       if(mock)song.append(h("option",{value:"fixture"},"Synthetisches Testsignal (Mock)"));
-      for(const e of entries)song.append(h("option",{value:e.path},e.label));
+      for(const e of filterCatalog(entries,search.value,previous))song.append(h("option",{value:e.path},e.label));
       if([...song.options].some(o=>o.value===previous))song.value=previous;
       paint();
     }
@@ -334,7 +359,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       try {
         const data=await catalog.stemStatus(song.value,model.value);
         if(!active || generation!==stemGeneration)return;
-        for(const name of Array.isArray(data?.stems)?data.stems:[])
+        for(const name of data?.zustand==="bereit" && Array.isArray(data?.stems)?data.stems:[])
           if(typeof name==="string")stem.append(h("option",{value:name},name));
       }catch{if(active && generation===stemGeneration)catalogStatus.textContent="Stem-Cache nicht verfügbar; Original wählbar.";}
       paint();
@@ -352,12 +377,12 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
           if(!active)return;
           mock=nextMock;client=mock&&mockFactory?mockFactory():remote;
           controller=mock?(mockFactory?createSessionController(client):createAudioSessionController(client,
-            ()=>({path:song.value,stem:stem.value}),{onStatus:paint})):null;
+            ()=>({path:song.value,stem:stem.value,model:model.value}),{onStatus:paint})):null;
           fillSongs();
         }
         caps=next;error=null;
         const previous=capability.value;
-        capability.replaceChildren(...caps.capabilities.map(c=>h("option",{value:c.id},c.id+" · "+modeLabel(c.mode)+(c.mock?" · Testmodus":"")+(c.available?"":" · gesperrt"))));
+        capability.replaceChildren(...caps.capabilities.map(c=>h("option",{value:c.id,disabled:!c.available},c.id+" · "+modeLabel(c.mode)+(c.mock?" · Testmodus":"")+(c.available?"":" · gesperrt"))));
         if(caps.capabilities.some(c=>c.id===previous))capability.value=previous;
         else if(mock)capability.value="mock";
         capsInfo.replaceChildren(...caps.capabilities.map(c=>h("li",{},c.id+": "+modeLabel(c.mode)+" · "+(c.available?"gemeldet verfügbar":"nicht freigegeben")+(c.mock?" · Testmodus":""))));
@@ -401,6 +426,9 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
         slot=next;preset=normalizePreset(old[next]);run(apply);paint();},
     };
     const on=(el,event,fn)=>resources.listen(el,event,fn);
+    on(search,"input",fillSongs);
+    on(pad,"click",()=>{if(controller?.state!=="playing")return;preset={...preset,gain:0.5,wet:100,bypass:false};run(apply);paint();});
+    on(exportButton,"click",()=>{controller?.export?.(preset).then(paint).catch(e=>{if(active){exportInfo.textContent=e.message;}});});
     on(record,"click",()=>{controller?.record?.().then(paint).catch(e=>{if(active){error=e;paint();}});});
     on(play,"click",actions.transport);on(panic,"click",actions.panic);on(bypass,"click",actions.bypass);on(ab,"click",actions.ab);
     on(stop,"click",()=>{controller?.reset().then(()=>{muted=false;paint();}).catch(e=>{if(active){error=e;paint();}});});
