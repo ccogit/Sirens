@@ -4,7 +4,7 @@ WP00 gemergt; Branch extern/KETTE-11, [PR #8](https://github.com/ccogit/Sirens/p
 
 ## Umsetzung
 
-Architektur, Protokoll, Adapter, Sicherheit und fünf ADRs in docs/realtime; 13 JSON-Schemas mit Beispielen für neun API-Adressen, zwei PCM-Hex-Referenzen; Python-Zustandsautomaten, Befehls- und Schema-Prüfung, Pfade, PCM-Codec, Gain/Delay-Mock; JS-PCM und UI-Mock. Schalter SIRENS_RT_ENABLED standardmäßig aus, optional SIRENS_RT_DIR und SIRENS_RT_MOCK. Einzige neue Weiche im bestehenden Server, nur GET capabilities implementiert, übrige RT-Adressen unavailable. Board nur WP01-Zeile. Keine echten Worker, kein Sidecar, keine Oberfläche.
+Architektur, Protokoll, Adapter, Sicherheit und fünf ADRs in docs/realtime; 13 JSON-Schemas mit Beispielen für neun API-Adressen, zwei PCM-Hex-Referenzen; Python-Zustandsautomaten, Befehls- und Schema-Prüfung, Pfade, PCM-Codec, Gain/Delay-Mock; JS-PCM und UI-Mock. Schalter SIRENS_RT_ENABLED standardmäßig aus, optional SIRENS_RT_DIR und SIRENS_RT_MOCK. Einzige neue Weiche im bestehenden Server, nur GET capabilities implementiert, übrige RT-Adressen unavailable. Die zunächst bearbeitete WP01-Board-Zeile ist nach der zwischenzeitlich gemergten Koordinatorregel (Board nur A0) auf den Integrationsstand zurückgesetzt. Keine echten Worker, kein Sidecar, keine Oberfläche.
 
 ## Abnahme
 
@@ -14,11 +14,11 @@ Architektur, Protokoll, Adapter, Sicherheit und fünf ADRs in docs/realtime; 13 
 | 2 | PCM.test_fixtures_and_roundtrip, PCM.test_invalid und rt_contracts.test.mjs: beidseitig identische Hex-Referenzen, BigInt, Fehlerfälle | erster Code-CI-Lauf bestanden |
 | 3 | Contracts.test_transitions, test_commands: alle Zustandspaare, alte Epoch und ungültige Befehle | erster Code-CI-Lauf bestanden |
 | 4 | HTTP.test_switch_and_security sowie unveränderte Bestandstests: 503/200, Schema, Origin/Host | erster Code-CI-Lauf bestanden |
-| 5 | Contracts.test_stdlib_imports_recursively: AST rekursiv, keine neuen Fremdimporte; Alt-DSP-Ausnahme siehe unten | korrigiert, erneute CI ausstehend |
+| 5 | Contracts.test_stdlib_imports_recursively: AST rekursiv, keine neuen Fremdimporte; Alt-Worker-Ausnahmen siehe unten | korrigiert, erneute CI ausstehend |
 | 6 | Mock.test_gain_delay: samplegenauer Gain/Delay über Blockgrenzen, Lifecycle und Determinismus | erster Code-CI-Lauf bestanden |
 | 7 | python -m unittest discover -s tests -v | erneute CI ausstehend |
 
-Erster Code-CI-Lauf [45452123740](https://github.com/ccogit/Sirens/actions/runs/45452123740), Head da8f1362: 101 Tests, 1 Fehler, 4 bestehende Skips. Fehler: test_stdlib_imports_recursively, AssertionError: numpy not found … sirens/kick_dsp.py. Kein neuer RT-Test außer diesem Importinventar fehlgeschlagen. Korrektur: Der unveränderte Kick-DSP ist ein eigenes CLI, das kicktausch.py per subprocess.run startet. Die vorhandenen Imports numpy, scipy, soundfile ausschließlich in diesem Modul sind explizit zugelassen; alle übrigen Fremdimporte sowie Hauptprozess-Imports dieses CLI bleiben verboten. Das strikte wörtliche Kriterium „kein Modul unter sirens/“ ist wegen des Altbestands nicht vollständig erfüllt; Verschiebung des Bestands-CLI wäre außerhalb WP01 und potenziell regressiv.
+Erster Code-CI-Lauf [45452123740](https://github.com/ccogit/Sirens/actions/runs/45452123740), Head da8f1362: 101 Tests, 1 Fehler, 4 bestehende Skips. Fehler: test_stdlib_imports_recursively, AssertionError: numpy not found … sirens/kick_dsp.py. Kein neuer RT-Test außer diesem Importinventar fehlgeschlagen. Zweiter Code-CI-Lauf [45452333368](https://github.com/ccogit/Sirens/actions/runs/45452333368), Head 05592a62: 101 Tests, 1 Fehler, 4 bestehende Skips. Fehler: AssertionError: basic_pitch not found … sirens/stem_transcribe.py. Korrektur: zwei unveränderte Bestands-CLIs: kick_dsp.py (numpy, scipy, soundfile) via kicktausch.py und stem_transcribe.py (basic_pitch) via stem_notes.py; beide werden ausschließlich als Unterprozess gestartet. Nur diese konkreten Altimporte sind zugelassen; alle übrigen Fremdimporte und Paketimporte dieser CLIs bleiben verboten. Das strikte wörtliche Kriterium „kein Modul unter sirens/“ ist wegen des Altbestands nicht vollständig erfüllt; Verschiebung der Bestands-CLIs wäre außerhalb WP01 und potenziell regressiv.
 
 ## Entscheidungen, Grenzen, Risiken
 
@@ -29,3 +29,7 @@ Erster Code-CI-Lauf [45452123740](https://github.com/ccogit/Sirens/actions/runs/
 - Rückbau: WP01-Aufgabencommits revertieren bzw. PR nicht mergen; Merge der Koordinatoränderungen nicht rückgängig machen. Schalter aus deaktiviert RT, keine persistierten Daten durch WP01.
 
 Nachstellen: python -m unittest discover -s tests -v; node --test tests/realtime/rt_contracts.test.mjs; Beispiele unter docs/realtime/examples.
+
+## Übergabe
+
+Fertig: WP01-Verträge, Mock, Schalter, Beispiele und Tests. Offen: A0 muss entscheiden, ob die unveränderten Bestands-CLIs als Unterprozess-Ausnahme zu Abnahme 5 akzeptiert oder separat aus sirens/ verschoben werden. Die Fehlerausgaben der beiden bisherigen CI-Läufe stehen oben. Nächster Schritt: letzte PR-CI prüfen und die Alt-Worker-Ausnahme beurteilen; keine Änderung am Bestand ohne Freigabe. Keine Hardwaremessung erforderlich.
