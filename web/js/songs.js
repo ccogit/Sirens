@@ -70,6 +70,30 @@ function profilAnsicht(profil, details, tagWaehlen) {
       felder.map(([name, wert]) => [h("dt", {}, name), h("dd", {}, wert)])));
 }
 
+const scZaehler = [
+  ["playback_count", "Plays"], ["likes_count", "Likes"], ["reposts_count", "Reposts"],
+  ["comment_count", "Kommentare"], ["download_count", "Downloads"],
+];
+const zahlenformat = new Intl.NumberFormat("de-DE");
+const datumsformat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+
+function soundcloudZahlen(song) {
+  const tracks = (song.soundcloud || []).filter(track => track.zahlen &&
+    scZaehler.some(([key]) => Number.isFinite(track.zahlen[key])));
+  if (!tracks.length) return null;
+  const zeile = track => {
+    const datum = new Date(track.zahlenstand || "");
+    const stand = Number.isFinite(datum.getTime()) ? "Stand " + datumsformat.format(datum) : "";
+    return h("div", { class: "library-sc-numbers", title: stand },
+      h("span", {}, tracks.length === 1 ? "SoundCloud" : track.title),
+      ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label]) =>
+        h("span", {}, h("strong", {}, zahlenformat.format(track.zahlen[key])), " " + label)));
+  };
+  if (tracks.length === 1) return zeile(tracks[0]);
+  return h("details", { class: "library-sc-versions" }, h("summary", {}, "SoundCloud-Zahlen · " + tracks.length + " Tracks"),
+    tracks.map(zeile));
+}
+
 function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
   const cover = song.cover || song.dateien.map(d => auftraege.get(d.pfad)?.song.cover).find(Boolean);
   const titel = h("strong", {}, song.titel);
@@ -110,7 +134,7 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
   return h("li", { class: "library-song" },
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
-    h("div", { class: "library-song-identity" }, titel, status,
+    h("div", { class: "library-song-identity" }, titel, status, soundcloudZahlen(song),
       profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
     fassung, aktionen);
 }

@@ -173,3 +173,9 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .songs-page .library-track-description summary { color: var(--leise); font-weight: 400; }
 .songs-page .library-track-description { margin-top: .12rem; }
 .songs-page .library-tags { margin: 0; }
+
+.library-sc-numbers { display: flex; flex-wrap: wrap; gap: .12rem .65rem; margin-top: .15rem;
+  color: var(--leise); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.library-sc-numbers strong { font-weight: 650; }
+.library-sc-versions { color: var(--leise); font-size: .74rem; }
+.library-sc-versions summary { cursor: pointer; }

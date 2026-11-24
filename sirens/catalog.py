@@ -139,6 +139,11 @@ def _soundcloud_infos(root):
         updates = json.loads((root / "_soundcloud" / "metadata-sync.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         updates = {}
+    try:
+        statistik = json.loads((root / "_soundcloud" / "stats.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        statistik = {}
+    zaehler = ("playback_count", "likes_count", "reposts_count", "comment_count", "download_count")
     pfade, titel = {}, {}
     for track in daten.get("tracks", []):
         aktualisiert = updates.get(f"track:{track['id']}", {})
@@ -152,7 +157,11 @@ def _soundcloud_infos(root):
             tags = []
         cover = next((ort.get("cover") for ort in eintrag.get("placements", [])
                       if ort.get("cover") and (root / ort["cover"]).is_file()), None)
-        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"),
+        stand = statistik.get("tracks", {}).get(str(track["id"]))
+        zahlen = {feld: (stand or track).get(feld) for feld in zaehler}
+        info = {"id": track["id"], "title": track["title"], "zahlen": zahlen,
+                "zahlenstand": statistik.get("fetched_at") if stand else daten.get("fetched_at"),
+                "tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"),
                 "beschreibung": _beschreibung(track.get("description")),
                 "cover": cover.replace(chr(92), "/") if cover else None}
         kandidaten = [*eintrag.get("audio_candidates", []), *eintrag.get("musicmaker_audio_candidates", [])]

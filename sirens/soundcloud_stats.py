@@ -6,8 +6,10 @@ import io
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
 
+from .config import load
 from .migrate_music_db import MusicmakerPfade
 
 
@@ -47,16 +49,18 @@ def abrufen(upload_skript, profil):
         if t.get("sharing") != "public":
             continue
         track_id = t.get("id") or str(t["urn"]).split(":")[-1]
-        auswahl[int(track_id)] = {"id": int(track_id), **{f: t.get(f) for f in felder}}
+        zaehler = {f: t.get(f) for f in felder}
+        if zaehler["likes_count"] is None:
+            zaehler["likes_count"] = t.get("favoritings_count")
+        auswahl[int(track_id)] = {"id": int(track_id), **zaehler}
     if not auswahl:
         raise RuntimeError("SoundCloud meldet keine öffentlichen Tracks.")
     return list(auswahl.values())
 
 
-def speichern(db, profil, tracks):
+def speichern(db, profil, tracks, zeit):
     daten = json.dumps(tracks, ensure_ascii=False).replace("'", "''")
     profil = profil.replace("'", "''")
-    zeit = datetime.now(timezone.utc).isoformat()
     db.sql(f"""
 BEGIN;
 SET LOCAL standard_conforming_strings = on;
@@ -76,14 +80,30 @@ WHERE soundcloud_track_observations.observed_at <= excluded.observed_at;
 COMMIT;""")
 
 
+def katalogzahlen_speichern(root, tracks, zeit):
+    ordner = root / "_soundcloud"
+    ordner.mkdir(exist_ok=True)
+    with NamedTemporaryFile(dir=ordner, delete=False, mode="w", encoding="utf-8") as datei:
+        temp = Path(datei.name)
+        try:
+            json.dump({"fetched_at": zeit, "tracks": {t["id"]: t for t in tracks}}, datei, ensure_ascii=False)
+            datei.close()
+            temp.replace(ordner / "stats.json")
+        finally:
+            temp.unlink(missing_ok=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("upload_skript", type=Path)
     parser.add_argument("--profil", default="cco_music")
     parser.add_argument("--container", default="musicmaker-postgres")
+    parser.add_argument("--musikordner", type=Path, default=load().music_root)
     args = parser.parse_args()
     tracks = abrufen(args.upload_skript, args.profil)
-    speichern(MusicmakerPfade(args.container), args.profil, tracks)
+    zeit = datetime.now(timezone.utc).isoformat()
+    speichern(MusicmakerPfade(args.container), args.profil, tracks, zeit)
+    katalogzahlen_speichern(args.musikordner, tracks, zeit)
     print(f"Öffentliche SoundCloud-Tracks aktualisiert: {len(tracks)}")
 
 
