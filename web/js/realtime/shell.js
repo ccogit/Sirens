@@ -1,6 +1,9 @@
 import { h } from "../dom.js";
 import { api as catalogApi } from "../api.js";
 import { createRtApi, MOCK_ASSET } from "./api.js";
+import { AudioCore } from "./audio_core.js";
+import { Recorder } from "./recorder.js";
+import { createBeatGrid } from "./beat_grid.js";
 import { deriveState, modeLabel } from "./capabilities.js";
 import { gpuText, latencyText } from "./gpu_panel.js";
 import { createResources, keyAction, DEFAULT_PRESET, readPresets, savePreset, normalizePreset } from "./controls.js";
@@ -34,6 +37,199 @@ export function createSessionController(api) {
     },
   };
 }
+const wait = ms => new Promise(resolve=>setTimeout(resolve,ms));
+const timed = (promise,ms) => {
+  let timer;
+  return Promise.race([promise,new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(new Error("Zeitgrenze überschritten")),ms);
+  })]).finally(()=>clearTimeout(timer));
+};
+
+export function decodeDry(core, raw, asset) {
+  if(!(raw instanceof ArrayBuffer) || raw.byteLength!==asset.nframes*8 || asset.sample_rate!==core.rate)
+    throw new Error("Ungültige PCM-Quelle");
+  const buffer=core.context.createBuffer(2,asset.nframes,core.rate);
+  const view=new DataView(raw);
+  for(let channel=0;channel<2;channel++){
+    const samples=buffer.getChannelData(channel);
+    for(let frame=0;frame<asset.nframes;frame++){
+      const sample=view.getFloat32(frame*8+channel*4,true);
+      samples[frame]=Number.isFinite(sample)?sample:0;
+    }
+  }
+  return buffer;
+}
+
+// Ein gemeinsamer AudioContext, keine PCM-Übertragung über JSON. Der Client
+// meldet lediglich begrenzte Quell-/Master-Frame-Aufträge; Wet kommt per Sidecar.
+export function createAudioSessionController(api, selection, {openCore=()=>AudioCore.open([0]),
+    onStatus=()=>{}}={}) {
+  let session=null, core=null, asset=null, buffer=null, grid=null, recorder=null;
+  let tail=Promise.resolve(), closed=false, generation=0, timer=null, pumping=false;
+  let plan=null, source=0, mix=0, bypass=false, fallback=false, fault=null;
+  const enqueue=fn=>{
+    const result=tail.then(fn);
+    tail=result.catch(()=>{});
+    return result;
+  };
+  const inform=()=>onStatus();
+  const silence=()=>{
+    if(core)core.param(1,{mix:0,bypass:true,gain:0});
+    plan=null;
+  };
+  const stopRecorder=async()=>{
+    if(!recorder)return;
+    const old=recorder;recorder=null;
+    try{const result=await timed(old.stop(),5000);if(result.error)fault=new Error(result.error);}
+    catch(e){old.fail(e.message);fault=e;}
+    inform();
+  };
+  async function cleanup(){
+    plan=null;
+    clearInterval(timer);timer=null;
+    await stopRecorder();
+    const c=core;core=null;
+    try{if(c)await c.destroy();}
+    finally{
+      const old=session;session=null;
+      if(old)await api.close(old);
+      asset=null;buffer=null;grid=null;source=0;fallback=false;
+    }
+  }
+  async function initialize(){
+    if(session)return;
+    // openCore wird vor dem ersten HTTP-Await aus der Nutzeraktion ausgelöst.
+    core=await openCore();
+    if(core.rate!==48000)throw new Error("Mock-Testmodus benötigt einen AudioContext mit 48 kHz");
+    if(closed)throw new Error("Sitzung geschlossen");
+    const selected=selection();
+    if(selected.stem)throw new Error("Stem-RT-Auflösung noch nicht freigegeben");
+    asset=selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
+    session=await api.create("mock",core.rate);
+    session=await api.command(session,"load",{asset_id:asset.id});
+    const end=Date.now()+20000;
+    while(session.state==="loading" && Date.now()<end && !closed){
+      await wait(50);session=await api.session(session);
+    }
+    if(session.state!=="ready"||closed)throw new Error("Mock-Sitzung nicht bereit");
+    buffer=decodeDry(core,await api.dry(session),asset);
+    try{grid=createBeatGrid(await api.beatgrid(asset.id),asset.sample_rate);}catch{grid=null;}
+    try{
+      const transport=await api.transport(session);
+      const ws=core.connect("ws://127.0.0.1:"+transport.port+"/pcm",transport.token);
+      await timed(new Promise((resolve,reject)=>{
+        ws.addEventListener("open",resolve,{once:true});
+        ws.addEventListener("error",reject,{once:true});
+        ws.addEventListener("close",reject,{once:true});
+      }),4000);
+      ws.addEventListener("close",()=>{fallback=true;core?.param(1,{mix:0});inform();});
+    }catch{fallback=true;core.param(1,{mix:0});}
+    timer=setInterval(()=>{pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});},20);
+  }
+  function begin(offset){
+    if(!core||!buffer)return;
+    if(offset>=buffer.length)offset=0;
+    source=offset;
+    const frame=core.frame()+Math.round(core.rate*.22);
+    const loop=asset.id===MOCK_ASSET?buffer.length-offset:0;
+    const state=core.play([buffer],{source:offset,frame,loopLength:loop});
+    plan={audioEpoch:state.epoch,seq:0,output:state.frame,source:offset,
+      offset,loop,end:state.frame+buffer.length-offset};
+    core.param(1,{mix:fallback?0:mix,bypass,gain:1});
+    void pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});
+  }
+  async function pump(){
+    if(recorder && core?.context.state==="suspended")recorder.fail("AudioContext angehalten");
+    if(pumping || !plan || !core || !session || session.state!=="playing" || fallback)return;
+    pumping=true;
+    const active=plan;
+    try{
+      if(core.clock.epoch>active.audioEpoch && active.loop && core.status){
+        const cursor=core.status.cursor, position=core.status.source;
+        active.audioEpoch=core.clock.epoch;active.seq=0;
+        active.output=cursor;active.source=position;
+        active.end=cursor+buffer.length-position;
+      }
+      const now=core.frame();
+      if(!active.loop && now>=active.end){
+        plan=null;source=0;
+        core.pause();
+        void enqueue(async()=>{if(session?.state==="playing")session=await api.command(session,"pause");inform();}).catch(e=>{fault=e;inform();});
+        return;
+      }
+      // Abgelaufene Frames niemals nachliefern; fehlende Wet-Frames fallen auf Dry zurück.
+      if(active.output<now){
+        const skipped=now-active.output;
+        active.output+=skipped;active.source+=skipped;
+      }
+      for(let count=0;count<6 && plan===active && core && session && !fallback;count++){
+        if(active.output>=now+12288 || active.output>=active.end)break;
+        const n=Math.min(2048,buffer.length-active.source,active.end-active.output);
+        if(n<256)break;
+        const payload={epoch:session.epoch,audio_epoch:active.audioEpoch,seq:active.seq++,
+          source_frame:active.source,start_frame:active.output,nframes:n};
+        active.output+=n;active.source+=n;
+        try{await api.render(session,payload);}
+        catch(e){if(e.status!==503 && e.error!=="stale_epoch")throw e;}
+      }
+    }finally{pumping=false;}
+  }
+  async function command(name,args={}){
+    const before=session;
+    session=await api.command(session,name,args);
+    if(name==="play")begin(source);
+    else if(name==="pause"){
+      plan=null;source=Math.min(buffer.length,core.status?.source??source);core.pause();
+    }else if(name==="seek"){
+      source=args.source_frame;plan=null;
+      if(before.state==="playing")begin(source);
+    }else if(name==="bypass"){
+      bypass=args.enabled;core.param(1,{bypass,mix:fallback?0:mix});
+    }
+    return session;
+  }
+  return {
+    get state(){return session?.state||"created";},
+    get detail(){return {fallback,grid,recording:!!recorder,fault,underruns:core?.status?.streams?.[0]?.underruns};},
+    run(fn){
+      const current=generation;
+      return enqueue(async()=>{
+        if(closed||current!==generation)return;
+        try{
+          await initialize();
+          if(closed||current!==generation)return;
+          await fn(command,()=>session.state);
+        }catch(e){fault=e;silence();await cleanup().catch(()=>{});throw e;}
+      });
+    },
+    mix(value){mix=value;core?.param(1,{mix:fallback?0:mix,bypass});},
+    silence,
+    record(){
+      return enqueue(async()=>{
+        if(recorder){await stopRecorder();return;}
+        if(!session||!core||session.state!=="playing")throw new Error("Zuerst Testaudio abspielen");
+        const current=session;
+        const record=await api.record(current,"mock",core.rate);
+        try{
+          recorder=await Recorder.attach(core,
+            async(start,bytes)=>(await api.recordBlock(current,record.id,start,bytes)).next_frame,
+            ()=>api.recordClose(current,record.id));
+          recorder.start();
+        }catch(e){await api.recordClose(current,record.id).catch(()=>{});throw e;}
+        inform();
+      });
+    },
+    reset(){
+      generation++;silence();
+      return enqueue(cleanup);
+    },
+    destroy(){
+      closed=true;generation++;silence();
+      return enqueue(cleanup);
+    },
+  };
+}
+
 export function catalogEntries(data) {
   const entries=[];
   for(const artist of data?.artists || []) for(const release of artist.releases || [])
@@ -44,7 +240,7 @@ export function catalogEntries(data) {
 
 // Jede Mount-Generation hat genau einen Satz Listener und höchstens einen Poll-Timer.
 // WP05 erstellt weder AudioContext noch Audioelemente und startet keine Worker.
-export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtApi({mock:true}),
+export function createLabShell({remote=createRtApi(), mockFactory=null,
   catalog=catalogApi, timerHost=globalThis, keyboard=globalThis.window, storage}={}) {
   let dispose=null;
   function mount(root) {
@@ -57,7 +253,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
     const gpuInfo=h("p",{},"GPU-Telemetrie wird geladen");
     const capsInfo=h("ul",{});
     const latency=h("p",{},"Latenz: unbekannt");
-    const transport=h("p",{role:"status"},"Transport: bereit (kein Ton)");
+    const transport=h("p",{role:"status"},"Transport: bereit (Testmodus)");
+    const beatInfo=h("p",{},"BeatGrid: unsicher");
     const select=(label,options=[])=>h("select",{"aria-label":label},options.map(([v,t])=>h("option",{value:v},t)));
     const song=select("Song",[["","Song auswählen"]]);
     const model=select("Stem-Modell",[["htdemucs","Demucs · 4 Stems"],["htdemucs_6s","Demucs · 6 Stems"]]);
@@ -65,7 +262,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
     const capability=select("Fähigkeit");
     const btn=t=>h("button",{type:"button"},t);
     const play=btn("Abspielen / Pause"), stop=btn("Stop"), panic=btn("Panic · stumm / Dry"),
-      bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden");
+      bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten");
     const range=(label,min,max,value,step=1)=>h("input",{type:"range","aria-label":label,min,max,value:String(value),step});
     const wet=range("Dry/Wet",0,100,0), gain=range("Mock Gain",0,2,1,0.01);
     const wetValue=h("output",{},"0 %"), gainValue=h("output",{},"1");
@@ -76,13 +273,13 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
     const refresh=btn("Status erneut laden");
     root.replaceChildren(h("section",{class:"rt-shell","aria-label":"RTX Neural Lab"},
       h("h2",{},"RTX Neural Lab"),status,
-      h("p",{},"WP05: Steueroberfläche ohne Tonpfad. Testmodus verwendet nur synthetische Daten, auch bei Katalogauswahl."),
+      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Stems noch nicht freigegeben."),
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
           h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh)),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
-      h("section",{},h("h3",{},"Transport & Mischung"),transport,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore),
+      h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record),
         label("Quellframe (48 kHz im Mock)",seek),seekButton,label("Dry/Wet",wet),wetValue,label("Gain (Mock)",gain),gainValue,
         h("p",{},"Tastatur: Leertaste = Transport, Esc = Panic, B = Bypass, A = A/B. MIDI-Zuordnung vorbereitet; kein Gerät verbunden.")),
       h("details",{},h("summary",{},"Installationshilfe"),h("p",{},
@@ -107,7 +304,11 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
       wet.value=String(preset.wet);wetValue.textContent=preset.wet+" %";
       gain.value=String(preset.gain);gainValue.textContent=String(preset.gain);
       ab.textContent="A/B: "+slot;
-      transport.textContent="Transport: "+(muted?"Panic / stumm":controller?.state || "bereit")+" (kein Ton)";
+      const detail=controller?.detail;
+      record.disabled=!enabled||!detail||controller.state!=="playing";
+      record.textContent=detail?.recording?"Aufnahme stoppen":"Aufnahme starten";
+      beatInfo.textContent=detail?.grid?"BeatGrid vorhanden (Quantisierung noch gesperrt)":"BeatGrid: unsicher / nicht verfügbar";
+      transport.textContent="Transport: "+(muted?"Panic / stumm":controller?.state || "bereit")+(detail?.fallback?" · Dry-Rückfall":"")+" · nicht gemessen"+(detail?.underruns===undefined?"":" · Underrun-Frames: "+detail.underruns)+(detail?.fault?" · "+detail.fault.message:"");
     }
     function fillSongs() {
       const previous=song.value;
@@ -149,7 +350,9 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
         if(nextMock!==mock){
           if(controller)await controller.destroy();
           if(!active)return;
-          mock=nextMock;client=mock?mockFactory():remote;controller=mock?createSessionController(client):null;
+          mock=nextMock;client=mock&&mockFactory?mockFactory():remote;
+          controller=mock?(mockFactory?createSessionController(client):createAudioSessionController(client,
+            ()=>({path:song.value,stem:stem.value}),{onStatus:paint})):null;
           fillSongs();
         }
         caps=next;error=null;
@@ -179,13 +382,13 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
       finally{busy=false;paint();}
     };
     const apply=async command=>{
-      // Dry/Wet ist ein UI-Mischwert; WP06 bindet ihn an den Audio-Kern an.
+      controller?.mix?.(preset.wet/100);
       await command("set_param",{name:"gain",value:muted?0:preset.gain});
       await command("bypass",{enabled:preset.bypass || preset.wet===0});
     };
     const doPanic=()=>{
       if(!controller)return;
-      muted=true;preset={...preset,wet:0,bypass:true};paint();
+      controller.silence?.();muted=true;preset={...preset,wet:0,bypass:true};paint();
       // Close stoppt die Sitzung auch dann, wenn gerade ein Befehl aussteht.
       controller.reset().then(()=>{muted=true;preset={...preset,wet:0,bypass:true};paint();}).catch(e=>{if(active){error=e;paint();}});
     };
@@ -198,6 +401,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
         slot=next;preset=normalizePreset(old[next]);run(apply);paint();},
     };
     const on=(el,event,fn)=>resources.listen(el,event,fn);
+    on(record,"click",()=>{controller?.record?.().then(paint).catch(e=>{if(active){error=e;paint();}});});
     on(play,"click",actions.transport);on(panic,"click",actions.panic);on(bypass,"click",actions.bypass);on(ab,"click",actions.ab);
     on(stop,"click",()=>{controller?.reset().then(()=>{muted=false;paint();}).catch(e=>{if(active){error=e;paint();}});});
     on(seekButton,"click",()=>{const frame=Number(seek.value);if(Number.isSafeInteger(frame)&&frame>=0)run(cmd=>cmd("seek",{source_frame:frame}));});

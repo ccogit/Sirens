@@ -4,7 +4,7 @@ import {Clock} from "./clock.js";
 // Pro Suite ein Ausgabepfad. Erzeugung und Resume ausschließlich nach Nutzeraktion.
 export class AudioCore {
     static owner = null;
-    static async open(latencies=[0], Context=globalThis.AudioContext || globalThis.webkitAudioContext) {
+    static async open(latencies=[0], Context=globalThis.AudioContext || globalThis.webkitAudioContext, {dspEnabled=false}={}) {
         if(!Context || !latencies.length || latencies.length>8 ||
             latencies.some(n=>!Number.isInteger(n)||n<0||n>192000)) throw new RangeError("Audiokonfiguration");
         if(AudioCore.owner) throw new Error("Audio-Ausgabepfad bereits aktiv");
@@ -14,20 +14,20 @@ export class AudioCore {
             context=new Context();
             await context.resume();
             await context.audioWorklet.addModule(new URL("./worklet_processor.js",import.meta.url));
-            const core=new AudioCore(context,latencies);
+            const core=new AudioCore(context,latencies,{dspEnabled});
             AudioCore.owner=core;
             return core;
         } catch(error) { AudioCore.owner=null; if(context) await context.close(); throw error; }
     }
-    constructor(context,latencies) {
+    constructor(context,latencies,{dspEnabled=false}={}) {
         this.context=context; this.clock=new Clock(context.sampleRate); this.sources=[];
         this.node=new AudioWorkletNode(context,"sirens-core-v1",{
             numberOfInputs:latencies.length,numberOfOutputs:1,outputChannelCount:[2],
-            channelCount:2,channelCountMode:"explicit",processorOptions:{latencies:latencies.map(()=>Math.max(...latencies))}
+            channelCount:2,channelCountMode:"explicit",processorOptions:{latencies:latencies.map(()=>Math.max(...latencies)),dspEnabled:dspEnabled===true}
         });
         this.node.connect(context.destination);
         this.transports=latencies.map((_,i)=>new Transport(this.node.port,i+1,context.sampleRate));
-        this.latency=Math.max(...latencies); this.buffers=[];
+        this.latency=Math.max(...latencies); this.dspLatency=dspEnabled===true?896:0; this.buffers=[];
         this.status=null; this.socket=null; this.waiting=false; this.closed=false;
         this.node.port.onmessage=({data:m})=>{
             if(m.type==="reject") this.transports[m.stream-1]?.acknowledge(m);
@@ -75,6 +75,8 @@ export class AudioCore {
     seek(source,options={}){return this.play(this.buffers,{source,loopLength:this.loopLength,...options});}
     pause(){this.stopSources();return this.reset(this.clock.source,false);}
     stop(){this.stopSources();return this.reset(0,false);}
+    dspParam(stream,family,key,value){this.node.port.postMessage({type:"dspParam",stream,family,key,value});}
+    dspPreset(stream,name){this.node.port.postMessage({type:"dspPreset",stream,name});}
     param(stream,values){this.node.port.postMessage({...values,type:"param",stream});}
     push(block){
         if(this.closed) return false;
