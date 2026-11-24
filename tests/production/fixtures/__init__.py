@@ -3,6 +3,7 @@ import json
 import random
 import wave
 from pathlib import Path
+from sirens.store import write_json_atomic
 from sirens.production.contracts import expected_frames, sha256_file, tick_to_sample
 
 HERE = Path(__file__).parent
@@ -50,5 +51,18 @@ def generate(root, plan=None):
         stems.append(dict(track_id=track["id"], role=track["role"], file=file,
                           channels=1, sha256=digest,
                           source=dict(backend="mock", patch=track["patch"], revision="1")))
-    return dict(schema_version=1, assets=assets), dict(schema_version=1, sample_rate=48000,
-                                                       frames=frames, stems=stems)
+    asset_manifest = dict(schema_version=1, assets=assets)
+    stem_manifest = dict(schema_version=1, sample_rate=48000, frames=frames, stems=stems)
+    return asset_manifest, stem_manifest
+
+
+def write_manifests(root, plan=None):
+    """Populate a temporary directory with deterministic brief/plan/assets/stems."""
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    plan = load("plan") if plan is None else plan
+    assets, stems = generate(root, plan)
+    for name, value in (("brief", load("brief")), ("plan", plan),
+                        ("assets", assets), ("stems", stems)):
+        write_json_atomic(root / (name + ".json"), value)
+    return assets, stems
