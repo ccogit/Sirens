@@ -11,33 +11,43 @@ import { createResources, keyAction, DEFAULT_PRESET, readPresets, savePreset, no
 
 // Der Mock akzeptiert ausschließlich sein synthetisches Asset. Keine Katalogpfade als RT-IDs.
 export function createSessionController(api) {
-  let session=null, tail=Promise.resolve(), closed=false;
+  let session=null, tail=Promise.resolve(), closed=false, generation=0;
   const enqueue = fn => {
     const result=tail.then(fn);
     tail=result.catch(()=>{});
     return result;
   };
-  const command = async (name,args={}) => {
+  const cancelled=Symbol("Sitzung gestoppt");
+  const command = async (current,name,args={}) => {
+    if (closed || current!==generation) throw cancelled;
     session=await api.command(session,name,args);
+    if (closed || current!==generation) throw cancelled;
     return session;
   };
   return {
     get state() { return session?.state || "created"; },
-    run(fn) { return enqueue(async()=>{
-      if (closed) return;
-      if (!session) {
-        session=await api.create("mock");
-        if (!closed) await command("load",{asset_id:MOCK_ASSET});
-      }
-      if (!closed) return fn(command,()=>session.state);
-    }); },
-    reset() { return enqueue(async()=>{ if(session) { await api.close(session); session=null; } }); },
+    run(fn) {
+      const current=generation;
+      return enqueue(async()=>{
+        if (closed || current!==generation) return;
+        const send=(name,args)=>command(current,name,args);
+        try {
+          if (!session) {
+            session=await api.create("mock");
+            await send("load",{asset_id:MOCK_ASSET});
+          }
+          return await fn(send,()=>session.state);
+        } catch(e) { if(e!==cancelled) throw e; }
+      });
+    },
+    reset() { generation++; return enqueue(async()=>{ if(session) { await api.close(session); session=null; } }); },
     destroy() {
       closed=true;
       return enqueue(async()=>{ if(session) { await api.close(session); session=null; } });
     },
   };
 }
+const GPU_PROFILES=Object.freeze(["Eco","Performance","Neural","Training/Render"]);
 const wait = ms => new Promise(resolve=>setTimeout(resolve,ms));
 const timed = (promise,ms) => {
   let timer;
@@ -176,9 +186,14 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
       }
     }finally{pumping=false;}
   }
-  async function command(name,args={}){
+  const cancelled=Symbol("Sitzung gestoppt");
+  async function command(current,name,args={}){
+    if(closed||current!==generation)throw cancelled;
     const before=session;
     session=await api.command(session,name,args);
+    // Die HTTP-Antwort bleibt für Close erhalten, darf nach Panic aber
+    // weder eine lokale Wiedergabe starten noch weitere Befehle auslösen.
+    if(closed||current!==generation)throw cancelled;
     if(timeline.length<4096)timeline.push({frame:Math.max(timeline.at(-1)?.frame??0,core.frame()),command:{command:name,args:{...args},epoch:before.epoch,seq:before.seq===null?0:before.seq+1}});
     else historyFull=true;
     if(name==="play")begin(source);
@@ -202,30 +217,42 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
         try{
           await initialize();
           if(closed||current!==generation)return;
-          await fn(command,()=>session.state);
-        }catch(e){fault=e;silence();await cleanup().catch(()=>{});throw e;}
+          await fn((name,args)=>command(current,name,args),()=>session.state);
+        }catch(e){
+          if(e===cancelled||closed||current!==generation)return;
+          fault=e;silence();await cleanup().catch(()=>{});throw e;
+        }
       });
     },
     mix(value){mix=value;core?.param(1,{mix:fallback?0:mix,bypass});},
     silence,
     record(){
+      const currentGeneration=generation;
       return enqueue(async()=>{
+        if(closed||currentGeneration!==generation)return;
         if(recorder){await stopRecorder();return;}
         if(!session||!core||session.state!=="playing")throw new Error("Zuerst Testaudio abspielen");
         const current=session;
         const record=await api.record(current,"mock",core.rate);
         try{
+          if(closed||currentGeneration!==generation){
+            await api.recordClose(current,record.id);
+            return;
+          }
           recorder=await Recorder.attach(core,
             async(start,bytes)=>(await api.recordBlock(current,record.id,start,bytes)).next_frame,
             async()=>{const result=await api.recordClose(current,record.id);recorded.push(...result.assets.map(item=>item.id));});
+          if(closed||currentGeneration!==generation){await stopRecorder();return;}
           recorder.start();
         }catch(e){await api.recordClose(current,record.id).catch(()=>{});throw e;}
         inform();
       });
     },
     export(preset){
+      const current=generation;
       return enqueue(async()=>{
-        if(closed||!session||!asset||!core)throw new Error("Zuerst eine Quelle laden");
+        if(closed||current!==generation)return;
+        if(!session||!asset||!core)throw new Error("Zuerst eine Quelle laden");
         if(recorder)throw new Error("Zuerst Aufnahme stoppen");
         if(historyFull)throw new Error("Befehlsverlauf zu lang; neue Sitzung beginnen");
         const info=await api.exportSource(session);
@@ -257,13 +284,15 @@ export function catalogEntries(data) {
 // Jede Mount-Generation hat genau einen Satz Listener und höchstens einen Poll-Timer.
 // WP05 erstellt weder AudioContext noch Audioelemente und startet keine Worker.
 export function createLabShell({remote=createRtApi(), mockFactory=null,
-  catalog=catalogApi, timerHost=globalThis, keyboard=globalThis.window, storage}={}) {
+  catalog=catalogApi, timerHost=globalThis, keyboard=globalThis.window, storage,
+  onProfile=()=>{}}={}) {
   let dispose=null;
   function mount(root) {
     if(dispose) return;
     const resources=createResources(timerHost), abort=new AbortController();
     let active=true, caps=null, gpu=null, mock=false, client=remote, controller=null, error=null,
       entries=[], stemGeneration=0, polling=false, busy=false, preset={...DEFAULT_PRESET}, muted=false, slot="A";
+    let profile=null, profileBusy=false, profileEpoch=0, profileError="";
     const status=h("p",{role:"status","aria-live":"polite"},"Fähigkeiten werden geladen");
     const catalogStatus=h("p",{role:"status"},"Bibliothek wird geladen");
     const gpuInfo=h("p",{},"GPU-Telemetrie wird geladen");
@@ -277,6 +306,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const model=select("Stem-Modell",[["htdemucs","Demucs · 4 Stems"],["htdemucs_6s","Demucs · 6 Stems"]]);
     const stem=select("Stem",[["","Original"]]);
     const capability=select("Fähigkeit");
+    const profileSelect=select("GPU-Profil", [["","Profil nicht geladen"],...GPU_PROFILES.map(name=>[name,name])]);
+    const profileInfo=h("p",{role:"status"},"GPU-Profil wird geladen");
     const btn=t=>h("button",{type:"button"},t);
     const play=btn("Abspielen / Pause"), stop=btn("Stop"), panic=btn("Panic · stumm / Dry"),
       bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten"), exportButton=btn("Sitzungsdatei exportieren");
@@ -296,7 +327,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Suche",search),label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
-          h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh,
+          label("GPU-Profil",profileSelect),profileInfo,refresh,
           h("p",{},"RoFormer · Offline: freigegeben für G1, produktiver Jobpfad noch nicht installiert / angebunden."),
           h("ul",{},unavailableTools.map(name=>h("li",{},name+" · nicht installiert / nicht freigegeben"))))),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
@@ -311,6 +342,10 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const state=deriveState({capabilities:caps,gpu,mock,songs:entries.length || (song.value==="fixture"?1:0),error,capabilityId:capability.value});
       status.textContent=state.text || "Bereit";
       gpuInfo.textContent=gpuText(gpu);
+      profileSelect.value=profile??"";
+      profileSelect.disabled=!profile||profileBusy||!!error;
+      profileInfo.textContent=profileError || (profile===null?"GPU-Profil nicht verfügbar":
+        "Profil: "+profile+" · GPU-Worker-Limit; Mock bleibt CPU. Keine Modellfreigabe durch Profilwechsel.");
       latency.textContent=latencyText(selected());
       const enabled=state.enabled && Boolean(song.value) && !busy && !!controller;
       for(const b of buttons)b.disabled=!enabled;
@@ -364,6 +399,32 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       }catch{if(active && generation===stemGeneration)catalogStatus.textContent="Stem-Cache nicht verfügbar; Original wählbar.";}
       paint();
     }
+    function acceptProfile(value) {
+      if(!GPU_PROFILES.includes(value?.profile))throw new Error("Ungültiges GPU-Profil");
+      profile=value.profile;profileError="";onProfile(profile);
+    }
+    async function refreshProfile() {
+      if(!remote.profile||profileBusy)return;
+      const epoch=profileEpoch;
+      try{
+        const value=await remote.profile(abort.signal);
+        if(active&&epoch===profileEpoch&&!profileBusy)acceptProfile(value);
+      }catch(e){
+        if(active&&epoch===profileEpoch&&!profileBusy)profileError="GPU-Profil nicht abrufbar: "+e.message;
+      }
+    }
+    async function changeProfile() {
+      if(!active||!profile||profileBusy||!remote.setProfile)return;
+      const next=profileSelect.value;
+      if(!GPU_PROFILES.includes(next))return;
+      profileBusy=true;profileEpoch++;paint();
+      try{
+        const value=await remote.setProfile(next,abort.signal);
+        if(active)acceptProfile(value);
+      }catch(e){
+        if(active)profileError="Profilwechsel abgelehnt: "+e.message;
+      }finally{profileBusy=false;paint();}
+    }
     async function refreshStatus() {
       if(!active || polling)return;
       polling=true;
@@ -388,6 +449,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
         capsInfo.replaceChildren(...caps.capabilities.map(c=>h("li",{},c.id+": "+modeLabel(c.mode)+" · "+(c.available?"gemeldet verfügbar":"nicht freigegeben")+(c.mock?" · Testmodus":""))));
         const nextGpu=await client.gpu(abort.signal);
         if(active)gpu=nextGpu;
+        await refreshProfile();
       }catch(e){
         if(active){
           // 503 beim ersten GET ist der ausgeschaltete oder nicht verfügbare Dienst.
@@ -440,6 +502,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     on(song,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();paint();});
     on(model,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();});on(stem,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});});
     on(capability,"change",paint);on(refresh,"click",refreshStatus);
+    on(profileSelect,"change",changeProfile);
     if(keyboard)on(keyboard,"keydown",event=>{
       const action=keyAction(event);
       const target={transport:play,panic,bypass,ab}[action];
