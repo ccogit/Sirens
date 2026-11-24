@@ -42,7 +42,7 @@ def _walk(value, field="$"):
     if isinstance(value, dict):
         for key, item in value.items():
             _require(isinstance(key, str), field)
-            _require(key.lower() not in {"shell", "command", "code", "eval", "exec", "script"}, field + "." + key)
+            _require(key.lower() not in {"shell", "command", "eval", "exec", "script", "python_code", "shell_command"}, field + "." + key)
             _walk(item, field + "." + key)
     elif isinstance(value, list):
         for item in value:
@@ -168,7 +168,7 @@ def validate_brief(value):
 
 def _timeline(value):
     _number(value["bpm"], "bpm", 1)
-    _require(value["meter"] == [4, 4], "meter")
+    _require(value["meter"] == [4, 4] and all(type(x) is int for x in value["meter"]), "meter")
     _require(type(value["ppq"]) is int and value["ppq"] == PPQ, "ppq")
 
 
@@ -201,7 +201,7 @@ def validate_plan(value, *, automation_ranges=None):
     request_ids = _ids(requests, "id")
     for request in requests:
         _object(request, ("kind", "seed", "duration_seconds"))
-        _require(request["kind"] in ASSET_KINDS, "asset kind")
+        _require(isinstance(request["kind"], str) and request["kind"] in ASSET_KINDS, "asset kind")
         _number(request["seed"], "asset seed", integer=True)
         _number(request["duration_seconds"], "duration_seconds", 0.001)
         if request["kind"] == "speech":
@@ -274,7 +274,7 @@ def validate_assets(value, plan=None, root=None):
             _require(isinstance(item["error"], (str, dict)), "asset error")
             continue
         _object(item, ("file", "kind", "sample_rate", "channels", "frames", "sha256", "source", "measured"))
-        _require(item["kind"] in ASSET_KINDS, "asset kind")
+        _require(isinstance(item["kind"], str) and item["kind"] in ASSET_KINDS, "asset kind")
         _require(item["sample_rate"] == SAMPLE_RATE, "sample_rate")
         _number(item["frames"], "frames", 1, integer=True)
         _object(item["source"], ("backend", "revision", "seed", "license", "use"))
@@ -327,7 +327,9 @@ def validate_status(value):
     _str(value["stage"], "stage", nullable=True)
     _number(value["progress"], "progress", 0, 1, nullable=True)
     _require(value["error"] is None or isinstance(value["error"], (str, dict)), "error")
-    _object(value["timestamps"])
+    timestamps = _object(value["timestamps"], ("queued",))
+    for stamp in timestamps.values():
+        _str(stamp, "timestamp", nullable=True)
     return value
 
 
@@ -342,13 +344,21 @@ def validate_ableton(value, root=None):
     _sections(value["sections"], None, "label")
     _require(value["mode"] in ("set", "import_bundle", "live_editable"), "mode")
     _require((value["mode"] == "set") == (value["project_file"] is not None), "project_file/mode mismatch")
-    _object(value["capabilities"])
+    caps = _object(value["capabilities"], ("live_version", "edition", "max_for_live", "open_set", "render", "reason"))
+    for key in ("live_version", "edition", "reason"):
+        _str(caps[key], key, nullable=True)
+    for key in ("max_for_live", "open_set", "render"):
+        _require(caps[key] is None or type(caps[key]) is bool, key)
+    if value["mode"] == "live_editable":
+        _require(caps["open_set"] is True and bool(value.get("set_binding")), "live set binding required")
     _list(value["warnings"], "warnings")
     def path_check(relative):
         validate_relative_path(relative)
         if root is not None:
             _require(safe_path(root, relative).is_file(), "missing export file")
     path_check(value["reference_mix"])
+    if root is not None:
+        validate_wav(safe_path(root, value["reference_mix"]), frames=value["frames"])
     if value["project_file"] is not None:
         path_check(value["project_file"])
         _require(value["project_file"].lower().endswith(".als"), "project_file extension")
@@ -357,6 +367,7 @@ def validate_ableton(value, root=None):
     for track in tracks:
         _object(track, ("role", "audio_file", "midi_file", "patch", "automation_file", "sha256"))
         _id(track["patch"], "patch")
+        _str(track["role"], "role")
         _hash(track["sha256"])
         path_check(track["audio_file"])
         if root is not None:
