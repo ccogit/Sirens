@@ -1,0 +1,118 @@
+{
+  "revision": "19671f406d603126926c1b7e2adc169acbcade22",
+  "source": "https://huggingface.co/ACE-Step/Ace-Step1.5/tree/19671f406d603126926c1b7e2adc169acbcade22",
+  "models": [
+    {
+      "filename": "acestep-v15-turbo/model.safetensors",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/acestep-v15-turbo/model.safetensors",
+      "size_bytes": null,
+      "sha256": "3f6e0797fad420a39bd33979eb6e840e30989e34a3794e843d23b60ec6e422d7",
+      "display_size": "4.79 GB",
+      "license": "MIT"
+    },
+    {
+      "filename": "vae/diffusion_pytorch_model.safetensors",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/vae/diffusion_pytorch_model.safetensors",
+      "size_bytes": null,
+      "sha256": "da17edb604c40deaf09e9b24974e590d1ca83a374070e5d0884cfa4bed9a99b0",
+      "display_size": "337 MB",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/model.safetensors",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/model.safetensors",
+      "size_bytes": null,
+      "sha256": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd",
+      "display_size": "1.19 GB",
+      "license": "MIT"
+    },
+    {
+      "filename": "acestep-v15-turbo/silence_latent.pt",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/acestep-v15-turbo/silence_latent.pt",
+      "size_bytes": null,
+      "sha256": "a778e9dd942f5e8b2c09c55370782d318834432b03dabbcdf70e6ed49ad6358b",
+      "display_size": "3.84 MB",
+      "license": "MIT"
+    },
+    {
+      "filename": "acestep-v15-turbo/config.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/acestep-v15-turbo/config.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "vae/config.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/vae/config.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/added_tokens.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/added_tokens.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/chat_template.jinja",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/chat_template.jinja",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/config.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/config.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/merges.txt",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/merges.txt",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/special_tokens_map.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/special_tokens_map.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/tokenizer.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/tokenizer.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/tokenizer_config.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/tokenizer_config.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    },
+    {
+      "filename": "Qwen3-Embedding-0.6B/vocab.json",
+      "url": "https://huggingface.co/ACE-Step/Ace-Step1.5/resolve/19671f406d603126926c1b7e2adc169acbcade22/Qwen3-Embedding-0.6B/vocab.json",
+      "size_bytes": null,
+      "sha256": null,
+      "display_size": "siehe Modellseite",
+      "license": "MIT"
+    }
+  ]
+}
