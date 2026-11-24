@@ -13,10 +13,10 @@ Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinat
 | KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | gemergt |
 | KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | gemergt |
 | KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | gemergt |
-| KETTE-P05 | Mixing und Mastering | K05 | – | vergeben (24.11.2026) |
+| KETTE-P05 | Mixing und Mastering | K05 | – | gemergt |
 | KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | gemergt |
 | KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | gemergt |
-| KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | offen |
+| KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | vergeben (24.11.2026) |
 
 ### Regeln für Bearbeiter (gelten vor den Formulierungen weiter unten)
 
