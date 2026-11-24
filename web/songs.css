@@ -201,3 +201,10 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .library-sc-metric.leer .library-sc-glyph { color: inherit; }
 
 .library-song-heading > .library-sc-numbers { margin: 0 0 0 .2rem; }
+
+.library-sc-meter { width: 2.7rem; height: .35rem; margin-inline: .1rem .15rem; appearance: none; border: 0; background: none; }
+.library-sc-meter::-webkit-meter-bar { background: var(--linie); border: 0; border-radius: 10px; }
+.library-sc-meter::-webkit-meter-optimum-value { background: var(--akzent); border-radius: 10px; }
+.library-sc-meter.likes_count::-webkit-meter-optimum-value { background: #e787a1; }
+.library-sc-meter::-moz-meter-bar { background: var(--akzent); border-radius: 10px; }
+.library-sc-meter.likes_count::-moz-meter-bar { background: #e787a1; }

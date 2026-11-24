@@ -97,10 +97,14 @@ function soundcloudZahlen(song) {
       tracks.length > 1 ? h("span", {}, track.title) : null,
       ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label, symbol]) => {
         const zahl = zahlenformat.format(track.zahlen[key]);
+        const rang = track.rang?.[key];
+        const vergleich = Number.isFinite(rang) ? "Katalogvergleich: " + rang + " von 100" : "";
+        const balken = vergleich ? h("meter", { class: "library-sc-meter " + key,
+          min: 0, max: 100, value: String(rang), "aria-label": label + " im Katalogvergleich" }) : null;
         return h("span", { class: "library-sc-metric" + (track.zahlen[key] === 0 ? " leer" : ""),
-          title: [zahl + " " + label, stand].filter(Boolean).join(" · ") },
+          title: [zahl + " " + label, vergleich, stand].filter(Boolean).join(" · ") },
         h("span", { class: "library-sc-glyph " + key, "aria-hidden": "true" }, symbol),
-        h("strong", { "aria-label": zahl + " " + label }, zahl));
+        h("strong", { "aria-label": zahl + " " + label }, zahl), balken);
       }));
   };
   if (tracks.length === 1) return zeile(tracks[0]);

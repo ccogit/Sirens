@@ -6,6 +6,7 @@ import shlex
 import threading
 from pathlib import Path
 from collections import Counter
+from bisect import bisect_left, bisect_right
 
 from .contracts import AUDIO_EXT, BILD_EXT, parse_pfad
 from .musikablage import ablage, ist_single, release_metadaten
@@ -152,8 +153,13 @@ def _soundcloud_infos(root):
     except (OSError, ValueError):
         statistik = {}
     zaehler = ("playback_count", "likes_count", "reposts_count", "comment_count", "download_count")
+    tracks = daten.get("tracks", [])
+    aktuelle_tracks = statistik.get("tracks", {})
+    vergleich = aktuelle_tracks.values() if aktuelle_tracks else tracks
+    verteilungen = {feld: sorted(t[feld] for t in vergleich if isinstance(t.get(feld), int))
+                    for feld in ("playback_count", "likes_count")}
     pfade, titel = {}, {}
-    for track in daten.get("tracks", []):
+    for track in tracks:
         aktualisiert = updates.get(f"track:{track['id']}", {})
         for feld in ("description", "tag_list"):
             if isinstance(aktualisiert.get(feld), str):
@@ -167,7 +173,15 @@ def _soundcloud_infos(root):
                       if ort.get("cover") and (root / ort["cover"]).is_file()), None)
         stand = statistik.get("tracks", {}).get(str(track["id"]))
         zahlen = {feld: (stand or track).get(feld) for feld in zaehler}
-        info = {"id": track["id"], "title": track["title"], "zahlen": zahlen,
+        rang = {}
+        if stand or not aktuelle_tracks:
+            for feld, verteilung in verteilungen.items():
+                zahl = zahlen[feld]
+                if isinstance(zahl, int) and len(verteilung) > 1:
+                    darunter = bisect_left(verteilung, zahl)
+                    gleich = bisect_right(verteilung, zahl) - darunter
+                    rang[feld] = round(100 * (darunter + (gleich - 1) / 2) / (len(verteilung) - 1)) if zahl else 0
+        info = {"id": track["id"], "title": track["title"], "zahlen": zahlen, "rang": rang,
                 "zahlenstand": statistik.get("fetched_at") if stand else daten.get("fetched_at"),
                 "tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"),
                 "beschreibung": _beschreibung(track.get("description")),
