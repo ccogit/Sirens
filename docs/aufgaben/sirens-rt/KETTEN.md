@@ -20,7 +20,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | gemergt |
 | KETTE-24 | Welle 2: BeatGrid, Tonart, MIDI | 10 | KETTE-11 gemergt | gemergt |
 | KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 gemergt | gemergt |
-| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | offen |
+| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | vergeben (24.11.2026) |
 | KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | vergeben (24.11.2026) |
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
