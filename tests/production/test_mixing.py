@@ -107,6 +107,41 @@ class MixingTests(unittest.TestCase):
             self.assertNotEqual(data[12000*6:12001*6], bytes(6))
             self.assertEqual(report["mastering"]["requested_gain_db"], 0)
 
+    @unittest.skipUnless(shutil.which("ffmpeg"), "local ffmpeg required")
+    def test_gear_bass_stays_stereo_and_explicit_sub_is_mono(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            outputs = {}
+            for variant, patch_name, sidechain in (
+                ("bass", "gear_bass", False),
+                ("bass_ducked", "gear_bass", True),
+                ("sub", "mono_sub", True),
+            ):
+                with self.subTest(variant=variant):
+                    root = Path(tmp) / variant
+                    root.mkdir()
+                    plan, stems = fixture(root)
+                    track = plan["tracks"][-1]
+                    stem = stems["stems"][-1]
+                    track.update(role="bass", patch=patch_name)
+                    stem.update(role="bass")
+                    stem["source"]["patch"] = patch_name
+                    plan["mix"]["tracks"]["tone"] = {"pan": .7}
+                    if variant == "bass_ducked":
+                        plan["mix"]["tracks"]["tone"]["sidechain"] = True
+                    report = mix(plan, stems, root)
+                    cfg = report["settings"][-1]
+                    self.assertEqual(cfg["sub"], variant == "sub")
+                    self.assertEqual(cfg["sidechain"], sidechain)
+                    with wave.open(str(root / "mix.wav"), "rb") as wav:
+                        self.assertEqual(wav.getnframes(), 48000)
+                        data = wav.readframes(48000)
+                    self.assertEqual(
+                        any(data[i:i+3] != data[i+3:i+6]
+                            for i in range(0, len(data), 6)),
+                        variant != "sub")
+                    outputs[variant] = data
+            self.assertNotEqual(outputs["bass"], outputs["bass_ducked"])
+
     def test_invalid_stem_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
