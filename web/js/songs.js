@@ -47,6 +47,34 @@ function beschreibung(text, klasse, leer) {
       text.split(/\n\n+/).map(absatz => h("p", {}, absatz))));
 }
 
+function albumEigenschaften(album) {
+  const profile = album.songs.map(song => song.kurzprofil).filter(Boolean);
+  const formate = [...new Set(profile.flatMap(p => p.formate))].sort();
+  const tempo = profile.map(p => p.tempo_bpm).filter(Number.isFinite).sort((a, b) => a - b);
+  const genres = [...new Set(profile.flatMap(p => p.soundcloud_genres))];
+  const tags = new Map();
+  for (const p of profile)
+    for (const tag of p.soundcloud_tags) tags.set(tag, (tags.get(tag) || 0) + 1);
+  const haeufigeTags = [...tags].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
+    .slice(0, 5).map(([tag]) => tag);
+  const vonBis = tempo.length && tempo[0] !== tempo.at(-1) ? tempo[0] + "–" + tempo.at(-1) : tempo[0];
+  const felder = [
+    ["Stilreferenz", album.stilreferenz],
+    ["Lokaler Bestand", album.songs.length + " Songs · " + profile.reduce((summe, p) => summe + p.fassungen, 0) + " Fassungen"],
+    ["Audioformate", formate.join(", ")],
+    ["Lyrics lokal", profile.length ? profile.filter(p => p.lyrics_lokal).length + " von " + profile.length + " Songs" : ""],
+    ["SoundCloud", profile.length ? profile.filter(p => p.soundcloud_status === "Öffentlich zugeordnet").length +
+      " von " + profile.length + " Songs öffentlich zugeordnet" : ""],
+    ["Belegtes Tempo", tempo.length ? vonBis + " BPM · " + tempo.length + " Songs" : ""],
+    ["SoundCloud-Genres", genres.join(", ")],
+    ["Häufigste Tags", haeufigeTags.join(", ")],
+  ];
+  return h("aside", { class: "library-album-facts", "aria-label": "Albumeigenschaften" },
+    h("h3", {}, "Albumeigenschaften"),
+    h("dl", {}, felder.filter(([, wert]) => wert).map(([name, wert]) =>
+      h("div", {}, h("dt", {}, name), h("dd", {}, wert)))));
+}
+
 function profilAnsicht(profil, details, tagWaehlen) {
   if (!profil) return beschreibung(details, "library-track-description", "Keine Songbeschreibung hinterlegt");
   const felder = [
@@ -302,7 +330,9 @@ export function songsAnsicht(el) {
           label === "Kommentare" ? "Komm." : label))),
       h("span", { class: "library-song-version" }, "Fassung"));
     inhalt.append(kopf, h("div", { class: "library-detail-body" },
-      album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
+      album ? h("div", { class: "library-album-overview" },
+        beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt"),
+        albumEigenschaften(katalog.releases.find(release => release.pfad === album.pfad) || album)) : null,
       sichtbar.length ? [spalten, h("ul", { class: "library-song-list" }, haupttitel.map(zeile), extraListe)]
         : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei.")));
     knoepfeAktualisieren();
