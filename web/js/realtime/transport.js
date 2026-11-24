@@ -48,7 +48,7 @@ export class Transport {
         const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
         const raw = new Float32Array(h.nframes * 2);
         for (let i=0;i<raw.length;i++) raw[i] = view.getFloat32(i*4,true);
-        const samples = resample(raw,h.sample_rate,this.rate);
+        const samples = resample(raw,h.sample_rate,this.rate,Math.round(start*h.sample_rate/this.rate));
         if (this.pending.size >= 8 || start < this.cursor || start + samples.length/2 > this.cursor+this.lookahead) {
             this.dropped++; return false;
         }

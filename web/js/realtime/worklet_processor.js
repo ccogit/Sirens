@@ -13,7 +13,7 @@ export class RenderPath {
         this.delay = new Float32Array(latency*2);
         this.latency=latency; this.index=0;
         this.pair=new Float32Array(2); this.out=new Float32Array(2);
-        this.lastWet=new Float32Array(2); this.ramp=Math.max(1,ramp);
+        this.expectedUnderruns=0; this.lastWet=new Float32Array(2); this.ramp=Math.max(1,ramp);
         this.mix=0; this.target=0; this.gain=1; this.targetGain=1; this.bypass=false;
     }
     reset(epoch,frame) {
@@ -31,6 +31,7 @@ export class RenderPath {
             this.index=(i+2)%this.delay.length;
         }
         const ready=this.wet.read(this.pair);
+        if(!ready && this.target>0 && !this.bypass) this.expectedUnderruns++;
         if(ready) { this.lastWet[0]=this.pair[0]; this.lastWet[1]=this.pair[1]; }
         const target=ready && !this.bypass ? this.target : 0;
         this.mix += clamp(target-this.mix,-1/this.ramp,1/this.ramp);
@@ -49,10 +50,12 @@ if(typeof AudioWorkletProcessor !== "undefined") {
             const cfg=options.processorOptions;
             this.paths=cfg.latencies.map(l=>new RenderPath(l,Math.max(1,Math.round(sampleRate*.005))));
             this.epoch=0; this.start=currentFrame; this.active=false; this.cursor=currentFrame;
+            this.source=0; this.loopSource=0;
             this.loopLength=0; this.nextLoop=Infinity;
             this.port.onmessage=({data:m})=>{
                 if(m.type==="reset" && m.epoch>=this.epoch) {
                     this.epoch=m.epoch; this.start=m.frame; this.active=m.active;
+                    this.source=m.source; this.loopSource=m.source;
                     this.loopLength=m.loopLength||0; this.nextLoop=this.loopLength?this.start+this.loopLength:Infinity;
                     for(const p of this.paths) p.reset(m.epoch,m.frame);
                 } else if(m.type==="pcm") {
@@ -67,8 +70,8 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                         if(typeof m.bypass==="boolean") p.bypass=m.bypass;
                     }
                 } else if(m.type==="status") {
-                    this.port.postMessage({type:"status",epoch:this.epoch,cursor:this.cursor,
-                        streams:this.paths.map(p=>({cursor:p.wet.cursor,underruns:p.wet.underruns}))});
+                    this.port.postMessage({type:"status",epoch:this.epoch,cursor:this.cursor,source:this.source,
+                        streams:this.paths.map(p=>({cursor:p.wet.cursor,underruns:p.expectedUnderruns,rawUnderruns:p.wet.underruns}))});
                 }
             };
         }
@@ -82,10 +85,11 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                     if(frame===this.nextLoop) {
                         if(this.epoch===0xffffffff) this.active=false;
                         else {
-                            this.epoch++; this.nextLoop+=this.loopLength;
+                            this.epoch++; this.nextLoop+=this.loopLength; this.source=this.loopSource;
                             for(let j=0;j<this.paths.length;j++) this.paths[j].reset(this.epoch,frame);
                         }
                     }
+                    if(this.active) this.source++;
                     if(this.active) for(let j=0;j<this.paths.length;j++) {
                         const p=this.paths[j], input=inputs[j];
                         // Ein verspäteter Reset darf keine vergangenen Blöcke wiedergeben.
