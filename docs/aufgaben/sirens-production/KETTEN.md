@@ -1,5 +1,59 @@
 # Vergabe und Parallelisierung
 
+## Register für das Werkzeug `ketten` (maßgeblich für Branch und Stand)
+
+Vergeben wird mit dem Werkzeug `ketten` (`.ketten.json` auf diesem Zweig). Kette KETTE-P0x = Auftrag K0x;
+Branch `extern/KETTE-P0x` (ersetzt `feat/production-k0x-…` unten), ein PR auf `integration/sirens-production`.
+Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinator.
+
+| Kette | Titel | Aufgaben | Voraussetzung | Stand |
+|---|---|---|---|---|
+| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | offen |
+| KETTE-P01 | Persönliches Referenzwissen | K01 | – | offen |
+| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | offen |
+| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | offen |
+| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | offen |
+| KETTE-P05 | Mixing und Mastering | K05 | – | offen |
+| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | offen |
+| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | offen |
+| KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | offen |
+
+### Regeln für Bearbeiter (gelten vor den Formulierungen weiter unten)
+
+1. **Früh pushen, die CI prüft.** Nach dem ersten Commit sofort `extern/KETTE-P0x` pushen und einen Draft-PR auf
+   `integration/sirens-production` öffnen. Die CI des PR (`python -m unittest discover -s tests -v`) ist die
+   maßgebliche Prüfung; Fehler anhand der CI-Ausgabe beheben. „Lokal nicht ausführbar“ ist nie ein Grund, nicht
+   zu pushen.
+2. **Nie ohne PR enden.** Bei Blockade: Stand pushen, in `ergebnisse/K0x.md` einen Abschnitt „Übergabe“ (fertig,
+   offen, nächster Schritt), PR mit Titelanfang `ÜBERGABE` auf Ready for review. Der Koordinator übernimmt.
+3. **Was nur am Zielrechner geht** (Live, Plugins, GPU, lokaler Katalog, AMM/SecondRoom-Dienste, Hörtests):
+   als Skript oder CLI-Befehl liefern, Aufruf und erwartetes Ergebnisformat in `ergebnisse/K0x.md`, dort als
+   „nicht gemessen“ ausweisen. Das hält den PR nicht auf; der Koordinator misst und berichtet nach.
+4. **Gerüst vorhanden:** `sirens/production/__init__.py` und `tests/production/__init__.py` existieren bereits;
+   nicht ersetzen. Gemeinsame Fixtures nur K00 (`tests/production/fixtures/`); andere Ketten legen eigene
+   Minimal-Fixtures in ihren eigenen Testdateien an (temporäre Ordner, erzeugte WAVs).
+5. **Vertrag aus K00 benutzen, sobald da:** Liegt auf `origin/extern/KETTE-P00` oder dem Zielzweig bereits
+   `sirens/production/contracts.py`, diesen Branch hineinmergen und die Validatoren benutzen (nicht ändern).
+   Passt etwas nicht: unter „Anpassungsbedarf“ in `ergebnisse/K0x.md` nennen und im eigenen Modul überbrücken.
+6. **Imports nur lazy** auf Module anderer Ketten; fehlt ein Nachbar, Mock aus CONTRACT.md im eigenen Test.
+7. **Abschluss:** Alle Punkte fertig, CI grün: PR auf Ready for review. Nicht selbst mergen.
+
+### Engpässe (pflegt der Koordinator)
+
+Was die Externe nicht kann und deshalb parallel zu den Ketten am Zielrechner läuft. Stand 24.11.2026.
+
+| Engpass | Wer | Schaltet frei | Stand |
+|---|---|---|---|
+| Gerüst `sirens/production`, `tests/production` | Claude | konfliktfreie parallele PRs | erledigt (dieser PR) |
+| Offline-Host: DawDreamer + Surge XT (VST3 vorhanden) in Worker-venv, Render-Rauchtest | Claude | K03 Hostwahl, G1 | läuft |
+| Ableton Live 12 Suite / Producer Pal: Capability-Probe read-only, isoliertes Test-Set | Claude, Start von Live durch Nutzer | K07 Spike, K03 | wartet auf Nutzer |
+| AMM-WB (Port 8000, PostgreSQL) und SecondRoom (Port 8099) lokal starten | Claude | K01 echte Geschmacksdaten, K04 Samples, K05 Ketten | prüfen |
+| Lokaler TTS-Kandidat (Qwen3-TTS) laden und messen | Claude nach Zustimmung | K04 Spoken Word, G1 | wartet auf Zustimmung |
+| Clear-Head-Lyrics/Original im lokalen Katalog finden | Claude | K02, B0 | offen |
+| Hörurteile G1 (3 Groove-Varianten), B2/G3 (12 Blind-A/B) | Nutzer | G1, G3 | nach K08 |
+| Ableton-Roundtrip (Export in Live, Return) | Nutzer (ein Exportdialog) | G2 Ableton | nach P07 |
+| Merge nach `main` | Nutzer | Abschluss | nach G2/G3 |
+
 Ziel: integration/sirens-production. Jede Kette erhält einen Branch feat/production-k0X-<name> vom Plan-Commit bzw. freigegebenen Stand, einen eigenen Worktree und einen PR auf den Integrationsbranch. Nie direkt auf main. A0 allein merged und passt gemeinsame Dateien an. Alte .ketten.json und RT-Ketten bleiben unangetastet, damit die laufende Realtime-Entwicklung nicht umgelenkt wird. Dieses Register ist separat; bei Nutzung eines externen Ketten-Orchestrators dessen Konfiguration im eigenen Worktree bewusst auf dieses Register umstellen.
 
 | Kette | Aufgabe | Owner-Dateien (Präfixe) | Start | Integration | Stand |
