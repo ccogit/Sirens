@@ -17,7 +17,7 @@ Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinat
 | KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | gemergt |
 | KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | gemergt |
 | KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | gemergt |
-| KETTE-P09 | Mix byte-reproduzierbar (Folge aus K05/K08) | K09 | – | vergeben (24.11.2026) |
+| KETTE-P09 | Mix byte-reproduzierbar (Folge aus K05/K08) | K09 | – | gemergt |
 
 **Begriffe:** *Aufgabe* = Datei `AUFGABE-nn-….md` mit eigener Abnahme. *Kette* = eine oder mehrere Aufgaben in
 fester Reihenfolge, ein Branch, ein PR. Abhängigkeiten zwischen Aufgaben derselben Kette erledigt die Reihenfolge,
