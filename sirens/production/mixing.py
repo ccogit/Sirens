@@ -107,8 +107,7 @@ def mix(plan, stems, root, cancelled=lambda: None, *, ffmpeg=None,
                                                threshold_linear=.06),
                                reverb="short filtered multitap return",
                                delay_ms=[240, 480], sub_crossover_hz=120, fade_ms=5),
-                  dependencies=dict(ffmpeg=audio.run(exe, ["-version"]).splitlines()[0]
-                                    if False else subprocess.check_output(
+                  dependencies=dict(ffmpeg=subprocess.check_output(
                                         [exe, "-version"], text=True, timeout=10).splitlines()[0]),
                   source_stems=[dict(track_id=s["track_id"], sha256=s["sha256"])
                                 for s in stems["stems"]],
@@ -137,7 +136,13 @@ def mix(plan, stems, root, cancelled=lambda: None, *, ffmpeg=None,
                 capture_output=True, text=True, timeout=600)
             if completed.returncode:
                 raise RuntimeError("AMM mastering failed: " + completed.stderr[-1500:])
-            validate_wav(candidate, channels=2, frames=frames)
+            # AMM may emit extensible PCM24 (not readable by wave on 3.11).
+            # Decode without padding or trimming to verify the actual length.
+            check = work / "amm-check.pcm"
+            audio.run(exe, ["-i", candidate, "-ar", 48000, "-ac", 2,
+                            "-f", "s24le", "-c:a", "pcm_s24le", "-n", check])
+            if check.stat().st_size != frames * 6:
+                raise RuntimeError("AMM master length mismatch")
             master_source = candidate
             method = "AMM mastering_engine.cli (Mode C), ffmpeg safety gain"
             report["dependencies"]["amm"] = "configured local checkout"
@@ -168,16 +173,24 @@ def mix(plan, stems, root, cancelled=lambda: None, *, ffmpeg=None,
             cancelled()
             ref = Path(reference).resolve(strict=True)
             # Reference is an explicitly supplied local analysis input, never mixed into song.
-            ref_frames = frames
-            with __import__("wave").open(str(ref), "rb") as wav:
-                ref_frames = round(wav.getnframes() * 48000 / wav.getframerate())
+            # Count actual decoded frames (supports WAV/other local formats).
+            ref_pcm = work / "reference-check.pcm"
+            audio.run(exe, ["-i", ref, "-ar", 48000, "-ac", 2,
+                            "-f", "s24le", "-c:a", "pcm_s24le", "-n", ref_pcm])
+            ref_frames = ref_pcm.stat().st_size // 6
+            if not ref_frames:
+                raise ValueError("empty reference")
             normalized = work / "reference-float.wav"
             audio.run(exe, ["-i", ref, "-ar", 48000, "-ac", 2,
                             "-c:a", "pcm_f32le", "-n", normalized])
             ref_metrics = audio.loudness(exe, normalized)
             if measured["lufs"] is None or ref_metrics["lufs"] is None:
                 raise ValueError("cannot loudness-match silence")
-            common = min(measured["lufs"], ref_metrics["lufs"])
+            if measured["true_peak_dbtp"] is None or ref_metrics["true_peak_dbtp"] is None:
+                raise ValueError("reference peak not measurable")
+            common = min(measured["lufs"], ref_metrics["lufs"],
+                         measured["lufs"] + ceiling - .1 - measured["true_peak_dbtp"],
+                         ref_metrics["lufs"] + ceiling - .1 - ref_metrics["true_peak_dbtp"])
             audio.encode(exe, work / "master.wav", work / "comparison_master.wav",
                          frames, common - measured["lufs"])
             audio.encode(exe, normalized, work / "comparison_reference.wav",
