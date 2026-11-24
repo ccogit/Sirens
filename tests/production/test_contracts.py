@@ -48,7 +48,10 @@ class ContractTests(unittest.TestCase):
                     c.safe_path(tmp, path)
             self.assertEqual(c.safe_path(tmp, "assets/x.wav"), Path(tmp).resolve() / "assets/x.wav")
             root = Path(tmp)
-            (root / "link").symlink_to(root / "missing")
+            try:
+                (root / "link").symlink_to(root / "missing")
+            except OSError:  # Windows ohne Symlink-Recht (WinError 1314)
+                self.skipTest("Symlinks nicht erlaubt")
             with self.assertRaises(c.ContractError):
                 c.safe_path(root, "link/x")
 
@@ -62,3 +65,22 @@ class ContractTests(unittest.TestCase):
             self.assertNotEqual(first["stems"][0]["sha256"], second["stems"][0]["sha256"])
             c.validate_stems(first, plan, a)
             c.validate_stems(second, changed, b)
+
+
+    def test_ableton_schema_and_audio(self):
+        value = load("ableton")
+        c.validate_ableton(value)
+        with tempfile.TemporaryDirectory() as tmp:
+            from production.fixtures import wav
+            root = Path(tmp)
+            track = value["tracks"][0]
+            track["sha256"] = wav(root / track["audio_file"], value["frames"], 1)
+            wav(root / value["reference_mix"], value["frames"], 2, channels=2)
+            c.validate_ableton(value, root)
+            track["audio_file"] = "../escape.wav"
+            with self.assertRaises(c.ContractError):
+                c.validate_ableton(value, root)
+        value = load("ableton")
+        value["mode"] = "live_editable"
+        with self.assertRaises(c.ContractError):
+            c.validate_ableton(value)
