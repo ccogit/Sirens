@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "session_create",
+  "type": "object",
+  "properties": {
+    "capability_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sample_rate": {
+      "type": "integer",
+      "minimum": 8000,
+      "maximum": 192000
+    }
+  },
+  "required": [
+    "capability_id",
+    "sample_rate"
+  ],
+  "additionalProperties": false
+}
