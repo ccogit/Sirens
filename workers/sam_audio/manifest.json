@@ -2,6 +2,10 @@
   "version": 1,
   "name": "sam_audio",
   "interpreter_env": "SIRENS_RT_SAM_AUDIO_PYTHON",
+  "python_dirs": [
+    ".venv-sam-audio",
+    ".venv-spike-sam-audio"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {

@@ -2,12 +2,16 @@
   "version": 1,
   "name": "stable_audio",
   "interpreter_env": "SIRENS_RT_STABLE_AUDIO_PYTHON",
+  "python_dirs": [
+    ".venv-stable-audio",
+    ".venv-spike-stable-audio-3"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {
     "id": "stable_audio",
     "mock": false,
-    "available": false,
+    "available": true,
     "mode": "lookahead",
     "sample_rates": [
       44100

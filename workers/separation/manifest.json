@@ -2,6 +2,10 @@
   "version": 1,
   "name": "separation",
   "interpreter_env": "SIRENS_RT_SEPARATION_PYTHON",
+  "python_dirs": [
+    ".venv-separation",
+    ".venv-spike-roformer-drumsep"
+  ],
   "script": "worker.py",
   "args": [],
   "capability": {
