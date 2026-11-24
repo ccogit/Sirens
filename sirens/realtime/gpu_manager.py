@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from .contracts import error, invalid
 from .telemetry import read_gpu
+from .model_registry import PROFILES
 
 GIB = 1024**3
 
@@ -26,13 +27,30 @@ class Lease:
 
 
 class GPUManager:
-    def __init__(self, telemetry=read_gpu, reserve_bytes=5*GIB//2):
+    def __init__(self, telemetry=read_gpu, reserve_bytes=5*GIB//2, profile="Performance"):
         if type(reserve_bytes) is not int or reserve_bytes < 0:
             raise invalid("reserve_bytes")
         self.reserve_bytes = reserve_bytes
         self._telemetry = telemetry
         self._lock = RLock()
         self._leases = {}
+        self._profile = "Performance"
+        self.set_profile(profile)
+
+    @property
+    def profile(self):
+        with self._lock:
+            return self._profile
+
+    def set_profile(self, profile):
+        if type(profile) is not str or profile not in PROFILES:
+            raise invalid("profile")
+        with self._lock:
+            # Kein überraschender Abbruch laufender Audio-Worker beim Profilwechsel.
+            if len(self._leases) > PROFILES[profile]["max_gpu_workers"]:
+                raise error("busy_gpu")
+            self._profile = profile
+            return profile
 
     @property
     def leases(self):
@@ -71,8 +89,12 @@ class GPUManager:
         if user_action is not True:
             raise error("unavailable")
         with self._lock:
-            while (self._free() < peak_bytes or
-                   (max_leases is not None and len(self._leases) >= max_leases)):
+            limit = PROFILES[self._profile]["max_gpu_workers"]
+            if max_leases is not None:
+                limit = min(limit, max_leases)
+            if limit == 0:
+                raise error("busy_gpu")
+            while self._free() < peak_bytes or len(self._leases) >= limit:
                 if not self._evict(priority):
                     raise error("busy_gpu")
             lease = Lease(uuid4().hex, peak_bytes, priority)
