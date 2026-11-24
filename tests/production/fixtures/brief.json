@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "title": "Synthetic test",
+  "style": "test",
+  "negative_tags": [],
+  "lyrics": "Synthetic.",
+  "bpm": 120,
+  "key": null,
+  "target_seconds": 2,
+  "seed": 101,
+  "reference_ids": [],
+  "vocal_mode": "spoken"
+}

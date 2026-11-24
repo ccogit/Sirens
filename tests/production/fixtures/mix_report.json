@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "warnings": [
+    "Synthetic fixture; not measured"
+  ],
+  "measured": {
+    "true_peak_dbtp": null,
+    "lufs": null,
+    "lra": null
+  }
+}
