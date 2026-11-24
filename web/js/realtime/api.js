@@ -48,6 +48,7 @@ export function createRtApi({mock=false, fetcher=globalThis.fetch}={}) {
     session: session => request("GET",sessionPath(session.id)),
     asset: aid => request("GET","assets/"+aid),
     resolve: pfad => request("POST","assets/resolve",{pfad}),
+    cachedStem: (pfad,modell,stem) => request("POST","assets/cached-stem",{pfad,modell,stem}),
     beatgrid: aid => request("GET","assets/"+aid+"/beatgrid"),
     transport: session => request("POST",sessionPath(session.id)+"/transport",{}),
     dry: session => binary("GET",sessionPath(session.id)+"/dry"),

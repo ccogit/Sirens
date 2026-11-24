@@ -105,8 +105,8 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     if(core.rate!==48000)throw new Error("Mock-Testmodus benötigt einen AudioContext mit 48 kHz");
     if(closed)throw new Error("Sitzung geschlossen");
     const selected=selection();
-    if(selected.stem)throw new Error("Stem-RT-Auflösung noch nicht freigegeben");
-    asset=selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
+    asset=selected.stem?await api.cachedStem(selected.path,selected.model,selected.stem):
+      selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
     session=await api.create("mock",core.rate);
     session=await api.command(session,"load",{asset_id:asset.id});
     const end=Date.now()+20000;
@@ -292,7 +292,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const refresh=btn("Status erneut laden");
     root.replaceChildren(h("section",{class:"rt-shell","aria-label":"RTX Neural Lab"},
       h("h2",{},"RTX Neural Lab"),status,
-      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Stems noch nicht freigegeben."),
+      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Vorhandene Demucs-Cache-Stems (PCM16, 44,1/48 kHz) einzeln im Mock; keine neue Trennung."),
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Suche",search),label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
@@ -359,7 +359,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       try {
         const data=await catalog.stemStatus(song.value,model.value);
         if(!active || generation!==stemGeneration)return;
-        for(const name of Array.isArray(data?.stems)?data.stems:[])
+        for(const name of data?.zustand==="bereit" && Array.isArray(data?.stems)?data.stems:[])
           if(typeof name==="string")stem.append(h("option",{value:name},name));
       }catch{if(active && generation===stemGeneration)catalogStatus.textContent="Stem-Cache nicht verfügbar; Original wählbar.";}
       paint();
@@ -377,7 +377,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
           if(!active)return;
           mock=nextMock;client=mock&&mockFactory?mockFactory():remote;
           controller=mock?(mockFactory?createSessionController(client):createAudioSessionController(client,
-            ()=>({path:song.value,stem:stem.value}),{onStatus:paint})):null;
+            ()=>({path:song.value,stem:stem.value,model:model.value}),{onStatus:paint})):null;
           fillSongs();
         }
         caps=next;error=null;

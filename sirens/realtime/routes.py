@@ -133,6 +133,11 @@ def dispatch(handler, path, body):
             if body != {}:
                 raise invalid("body")
             return handler._json(200, service(handler).job(parts[1], cancel=True))
+    if method == "POST" and parts == ["assets", "cached-stem"]:
+        if not isinstance(body, dict) or set(body) != {"pfad", "modell", "stem"}:
+            raise invalid("asset")
+        return handler._json(201, service(handler).sources.register_stem(
+            handler.app.stems, body["pfad"], body["modell"], body["stem"]))
     if method == "POST" and parts == ["assets", "resolve"]:
         if not isinstance(body, dict) or set(body) != {"pfad"}:
             raise invalid("asset")

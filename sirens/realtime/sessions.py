@@ -45,6 +45,7 @@ class Sources:
         self.cfg = cfg
         self.lock = threading.RLock()
         self.items = {}
+        self.stem_resolvers = {}
         self.grids = {}
         self.digests = {}
         self.recorded = {}
@@ -52,6 +53,20 @@ class Sources:
 
     def register(self, relative):
         path = source_path(self.cfg.music_root, relative)
+        return self._register(path, relative)
+
+    def register_stem(self, stem_service, relative, model, stem):
+        # Keine Client-Cachepfade: nur der Bestandsdienst darf sie auflösen.
+        def resolve():
+            path = stem_service.audiodatei(relative, model, stem).resolve()
+            if self.cfg.data_dir.resolve() not in path.parents:
+                raise error("unavailable")
+            if self.cfg.music_root.resolve() in path.parents:
+                raise error("unavailable")
+            return path
+        return self._register(resolve(), relative, resolve)
+
+    def _register(self, path, relative, resolve=None):
         if path.suffix.lower() != ".wav" or not path.is_file():
             raise error("unavailable")
         try:
@@ -61,14 +76,20 @@ class Sources:
         except (wave.Error, EOFError, OSError):
             raise invalid("audio") from None
         # Bewusst begrenzter, exakt vergleichbarer Referenzpfad für G2.
-        if rate != 48000 or channels not in (1, 2) or width != 2 or not 256 <= count <= MAX_SOURCE_FRAMES:
+        rates = (44100, 48000) if resolve else (48000,)
+        if rate not in rates or channels not in (1, 2) or width != 2 or count < 256:
+            raise error("unavailable")
+        frames = (count - 1) * 48000 // rate + 1
+        if frames > MAX_SOURCE_FRAMES:
             raise error("unavailable")
         with self.lock:
             if len(self.items) >= MAX_ASSETS:
                 raise error("unavailable")
             aid = new_id()
-            metadata = dict(id=aid, kind="source", sample_rate=rate, channels=2, nframes=count)
+            metadata = dict(id=aid, kind="source", sample_rate=48000, channels=2, nframes=frames)
             self.items[aid] = (relative, metadata)
+            if resolve is not None:
+                self.stem_resolvers[aid] = (resolve, rate, count)
             return dict(metadata)
 
     def metadata(self, aid):
@@ -92,16 +113,18 @@ class Sources:
         with self.lock:
             relative, meta = self.items[aid]
             self.grids.pop(aid, None)
-        path = source_path(self.cfg.music_root, relative)
+            cached = self.stem_resolvers.get(aid)
+        rate, count = (cached[1], cached[2]) if cached else (48000, meta["nframes"])
+        path = cached[0]() if cached else source_path(self.cfg.music_root, relative)
         try:
             stat = path.stat()
             with wave.open(str(path), "rb") as wav:
                 channels = wav.getnchannels()
-                if (wav.getframerate() != 48000 or channels not in (1, 2)
-                        or wav.getsampwidth() != 2 or wav.getnframes() != meta["nframes"]):
+                if (wav.getframerate() != rate or channels not in (1, 2)
+                        or wav.getsampwidth() != 2 or wav.getnframes() != count):
                     raise invalid("audio")
-                raw = wav.readframes(meta["nframes"])
-            if len(raw) != meta["nframes"] * channels * 2:
+                raw = wav.readframes(count)
+            if len(raw) != count * channels * 2:
                 raise invalid("audio")
             digest = source_hash(path)
             after = path.stat()
@@ -113,7 +136,18 @@ class Sources:
         samples.frombytes(raw)
         if sys.byteorder != "little":
             samples.byteswap()
-        if channels == 1:
+        if rate != 48000:
+            # Begrenzte Offline-Referenz: lineare Interpolation im 48-kHz-Mock,
+            # keine Aussage über samplegenaue Stemausrichtung oder Hörqualität.
+            stereo = array("f")
+            for frame in range(meta["nframes"]):
+                left, fraction = divmod(frame * rate, 48000)
+                right = min(left + 1, count - 1)
+                for ch in range(2):
+                    channel = min(ch, channels - 1)
+                    a, b = samples[left * channels + channel], samples[right * channels + channel]
+                    stereo.append((a + (b - a) * fraction / 48000) / 32768)
+        elif channels == 1:
             stereo = array("f", (x/32768 for x in samples for _ in range(2)))
         else:
             stereo = array("f", (x/32768 for x in samples))
