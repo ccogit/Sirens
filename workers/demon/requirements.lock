@@ -1,0 +1,7 @@
+# Identisch zum gepinnten Messpfad, noch KEIN vollständiger transitive Lock.
+# Installer akzeptiert ausschließlich den Upstream uv.lock mit --locked --no-build.
+# DEMON: 96acc905204d54bfd3055084ca8e9df8a6d9a33f
+torch==2.9.1+cu128
+torchvision==0.24.1+cu128
+torchaudio==2.9.1+cu128
+torchao==0.17.0
