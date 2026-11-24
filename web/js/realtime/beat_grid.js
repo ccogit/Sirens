@@ -16,7 +16,7 @@ function bpm(v) {
   return v;
 }
 export function createBeatGrid(grid, sampleRate) {
-  if (!Number.isSafeInteger(sampleRate) || sampleRate <= 0) throw new RangeError("Samplerate");
+  if (!Number.isSafeInteger(sampleRate) || sampleRate < 8000 || sampleRate > 192000) throw new RangeError("Samplerate");
   if (!grid || number(grid.confidence, "Konfidenz") < MIN_CONFIDENCE || grid.confidence > 1)
     throw new RangeError("BeatGrid unsicher");
   const beat0 = frame(grid.beat0), bar0 = frame(grid.bar0);
@@ -47,11 +47,12 @@ export function createBeatGrid(grid, sampleRate) {
   }
   const origin = absoluteBeat(beat0), barOrigin = absoluteBeat(bar0)-origin;
   function frameToBeat(f) { return absoluteBeat(frame(f))-origin; }
-  function beatToFrame(b) {
+  function rawFrame(b) {
     const absolute = number(b, "Schlag")+origin;
     const s = segment("beat", absolute);
-    return frame(Math.round(s.frame+(absolute-s.beat)*60*sampleRate/s.bpm));
+    return Math.round(s.frame+(absolute-s.beat)*60*sampleRate/s.bpm);
   }
+  function beatToFrame(b) { return frame(rawFrame(b)); }
   function beatToBar(b) { return (number(b, "Schlag")-barOrigin)/4; }
   function barToBeat(b) { return number(b, "Takt")*4+barOrigin; }
   function frameToBar(f) { return beatToBar(frameToBeat(f)); }
@@ -61,9 +62,7 @@ export function createBeatGrid(grid, sampleRate) {
     let b = Math.floor(frameToBar(f));
     // Vor dem ersten Quellframe darf kein negativer Frame zurückgegeben werden.
     while (true) {
-      const absolute = barToBeat(b)+origin;
-      const s = segment("beat", absolute);
-      const candidate = Math.round(s.frame+(absolute-s.beat)*60*sampleRate/s.bpm);
+      const candidate = rawFrame(barToBeat(b));
       if (candidate > f) return frame(candidate);
       b++;
     }
@@ -71,11 +70,9 @@ export function createBeatGrid(grid, sampleRate) {
   function quantize(f, step=1) {
     if (number(step, "Raster") <= 0) throw new RangeError("Raster");
     const b = Math.round(frameToBeat(f)/step)*step;
-    try { return beatToFrame(b); }
-    catch (e) {
-      if (!(e instanceof RangeError)) throw e;
-      return beatToFrame(Math.ceil(-origin/step)*step);
-    }
+    const candidate = rawFrame(b);
+    if (candidate < 0) return beatToFrame(Math.ceil(-origin/step)*step);
+    return frame(candidate);
   }
   return Object.freeze({frameToBeat, beatToFrame, beatToBar, barToBeat,
     frameToBar, barToFrame, nextBar, quantize});
