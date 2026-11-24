@@ -297,7 +297,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'self' https: data:; media-src 'self' https: data: blob:; object-src 'none'")
+        # connect-src: der PCM-Sidecar läuft auf einem eigenen Loopback-Port (ws://127.0.0.1:<port>/pcm).
+        self.send_header("Content-Security-Policy", "default-src 'self' https: data:; media-src 'self' https: data: blob:; "
+                         "connect-src 'self' https: ws://127.0.0.1:*; object-src 'none'")
         self.end_headers()
         self.wfile.write(body)
 

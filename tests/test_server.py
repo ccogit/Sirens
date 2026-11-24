@@ -136,6 +136,9 @@ class Dienst(ServerFall):
         self.assertEqual(status, 200)
         self.assertIn(b"Sirens", seite)
         self.assertIn("text/html", kopf["Content-Type"])
+        # Der Browser muss den PCM-Sidecar auf seinem eigenen Loopback-Port erreichen dürfen (G2 scheiterte daran).
+        self.assertIn("connect-src 'self' https: ws://127.0.0.1:*", kopf["Content-Security-Policy"])
+        self.assertIn("object-src 'none'", kopf["Content-Security-Policy"])
         self.assertEqual(self.http("GET", "/js/logic.js", roh=True)[0], 200)
         status, health, _ = self.http("GET", "/api/health")
         self.assertEqual((status, health["status"], health["auftraege"], health["music_root_vorhanden"]),
