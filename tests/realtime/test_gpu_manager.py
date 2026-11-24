@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from sirens.contracts import Ablehnung
 from sirens.realtime.gpu_manager import GPUManager, Priority, GIB
 from sirens.realtime.telemetry import read_gpu, Telemetry, MIB
-from sirens.realtime.schema import validate
+from sirens.realtime.schemas import validate
 
 
 class GPU(unittest.TestCase):

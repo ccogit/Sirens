@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..config import umgebung
 from .contracts import error, invalid
-from .schema import validate
+from .schemas import validate
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILES = {

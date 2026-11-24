@@ -2,7 +2,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from hilfe import ServerFall
-from sirens.realtime.schema import validate
+from sirens.realtime.schemas import validate
 from sirens.realtime.telemetry import Telemetry
 
 

@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from sirens.contracts import Ablehnung
 from sirens.realtime.model_registry import ModelRegistry
 from sirens.realtime.worker_supervisor import WorkerSupervisor
-from sirens.realtime.schema import validate
+from sirens.realtime.schemas import validate
 
 
 class Workers(unittest.TestCase):
