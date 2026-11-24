@@ -1,4 +1,4 @@
-import subprocess
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from types import SimpleNamespace
 
@@ -54,3 +54,19 @@ class GPU(unittest.TestCase):
         with self.assertRaises(Ablehnung):
             manager.acquire(GIB, Priority.AUDIO, lambda: True, user_action=True)
         self.assertEqual(manager.leases, (low,))
+
+    def test_concurrent_admission_and_profile(self):
+        manager = GPUManager(lambda: Telemetry("GPU", 16*GIB, 0, 16*GIB, 0, 40))
+        def acquire():
+            try:
+                return manager.acquire(GIB, Priority.BACKGROUND, lambda: True,
+                                       user_action=True, max_leases=1)
+            except Ablehnung as exc:
+                return exc.code
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            result = list(pool.map(lambda _: acquire(), range(4)))
+        self.assertEqual(result.count("busy_gpu"), 3)
+        self.assertEqual(len(manager.leases), 1)
+        high = manager.acquire(GIB, Priority.AUDIO, lambda: True,
+                               user_action=True, max_leases=1)
+        self.assertEqual(manager.leases, (high,))
