@@ -12,7 +12,9 @@
     alignment_max_samples:null,dry_fallback:false,worker_error:false,sample_rate:null,error:null};
   let core,session,ws,recorder;
   try{
-    core=await AudioCore.open([0]);
+    // 48 kHz anfordern; läuft das Gerät mit 44,1 kHz, rechnet der Browser um (digitale Prüfung unverändert).
+    const C48=class extends AudioContext{constructor(o){super({...(o||{}),sampleRate:48000});}};
+    core=await AudioCore.open([0],C48);
     raw.sample_rate=core.rate;
     if(core.rate!==48000)throw Error("48 kHz benötigt");
     const asset=await api.asset(MOCK_ASSET);
@@ -58,7 +60,8 @@
       if(interrupted&&!wasInterrupted)raw.interruptions++;
       wasInterrupted=interrupted;
       if(next<now){raw.skipped_blocks++;next=now;}
-      while(next+1024<=now+12288 && expected.size<8 && core.transports[0].pending.size<8){
+      // Angeforderte plus beim Transport wartende Blöcke zusammen höchstens 8 (Transport-Grenze), sonst verwirft er.
+      while(next+1024<=now+12288 && expected.size+core.transports[0].pending.size<8){
         const source=(next-start)%asset.nframes,n=Math.min(1024,asset.nframes-source);
         if(n<256){next+=n;raw.skipped_blocks++;continue;}
         const q={epoch:session.epoch,audio_epoch:epoch,seq:seq++,source_frame:source,start_frame:next,nframes:n};
