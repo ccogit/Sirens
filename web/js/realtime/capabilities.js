@@ -4,7 +4,7 @@ export function deriveState({capabilities, gpu, mock=false, songs=0, error=null,
   const list = capabilities?.capabilities || [];
   const selected = capabilityId ? list.find(c => c.id === capabilityId) : list.find(c => c.available);
   const flags = [];
-  if (mock) flags.push("Testmodus – kein Ton, keine KI");
+  if (mock) flags.push("Testmodus – keine KI, nicht gemessen");
   if (gpu?.available === false) flags.push("Keine GPU verfügbar");
   if (songs === 0) flags.push("Leere Bibliothek");
   if (capabilities && !selected?.available && error) flags.push("Kein Modell installiert oder freigegeben");
