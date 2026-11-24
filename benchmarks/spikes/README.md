@@ -6,7 +6,7 @@ Alle Gates `nicht_gemessen`. Lizenzampel ist nur Vorprüfung, keine Gate-Freigab
 |---|---|---|---|---|
 | 1 | [RoFormer / DrumSep](roformer-drumsep/BERICHT.md) | gelb | offline | RoFormer: green (offline, [Messung](../results/g1/roformer.md)); DrumSep: nicht_gemessen |
 | 2 | [SAM Audio](sam-audio/BERICHT.md) | gelb | offline | nicht_gemessen |
-| 3 | [DEMON](demon/BERICHT.md) | gelb | streaming (zu prüfen) | nicht_gemessen |
+| 3 | [DEMON](demon/BERICHT.md) | gelb | streaming (zu prüfen) | nicht_gemessen; [Teilstand und Befehle](demon/BERICHT.md#kopierbare-befehle-windows-repo-root) |
 | 4 | [RAVE](rave/BERICHT.md) | gelb | streaming (zu prüfen) | nicht_gemessen |
 | 5 | [AFTER](after/BERICHT.md) | gelb | streaming / lookahead (zu prüfen) | nicht_gemessen |
 | 6 | [Stable Audio 3](stable-audio-3/BERICHT.md) | gelb | lookahead / offline | nicht_gemessen |
