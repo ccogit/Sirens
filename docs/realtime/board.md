@@ -4,7 +4,7 @@ Anfangsstand gemäß AUFGABE-00. A0 pflegt den Stand beim Merge oder Capability-
 
 | wp | owner | depends_on | branch | commit | tests | gate | blockers | next_action | status |
 |---|---|---|---|---|---|---|---|---|---|
-| WP00 | KETTE-00 | – | extern/KETTE-00 | – | Teilprüfung; Gesamttest offen | nicht_gemessen | vollständiger Checkout/CI offen | Gesamttest, dann Review | review |
+| WP00 | KETTE-00 | – | extern/KETTE-00 | b2be62ec | CI: 91 Tests, 4 bestehende Skips | nicht_gemessen | Zielrechner nicht gemessen | A0: Review und Baseline | review |
 | WP01 | – | 00 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
 | WP02 | – | 00 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
 | WP03 | – | 01 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
