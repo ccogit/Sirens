@@ -31,13 +31,14 @@ class DSPProbe extends AudioWorkletProcessor {
                 this.first=t;this.port.postMessage({type:"impulse",frames:t-512,declared:this.latency,rate:sampleRate});
             }
             this.probe.process(x,-x,this.a);this.ref.process(x,-x,this.b);
-            // Vergleich mit zeitgleicher Dry-Referenz; bei Abschalten mit Referenz
-            // des zuvor aktiven Zustands vergleichen wir erst nach neuer Einschaltung.
-            if(this.pending!==-1&&((this.active&&Math.abs(this.a[0]-this.b[0])>1e-5)||
-                (!this.active&&Math.abs(this.a[0]-this.b[0])<1e-8))){
+            // Referenz hält den vorherigen Parameterzustand bis zur ersten Änderung.
+            if(this.pending!==-1&&Math.abs(this.a[0]-this.b[0])>1e-5){
                 this.port.postMessage({type:"probe",id:this.pending,frame:currentFrame+i});
+                this.ref.setParameter(2,"wet",this.active?1:0);
                 this.pending=-1;
             }
+            // Der gemessene Pfad ist selbst hörbar; Referenz bleibt stumm.
+            if(this.mode){l=(l+this.a[0])*0.5;r=(r+this.a[1])*0.5;}
             out[0][i]=Math.max(-.89,Math.min(.89,l));out[1][i]=Math.max(-.89,Math.min(.89,r));
         }
         return true;
