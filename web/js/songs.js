@@ -94,8 +94,9 @@ function soundcloudZahlen(song) {
     const datum = new Date(track.zahlenstand || "");
     const stand = Number.isFinite(datum.getTime()) ? "Stand " + datumsformat.format(datum) : "";
     return h("div", { class: "library-sc-numbers", title: stand },
-      tracks.length > 1 ? h("span", {}, track.title) : null,
-      ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label, symbol]) => {
+      tracks.length > 1 ? h("span", { class: "library-sc-track-name" }, track.title) : null,
+      ...scZaehler.map(([key, label, symbol]) => {
+        if (!Number.isFinite(track.zahlen[key])) return h("span", { "aria-hidden": "true" });
         const zahl = zahlenformat.format(track.zahlen[key]);
         const rang = track.rang?.[key];
         const vergleich = Number.isFinite(rang) ? "Katalogvergleich: " + rang + " von 100" : "";
@@ -153,9 +154,9 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
     h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
-      titel, soundcloudSymbol(song), soundcloudZahlen(song), status),
+      titel, soundcloudSymbol(song), status),
       profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
-    fassung, aktionen);
+    h("div", { class: "library-song-stats" }, soundcloudZahlen(song)), fassung, aktionen);
 }
 
 const filterFelder = [
@@ -291,9 +292,14 @@ export function songsAnsicht(el) {
       h("details", { open: !haupttitel.length },
         h("summary", {}, "Weitere lokale Songs (" + weitere.length + ")"),
         h("ul", { class: "library-song-list" }, weitere.map(zeile)))) : null;
+    const spalten = h("div", { class: "library-song-columns" },
+      h("span", { class: "library-song-identity" }, "Song"),
+      h("div", { class: "library-song-stats library-sc-numbers" },
+        scZaehler.map(([, label, symbol]) => h("span", { title: label, "aria-label": label }, symbol))),
+      h("span", { class: "library-song-version" }, "Fassung"));
     inhalt.append(kopf, h("div", { class: "library-detail-body" },
       album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
-      sichtbar.length ? h("ul", { class: "library-song-list" }, haupttitel.map(zeile), extraListe)
+      sichtbar.length ? [spalten, h("ul", { class: "library-song-list" }, haupttitel.map(zeile), extraListe)]
         : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei.")));
     knoepfeAktualisieren();
   }
