@@ -10,7 +10,7 @@ Alle Gates `nicht_gemessen`. Lizenzampel ist nur Vorprüfung, keine Gate-Freigab
 | 4 | [RAVE](rave/BERICHT.md) | gelb | streaming (zu prüfen) | nicht_gemessen |
 | 5 | [AFTER](after/BERICHT.md) | gelb | streaming / lookahead (zu prüfen) | nicht_gemessen |
 | 6 | [Stable Audio 3](stable-audio-3/BERICHT.md) | gelb | lookahead / offline | nicht_gemessen |
-| 7 | [Magenta RealTime 2](magenta-realtime/BERICHT.md) | gelb | streaming (zu prüfen) | nicht_gemessen |
+| 7 | [Magenta RealTime 2](magenta-realtime/BERICHT.md) | gelb | offline (WSL2/JAX; [Installations- und Messbefehle](magenta-realtime/BERICHT.md#installation-und-aufruf-windows-11--wsl2)) | nicht_gemessen |
 | 8 | [GPU Audio SDK](gpu-audio-sdk/BERICHT.md) | gelb | streaming (DSP) | nicht_gemessen |
 | 9 | [Beat This! Live](beat-this-live/BERICHT.md) | grün | streaming (Beat-Tracking) | nicht_gemessen |
 | 10 | [Signalsmith Stretch](signalsmith-stretch/BERICHT.md) | grün | streaming (DSP) | nicht_gemessen |
