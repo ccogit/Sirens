@@ -151,6 +151,7 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
         if out == music or music in out.parents or out in music.parents:
             raise ValueError("Ausgabe und Musikbestand müssen getrennt sein")
     out.mkdir(parents=True, exist_ok=False)
+    print("Suite-Ausgabeordner: " + str(out), flush=True)
     rows = inventory()
     errors = []
     before_hash = hashes(music) if music else {}
