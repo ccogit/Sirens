@@ -69,7 +69,18 @@ def measure(exe, path):
     return result
 
 
+def assert_finite(exe, path):
+    log = run(exe, ["-i", path, "-af", "aformat=sample_fmts=flt,astats=metadata=0",
+                    "-f", "null", "-"])
+    overall = log.rsplit("Overall", 1)[-1]
+    for name in ("NaNs", "Infs"):
+        match = re.search(r"Number of " + name + r":\s*(\S+)", overall)
+        if not match or float(match.group(1)) != 0:
+            raise RuntimeError("non-finite or unverified samples: " + name)
+
+
 def encode(exe, source, destination, frames, gain=0):
+    assert_finite(exe, source)
     # ffmpeg writes WAVE_FORMAT_EXTENSIBLE for PCM24; Python 3.11 wave
     # (the shared contract validator) requires ordinary WAVE_FORMAT_PCM.
     raw = destination.with_suffix(".pcm")
