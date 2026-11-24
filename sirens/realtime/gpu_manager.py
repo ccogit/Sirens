@@ -24,6 +24,7 @@ class Lease:
     id: str
     peak_bytes: int
     priority: Priority
+    owner: str = "worker"
 
 
 class GPUManager:
@@ -47,7 +48,7 @@ class GPUManager:
             raise invalid("profile")
         with self._lock:
             # Kein überraschender Abbruch laufender Audio-Worker beim Profilwechsel.
-            if len(self._leases) > PROFILES[profile]["max_gpu_workers"]:
+            if sum(l.owner == "worker" for l, _ in self._leases.values()) > PROFILES[profile]["max_gpu_workers"]:
                 raise error("busy_gpu")
             self._profile = profile
             return profile
@@ -56,6 +57,28 @@ class GPUManager:
     def leases(self):
         with self._lock:
             return tuple(item[0] for item in self._leases.values())
+
+    def lease_snapshot(self):
+        """Separat vom eingefrorenen Telemetrievertrag v1."""
+        with self._lock:
+            return [dict(id=l.id, owner=l.owner, peak_bytes=l.peak_bytes,
+                         priority=l.priority.name) for l, _ in self._leases.values()]
+
+    def acquire_claude(self):
+        """Unbekannter Peak: Claude exklusiv, nicht durch den Manager beenden.
+
+        Ohne Telemetrie bleibt die Exklusivsperre aktiv. Keine behauptete Messung.
+        """
+        with self._lock:
+            if self._leases:
+                raise error("busy_gpu")
+            snapshot = self._telemetry()
+            if snapshot.available and (snapshot.free is None or
+                    snapshot.free < self.reserve_bytes + 8*GIB):
+                raise error("busy_gpu")
+            lease = Lease(uuid4().hex, 8*GIB, Priority.BACKGROUND, "claude")
+            self._leases[lease.id] = (lease, lambda: False)
+            return lease
 
     def _free(self):
         snapshot = self._telemetry()
@@ -89,6 +112,8 @@ class GPUManager:
         if user_action is not True:
             raise error("unavailable")
         with self._lock:
+            if any(l.owner == "claude" for l, _ in self._leases.values()):
+                raise error("busy_gpu")
             limit = PROFILES[self._profile]["max_gpu_workers"]
             if max_leases is not None:
                 limit = min(limit, max_leases)
