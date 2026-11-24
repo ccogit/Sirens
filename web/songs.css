@@ -209,7 +209,7 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .library-sc-meter.likes_count::-moz-meter-bar { background: #e787a1; }
 
 .songs-page .library-song, .library-song-columns {
-  display: grid; grid-template-columns: 1.9rem auto minmax(0, 1fr) 12rem minmax(6rem, 11rem) 6rem;
+  display: grid; grid-template-columns: 1.9rem auto minmax(0, 1fr) clamp(14rem, 18vw, 17rem) minmax(6rem, 11rem) 6rem;
   column-gap: .65rem;
 }
 .library-song-columns {
@@ -217,14 +217,19 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
   position: sticky; top: 0; background: var(--flaeche); z-index: 1;
 }
 .library-song-columns::before { content: ""; grid-column: 2; width: 2rem; }
-.library-song-stats { grid-column: 4; min-width: 0; }
+.library-song-stats { grid-column: 4; min-width: 0; padding: 0 .65rem 0 .35rem;
+  border-inline-end: 1px solid color-mix(in srgb, var(--linie), transparent 25%); }
 .songs-page .library-song-version { grid-column: 5; }
 .songs-page .library-song-actions { grid-column: 6; }
 .library-sc-numbers, .library-song-columns .library-sc-numbers {
-  display: grid; grid-template-columns: 3rem 2.5rem repeat(3, minmax(0, 1fr)); gap: .2rem; margin: 0;
-  text-align: right;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .35rem; margin: 0;
+  align-items: start; text-align: center;
 }
 .library-sc-track-name { grid-column: 1 / -1; text-align: left; }
-.library-sc-metric { display: grid; justify-items: end; row-gap: .15rem; }
+.library-sc-metric { display: grid; justify-items: center; row-gap: .22rem; min-width: 0; }
+.library-song-columns .library-sc-numbers { font-size: .69rem; font-weight: 650; }
+.library-song .library-sc-metric strong { color: var(--tinte); }
+.library-song .library-sc-metric.leer strong, .library-sc-unavailable { color: var(--leise); opacity: .6; }
+.library-song-stats > .library-sc-unavailable { display: block; text-align: center; font-size: .75rem; }
 .library-sc-metric .library-sc-glyph { display: none; }
-.library-sc-meter { width: 100%; margin: 0; height: .24rem; }
+.library-sc-meter { width: min(100%, 2.35rem); margin: 0; height: .28rem; }

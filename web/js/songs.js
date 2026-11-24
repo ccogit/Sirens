@@ -96,7 +96,8 @@ function soundcloudZahlen(song) {
     return h("div", { class: "library-sc-numbers", title: stand },
       tracks.length > 1 ? h("span", { class: "library-sc-track-name" }, track.title) : null,
       ...scZaehler.map(([key, label, symbol]) => {
-        if (!Number.isFinite(track.zahlen[key])) return h("span", { "aria-hidden": "true" });
+        if (!Number.isFinite(track.zahlen[key])) return h("span", {
+          class: "library-sc-unavailable", "aria-label": label + ": Kein Messwert" }, "–");
         const zahl = zahlenformat.format(track.zahlen[key]);
         const rang = track.rang?.[key];
         const vergleich = Number.isFinite(rang) ? "Katalogvergleich: " + rang + " von 100" : "";
@@ -156,7 +157,8 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
     h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
       titel, soundcloudSymbol(song), status),
       profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
-    h("div", { class: "library-song-stats" }, soundcloudZahlen(song)), fassung, aktionen);
+    h("div", { class: "library-song-stats" }, soundcloudZahlen(song) ||
+      h("span", { class: "library-sc-unavailable", "aria-label": "Keine SoundCloud-Zahlen verfügbar" }, "–")), fassung, aktionen);
 }
 
 const filterFelder = [
@@ -295,7 +297,8 @@ export function songsAnsicht(el) {
     const spalten = h("div", { class: "library-song-columns" },
       h("span", { class: "library-song-identity" }, "Song"),
       h("div", { class: "library-song-stats library-sc-numbers" },
-        scZaehler.map(([, label, symbol]) => h("span", { title: label, "aria-label": label }, symbol))),
+        scZaehler.map(([, label]) => h("span", { title: label, "aria-label": label },
+          label === "Kommentare" ? "Komm." : label))),
       h("span", { class: "library-song-version" }, "Fassung"));
     inhalt.append(kopf, h("div", { class: "library-detail-body" },
       album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
