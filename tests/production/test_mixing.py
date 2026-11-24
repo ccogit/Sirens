@@ -3,12 +3,22 @@ import io
 import json
 import math
 import shutil
+import sys
 import tempfile
 import unittest
 import wave
 from pathlib import Path
 
-from sirens.production.mixing import fetch_chain, mix, analyze_return
+from sirens.production.mixing import fetch_chain, mix as run_mix, analyze_return as run_analyze_return
+
+
+def mix(*args, **kwargs):
+    # Worker uses stdlib + external ffmpeg only; explicit interpreter for tests.
+    return run_mix(*args, worker_python=sys.executable, **kwargs)
+
+
+def analyze_return(*args, **kwargs):
+    return run_analyze_return(*args, worker_python=sys.executable, **kwargs)
 
 
 def fixture(root, with_bass=True):
@@ -56,11 +66,11 @@ class MixingTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("ffmpeg"), "local ffmpeg required")
     def test_mix_sinus_and_impulse(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(prefix="mix Umlaute ä ") as tmp:
             root = Path(tmp)
             plan, stems = fixture(root)
             report = mix(plan, stems, root)
-            self.assertEqual(report, json.loads((root / "mix_report.json").read_text()))
+            self.assertEqual(report, json.loads((root / "mix_report.json").read_text(encoding="utf-8")))
             for name in ("dry.wav", "mix.wav", "master.wav"):
                 with wave.open(str(root / name), "rb") as wav:
                     self.assertEqual((wav.getnframes(), wav.getframerate(),
@@ -133,3 +143,51 @@ class MixingTests(unittest.TestCase):
             self.assertNotEqual(revised["measured"]["bands_dbfs"],
                                 report["measured"]["bands_dbfs"])
             self.assertEqual(before, (first / "master.wav").read_bytes())
+
+
+    def test_worker_failure_no_publication(self):
+        # Real child process, no ffmpeg dependency. A Python executable
+        # is intentionally not a usable ffmpeg binary.
+        with tempfile.TemporaryDirectory(prefix="mix Umlaute ä ") as tmp:
+            root = Path(tmp)
+            plan, stems = fixture(root, with_bass=False)
+            with self.assertRaisesRegex(RuntimeError, "mix worker failed"):
+                mix(plan, stems, root, ffmpeg=sys.executable)
+            self.assertFalse((root / "master.wav").exists())
+            self.assertFalse((root / "mix_report.json").exists())
+            self.assertFalse(list(root.glob(".mix-*")))
+            self.assertEqual(hashlib.sha256((root / stems["stems"][0]["file"]).read_bytes()).hexdigest(),
+                             stems["stems"][0]["sha256"])
+
+    def test_missing_worker_no_publication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, stems = fixture(root, with_bass=False)
+            with self.assertRaisesRegex(RuntimeError, "mix worker Python unavailable"):
+                run_mix(plan, stems, root, ffmpeg=sys.executable,
+                        worker_python=root / "missing-python")
+            self.assertFalse((root / "master.wav").exists())
+            self.assertFalse(list(root.glob(".mix-*")))
+
+
+    def test_cancel_worker_no_publication(self):
+        class Cancelled(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, stems = fixture(root, with_bass=False)
+            calls = 0
+
+            def cancelled():
+                nonlocal calls
+                calls += 1
+                if calls >= 2:
+                    raise Cancelled()
+
+            with self.assertRaises(Cancelled):
+                mix(plan, stems, root, cancelled, ffmpeg=sys.executable)
+            self.assertGreaterEqual(calls, 2)
+            self.assertFalse((root / "master.wav").exists())
+            self.assertFalse((root / "mix_report.json").exists())
+            self.assertFalse(list(root.glob(".mix-*")))
