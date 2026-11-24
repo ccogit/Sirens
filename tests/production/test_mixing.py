@@ -134,6 +134,13 @@ class MixingTests(unittest.TestCase):
             before = (first / "master.wav").read_bytes()
             version = report["dependencies"]["ffmpeg"]
             self.assertTrue(version.startswith("ffmpeg version"), version)
+            # Complete (non-truncated) K05 graph, measured with FFmpeg 7.1.5.
+            # A deterministic but incomplete sidechain must not pass merely
+            # because its hashes agree. This fixture ends mid-1024-sample block.
+            self.assertAlmostEqual(report["measured"]["lufs"], -12.01,
+                                   delta=.1, msg=version)
+            self.assertAlmostEqual(report["measured"]["true_peak_dbtp"], -4.18,
+                                   delta=.1, msg=version)
             for repeat in range(5):
                 with self.subTest(repeat=repeat + 1, ffmpeg=version):
                     if repeat:
