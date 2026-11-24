@@ -1,0 +1,15 @@
+# MSST 1523206d12a521bdb20673726562524cf0f9635b (MIT)
+# torch und torchaudio vom cu128-Index; Rest PyPI.
+torch==2.7.1+cu128
+torchaudio==2.7.1+cu128
+numpy==1.26.4
+PyYAML==6.0.2
+ml-collections==1.0.0
+omegaconf==2.2.3
+beartype==0.14.1
+rotary-embedding-torch==0.3.5
+einops==0.8.1
+librosa==0.11.0
+soundfile==0.13.1
+tqdm==4.67.1
+packaging==24.2

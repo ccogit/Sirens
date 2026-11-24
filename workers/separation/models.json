@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "id": "roformer",
+      "gate": "green",
+      "mode": "offline",
+      "stems": [
+        "vocals",
+        "instrumental"
+      ],
+      "code_revision": "1523206d12a521bdb20673726562524cf0f9635b",
+      "code_license": "MIT",
+      "weight_license": "MIT",
+      "weight_sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+      "sample_rates": [
+        44100
+      ],
+      "channels": 2
+    },
+    {
+      "id": "drumsep",
+      "gate": "red",
+      "available": false,
+      "stems": [],
+      "reason": "Nicht freigegeben; Gewichtslizenz ungeklärt"
+    },
+    {
+      "id": "htdemucs",
+      "mode": "offline",
+      "stems": [
+        "vocals",
+        "drums",
+        "bass",
+        "other"
+      ],
+      "revision": "demucs-4.0.0",
+      "reason": "Bestandsumgebung"
+    }
+  ]
+}
