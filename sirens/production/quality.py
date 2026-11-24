@@ -7,6 +7,7 @@ import json
 import math
 import random
 import statistics
+import subprocess
 import wave
 from pathlib import Path
 
@@ -45,7 +46,30 @@ def _gate(state, reasons):
     return {"status": state, "reasons": reasons}
 
 
-def inspect_run(root):
+def mastering_analyzer(worker_python, engine_root):
+    """Reuse the existing mastering_engine analyzer in an explicitly configured worker."""
+    worker_python = Path(worker_python).resolve(strict=True)
+    engine_root = Path(engine_root).resolve(strict=True)
+    if not worker_python.is_file() or not (engine_root / "mastering_engine" / "analysis.py").is_file():
+        raise ValueError("mastering analysis worker/checkout unavailable")
+    script = ("import dataclasses,json,sys; from mastering_engine import analysis; "
+              "print(json.dumps(dataclasses.asdict(analysis.analyze(sys.argv[1])), allow_nan=False))")
+    def analyze(path):
+        process = subprocess.run([str(worker_python), "-c", script, str(Path(path).resolve(strict=True))],
+                                 cwd=engine_root, capture_output=True, text=True,
+                                 encoding="utf-8", timeout=600, check=True)
+        raw = json.loads(process.stdout.strip().splitlines()[-1])
+        result = {}
+        for source, target in (("integrated_lufs", "lufs"), ("true_peak_dbtp", "true_peak_dbtp"),
+                               ("loudness_range_lu", "lra"), ("stereo_correlation", "stereo_correlation")):
+            value = raw.get(source)
+            result[target] = value if type(value) in (int, float) and math.isfinite(value) else None
+        result["measurement_method"] = "mastering_engine.analysis.analyze (worker)"
+        return result
+    return analyze
+
+
+def inspect_run(root, analyzer=None):
     """Audit immutable run inputs, not perceived musical quality."""
     root = Path(root)
     errors, missing, technical = [], [], {}
@@ -72,11 +96,27 @@ def inspect_run(root):
     for name in ("mix", "master"):
         try:
             technical[name] = measure_wav(c.safe_path(root, name + ".wav"), frames)
+            if analyzer is not None:
+                try:
+                    measured = analyzer(c.safe_path(root, name + ".wav"))
+                    for metric in ("lufs", "true_peak_dbtp", "lra", "stereo_correlation"):
+                        value = measured.get(metric)
+                        technical[name][metric] = value if type(value) in (int, float) and math.isfinite(value) else None
+                    technical[name]["measurement_method"] = measured.get("measurement_method")
+                except (ValueError, OSError, subprocess.SubprocessError, KeyError, IndexError) as exc:
+                    missing.append(name + ": external measurement unavailable (" + type(exc).__name__ + ")")
             if technical[name]["clipped_samples"]:
                 errors.append(name + ": clipping")
         except (ValueError, OSError) as exc:
             errors.append(f"{name}: {exc}")
             technical[name] = None
+    master = technical.get("master") or {}
+    if master.get("true_peak_dbtp") is not None and master.get("measurement_method") and master["true_peak_dbtp"] > -1:
+        errors.append("master exceeds -1 dBTP")
+    if any((technical.get(name) or {}).get(metric) is None or
+           not (technical.get(name) or {}).get("measurement_method")
+           for name in ("mix", "master") for metric in ("true_peak_dbtp", "lufs")):
+        missing.append("true peak and LUFS with measurement method")
     for asset in manifests.get("assets", {}).get("assets", []):
         if asset.get("error") is not None:
             errors.append("asset error: " + asset["id"])
@@ -95,7 +135,7 @@ def inspect_run(root):
                                           if lyrics and brief.get("vocal_mode") == "spoken" and plan else None)
     if technical["planned_text_complete"] is False:
         errors.append("planned spoken text differs from brief")
-    missing += ["measured BPM/beat drift", "true peak and LUFS with measurement method",
+    missing += ["measured BPM/beat drift",
                 "spoken audio transcription and absence of unintended singing/cuts",
                 "local inventory/reference manifest", "real B1/B2 listening",
                 "regeneration/cancel and Ableton roundtrip evidence"]
@@ -187,13 +227,13 @@ def summarize_b2(results):
                 release=False)
 
 
-def benchmark(manifest):
+def benchmark(manifest, analyzer=None):
     """Manifest lists relative run directories. Results remain local."""
     manifest = Path(manifest)
     data = _json(manifest)
     if data.get("schema_version") != 1 or not isinstance(data.get("runs"), list):
         raise ValueError("invalid benchmark manifest")
-    return {"schema_version": 1, "runs": [inspect_run(c.safe_path(manifest.parent, run))
+    return {"schema_version": 1, "runs": [inspect_run(c.safe_path(manifest.parent, run), analyzer)
                                         for run in data["runs"]]}
 
 
@@ -201,8 +241,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--analysis-python", type=Path, help="Existing isolated audio worker Python")
+    parser.add_argument("--analysis-root", type=Path, help="Existing mastering_engine checkout")
     args = parser.parse_args(argv)
-    result = benchmark(args.manifest)
+    if bool(args.analysis_python) != bool(args.analysis_root):
+        parser.error("both analysis options are required together")
+    analyzer = mastering_analyzer(args.analysis_python, args.analysis_root) if args.analysis_python else None
+    result = benchmark(args.manifest, analyzer)
     if args.output:
         _write_new(args.output, result)
     else:

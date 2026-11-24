@@ -20,6 +20,11 @@ class QualityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 quality.measure_wav(path, 3)
 
+    def test_worker_reuse_is_explicit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                quality.mastering_analyzer(directory, directory)
+
     def test_blind_lock_and_reveal(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "mapping.json"
