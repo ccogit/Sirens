@@ -41,6 +41,8 @@ export function createRtApi({mock=false, fetcher=globalThis.fetch}={}) {
   return {
     capabilities: signal => request("GET","capabilities",undefined,signal),
     gpu: signal => request("GET","gpu",undefined,signal),
+    profile: signal => request("GET","profile",undefined,signal),
+    setProfile: (profile,signal) => request("POST","profile",{profile},signal),
     create: (capability_id,sample_rate=48000) => request("POST","sessions",{capability_id,sample_rate}),
     command: (session,command,args={}) => request("POST",sessionPath(session.id)+"/commands",
       {command,args,epoch:session.epoch,seq:session.seq===null?0:session.seq+1}),
