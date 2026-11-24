@@ -296,3 +296,24 @@ def notes_to_frames(notes, sample_rate):
         result.append({"start_frame": round(start*sample_rate), "end_frame": round(end*sample_rate),
                        "pitch": pitch, "amplitude": amplitude})
     return sorted(result, key=lambda n:(n["start_frame"],n["pitch"]))
+
+
+class BeatThisLiveStub:
+    """Nicht registrierbarer Worker-Platzhalter bis zum WP02-Gate.
+    Keine Schein-Capability mit erfundenem Hop, Kontext oder Latenz.
+    """
+    def probe(self):
+        return None
+
+    def load(self, *args, **kwargs):
+        raise error("unavailable")
+
+    warmup = process = generate = load
+
+    def cancel(self):
+        pass
+
+    unload = cancel
+
+    def health(self):
+        return {"available": False, "loaded": False, "gate": "nicht_gemessen"}
