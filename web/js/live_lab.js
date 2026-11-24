@@ -82,7 +82,7 @@ export function liveLabAnsicht(el) {
     for(const tool of visible) {
       const b=h("button",{type:"button",class:"sr-tool","data-id":tool.id,"aria-pressed":String(tool.id===selected.id),
         onclick:()=>{selected=tool;speichern(keys.selected,tool.id);renderDetail();renderList(tool.id);
-          if(window.matchMedia?.("(max-width: 670px)").matches) stage.scrollIntoView({block:"start",behavior:"instant"});}},
+          if(window.matchMedia?.("(max-width: 670px)").matches) stage.scrollIntoView({block:"start",behavior:"auto"});}},
         h("span",{class:"sr-num"},"/"+nummer(tools.indexOf(tool)+1)),
         h("span",{},h("strong",{},tool.kurz||tool.titel,favorites.includes(tool.id)?" ★":""),
           h("small",{},tool.sub)),h("span",{class:"sr-arrow","aria-hidden":"true"},"↗"));
@@ -155,7 +155,8 @@ export function liveLabAnsicht(el) {
   async function produktionsStand() {
     try {
       const d=await api.claude();if(beendet)return;
-      produktion=Boolean(d.laeuft);state.textContent=produktion?"CLAUDE PRODUZIERT · ECO GPU":"CLAUDE IM STANDBY";
+      produktion=Boolean(d.laeuft);const label=produktion?"CLAUDE PRODUZIERT · ECO GPU":"CLAUDE IM STANDBY";
+      if(state.textContent!==label)state.textContent=label;
       state.dataset.state=produktion?"busy":"idle";
     } catch { if(!beendet){state.textContent="PRODUKTIONSSTATUS OFFLINE";state.dataset.state="offline";} }
   }
