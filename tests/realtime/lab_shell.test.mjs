@@ -87,7 +87,7 @@ test("Presets lokal, fehlerhafte Daten, Tastatur und MIDI", () => {
   assert.equal(MIDI_BINDINGS.wet.cc,1);
 });
 test("GPU null-Werte und deklarierte Mock-Latenz",()=>{
-  assert.match(gpuText({available:false,queue_depth:0}),/Warteschlange: 0/);
+  assert.match(gpuText({available:false,queue_depth:0}),/VRAM: unbekannt · Warteschlange: 0/);
   assert.match(gpuText({available:true,vram_used_bytes:null,vram_total_bytes:1048576}),/unbekannt \/ 1 MiB/);
   assert.match(latencyText(capability),/nicht gemessen/);
   assert.deepEqual(catalogEntries({artists:[]}),[]);
@@ -126,4 +126,26 @@ test("mount, pause, destroy: Listener, Timer, keine AudioContexts, keine späten
     resolveCaps({protocol_version:1,capabilities:[]});
     await Promise.resolve();
   }finally{Object.assign(globalThis,previous);}
+});
+
+test("Fehlendes Modell bleibt bei GPU-503 sichtbar",()=>{
+  const state=deriveState({capabilities:{protocol_version:1,capabilities:[]},error:{status:503}});
+  assert.match(state.text,/API-Fehler/);
+  assert.match(state.text,/Kein Modell installiert/);
+  assert.equal(state.enabled,false);
+});
+test("Destroy während Session-Erzeugung verhindert Load und schließt die Session",async()=>{
+  const real=createRtApi({mock:true});
+  let resolveCreate, commands=0, closed=0;
+  const api={...real,create:()=>new Promise(r=>{resolveCreate=r;}),
+    command:(...a)=>{commands++;return real.command(...a);},
+    close:s=>{closed++;return real.close(s);}};
+  const controller=createSessionController(api);
+  const pending=controller.run(()=>assert.fail("Play nach destroy"));
+  await Promise.resolve();
+  const done=controller.destroy();
+  resolveCreate(await real.create("mock"));
+  await Promise.all([pending,done]);
+  assert.equal(commands,0);
+  assert.equal(closed,1);
 });
