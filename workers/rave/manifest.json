@@ -7,15 +7,15 @@
   "capability": {
     "id": "rave",
     "mock": false,
-    "available": false,
-    "mode": "offline",
+    "available": true,
+    "mode": "streaming",
     "sample_rates": [
       48000
     ],
     "channels": 2,
     "context_frames": 0,
     "hop_frames": 2048,
-    "latency_frames": 0,
+    "latency_frames": 2048,
     "controls": [
       {
         "name": "wet",
@@ -132,7 +132,7 @@
         "default": 0
       }
     ],
-    "vram_peak_bytes": "unknown",
+    "vram_peak_bytes": 350224384,
     "device": "cuda",
     "license": "CC-BY-NC-4.0 (IIL)",
     "model_revision": "8471a1691f659ce52fcb2bb393afcc6f80187b17"

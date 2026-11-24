@@ -37,13 +37,25 @@ class NeuralMutationTest(unittest.TestCase):
         # Die beiden Deskriptoren sind bis zum Integrationshook explizit pending.
         registry = ModelRegistry(env={}, mock_enabled=False)
         from sirens.realtime.schemas import validate
-        for cls in (RaveAdapter, AfterAdapter):
-            cap = cls().probe()
-            validate("capability", cap)
-            self.assertNotIn(cap["id"], [item["id"] for item in registry.capabilities()])
-            self.assertFalse(cap["available"])
-            self.assertFalse(cap["mock"])
-            self.assertNotEqual(cap["mode"], "streaming")
+        # AFTER ist noch nicht gemessen und bleibt gesperrt.
+        cap = AfterAdapter().probe()
+        validate("capability", cap)
+        self.assertNotIn(cap["id"], [item["id"] for item in registry.capabilities()])
+        self.assertFalse(cap["available"])
+        self.assertFalse(cap["mock"])
+        self.assertNotEqual(cap["mode"], "streaming")
+
+    def test_rave_released_after_g1(self):
+        # RAVE hat G1 bestanden (benchmarks/results/g1/rave.md): Manifest freigegeben, Streaming, ein Block Latenz.
+        from sirens.realtime.schemas import validate
+        cap = RaveAdapter().probe()
+        validate("capability", cap)
+        self.assertEqual((cap["mode"], cap["latency_frames"], cap["mock"]), ("streaming", 2048, False))
+        self.assertTrue(cap["available"])
+        # Ohne installierten Interpreter meldet die Registry RAVE dennoch als nicht verfügbar.
+        listed = {c["id"]: c for c in ModelRegistry(env={}, mock_enabled=False).capabilities()}
+        self.assertIn("rave", listed)
+        self.assertFalse(listed["rave"]["available"])
 
     def test_rave_lifecycle_and_preset(self):
         adapter = RaveAdapter(RaveModel, allow_unmeasured=True)
@@ -106,7 +118,8 @@ class NeuralMutationTest(unittest.TestCase):
             data = json.dumps({"version": 1, "type": kind, "request_id": kind,
                                "payload": {}}).encode()
             return struct.pack("<I", len(data)) + data
-        for name in ("rave", "after"):
+        # Nur noch AFTER ist ungemessen; RAVE scheitert ohne isolierte Umgebung trotzdem mit "unavailable" beim Laden.
+        for name in ("after",):
             result = subprocess.run([sys.executable, "-u", str(root / "workers" / name / "worker.py")],
                                     input=frame("probe")+frame("load"), capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
