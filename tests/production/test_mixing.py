@@ -105,3 +105,31 @@ class MixingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mix(plan, stems, root)
             self.assertFalse((root / "master.wav").exists())
+
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "local ffmpeg required")
+    def test_reproducible_revision_and_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first, second = Path(tmp) / "first", Path(tmp) / "second"
+            first.mkdir()
+            second.mkdir()
+            plan, stems = fixture(first)
+            second_plan, second_stems = fixture(second)
+            report = mix(plan, stems, first, reference=first / "tone.wav")
+            comparison = report["comparison"]
+            self.assertLessEqual(abs(comparison["master"]["lufs"] -
+                                     comparison["reference"]["lufs"]), .5)
+            for variant in ("master", "reference"):
+                self.assertLessEqual(comparison[variant]["true_peak_dbtp"], -1)
+            before = (first / "master.wav").read_bytes()
+            same = mix(second_plan, second_stems, second)
+            self.assertEqual(before, (second / "master.wav").read_bytes())
+            self.assertEqual(same["measured"], report["measured"])
+            third = Path(tmp) / "third"
+            third.mkdir()
+            revised_plan, revised_stems = fixture(third)
+            revised_plan["mix"]["tracks"]["tone"]["gain_db"] = -20
+            revised = mix(revised_plan, revised_stems, third)
+            self.assertNotEqual(revised["measured"]["bands_dbfs"],
+                                report["measured"]["bands_dbfs"])
+            self.assertEqual(before, (first / "master.wav").read_bytes())
