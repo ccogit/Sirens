@@ -17,18 +17,25 @@ class Runner:
         self.backend = backend
         self.cache = HashCache(self.store.root)
 
-    def render(self, brief, plan, mode="full", *, parent=None):
+    def render(self, brief, plan, mode="full", *, parent=None, run_id=None,
+               additional_cancel=lambda: None):
         validate_brief(brief)
         validate_plan(plan)
         if mode not in ("preview", "full"):
             raise ContractError("invalid mode")
-        run_id, root = self.store.create(parent)
+        if run_id is None:
+            run_id, root = self.store.create(parent)
+        else:
+            root = self.store.get(run_id)
+            state = self.store.inspect(run_id)
+            if state["status"] not in ("queued", "running") or state["parent_run_id"] != parent:
+                raise ContractError("invalid prepared run")
         stage = "prepare"
 
         def checkpoint(name, progress):
             nonlocal stage
             stage = name
-            self.store.check_cancel(run_id)
+            cancelled()
             self.store.status(run_id, "running", name, progress)
 
         def manifest(name, result, validator, **kwargs):
@@ -37,6 +44,7 @@ class Runner:
             return result
 
         def cancelled():
+            additional_cancel()
             self.store.check_cancel(run_id)
 
         def cached_stage(name, inputs, compute, validator, **kwargs):
@@ -124,7 +132,10 @@ class Runner:
             self.store.status(run_id, "cancelled", stage, error=None)
         except Exception as exc:
             # Never persist arbitrary exception text (could contain private paths or secrets).
-            self.store.status(run_id, "failed", stage, error=type(exc).__name__)
+            action = getattr(self.backend, "next_action", None)
+            self.store.status(run_id, "failed", stage,
+                              error={"type": type(exc).__name__, "next_action": action(stage)}
+                              if callable(action) else type(exc).__name__)
         return self.store.inspect(run_id)
 
     def revise(self, run_id, plan, mode="full"):

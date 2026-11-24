@@ -3,12 +3,14 @@ from pathlib import Path
 from uuid import uuid4
 import shutil
 import tempfile
+import threading
+
 
 from ..config import umgebung
 from ..store import write_json_atomic
 from .contracts import (ContractError, read_manifest, safe_path, sha256_file,
                         validate_brief, validate_plan, validate_wav)
-from .jobs import RunStore
+from .jobs import Cancelled, RunStore
 
 
 def settings():
@@ -43,6 +45,14 @@ class RealBackend:
         self.options = settings() if options is None else options
         self.store = RunStore(cfg)
         self.asset_stage = asset_stage
+
+    @staticmethod
+    def next_action(stage):
+        return {"assets": "Prüfe die freigegebenen Quellen und asset_provenance.json.",
+                "stems": "Prüfe die lokale Instrument-/Patch-Konfiguration.",
+                "mix": "Prüfe die lokale Mix-Worker-/ffmpeg-Konfiguration.",
+                "report": "Prüfe report.json und die technische Messkonfiguration."}.get(
+                    stage, "Prüfe Brief und Plan.")
 
     def assets(self, brief, plan, root, cancelled):
         from .assets import AssetStage, Worker, local_candidate
@@ -184,3 +194,217 @@ def import_ableton(store, export_id, confirm):
     except Exception:
         store.status(run_id, "failed", "ableton_return", error="Inspect returned WAV")
     return store.inspect(run_id)
+
+
+class ProductionService:
+    """Local Signal Room job facade; uses Runner rather than a second pipeline."""
+
+    def __init__(self, cfg, *, backend_factory=None, options_factory=settings):
+        self.cfg = cfg
+        self.backend_factory = backend_factory or (lambda cfg, options: RealBackend(cfg, options))
+        self.options_factory = options_factory
+        self.lock = threading.Lock()
+        self.active = None
+
+    @property
+    def store(self):
+        return RunStore(self.cfg)
+
+    def status(self, run_id):
+        store = self.store
+        result = dict(store.inspect(run_id))
+        if result["status"] == "succeeded":
+            root = successful_run(store, run_id)
+            validate_wav(safe_path(root, "master.wav"))
+            report = read_manifest(safe_path(root, "report.json"))
+            from .contracts import validate_report
+            validate_report(report)
+            if report["technical"].get("errors"):
+                raise ContractError("Technical report contains errors")
+            result.update(validated=True, audio_url="/api/production/v1/audio?run=" + run_id,
+                          report=report)
+        return result
+
+    @staticmethod
+    def _validate(brief, plan, preview=False):
+        from .arrangement import validate_arrangement
+        from .contracts import expected_frames
+        validate_arrangement(brief, plan)
+        if preview and not 30 <= expected_frames(plan) / 48000 <= 60:
+            raise ContractError("Provide a validated 30–60 second preview plan")
+
+    def start(self, request):
+        if not isinstance(request, dict):
+            raise ContractError("Provide a production request")
+        options = self.options_factory()
+        mode = request.get("mode", "full")
+        if mode not in ("full", "preview"):
+            raise ContractError("Invalid production mode")
+        # A trusted operator can configure a prepared pilot for the simple UI.
+        # Arbitrary prompts cannot be converted to a plan by the K02 lighthouse recipe.
+        if "brief" not in request:
+            pilot = options.get("pilot")
+            if not isinstance(pilot, dict):
+                raise ContractError("Configure a local prepared pilot brief and plans")
+            prompt = request.get("prompt", "")
+            if not isinstance(prompt, str):
+                raise ContractError("Provide a text prompt")
+            brief = pilot.get("brief", {})
+            if prompt.strip() and prompt.strip() not in (brief.get("title"), brief.get("style")):
+                raise ContractError("Provide an agent-authored plan for this new prompt")
+            request = {**pilot, "mode": mode}
+        if mode == "preview":
+            brief, plan = request.get("preview_brief"), request.get("preview_plan")
+            if brief is None:
+                brief, plan = request.get("brief"), request.get("plan")
+            self._validate(brief, plan, preview=True)
+            return self._submit(brief, plan, mode, options)
+        brief, plan = request.get("brief"), request.get("plan")
+        preview_brief, preview_plan = request.get("preview_brief"), request.get("preview_plan")
+        self._validate(brief, plan)
+        self._validate(preview_brief, preview_plan, preview=True)
+        if any(preview_brief[k] != brief[k] for k in ("title", "seed", "bpm", "key")):
+            raise ContractError("Preview must belong to the same song and seed")
+        return self._submit(brief, plan, mode, options, preview=(preview_brief, preview_plan))
+
+    def revise(self, request):
+        if not isinstance(request, dict):
+            raise ContractError("Provide a revision request")
+        parent = request.get("run")
+        root = successful_run(self.store, parent)
+        brief = read_manifest(safe_path(root, "brief.json"))
+        options = self.options_factory()
+        plan = request.get("plan")
+        text = request.get("text", "")
+        if plan is None:
+            if not isinstance(text, str):
+                raise ContractError("Provide revision text")
+            # A configured agent result maps an exact requested revision to a new plan.
+            plan = options.get("revisions", {}).get(text.strip())
+            if plan is None:
+                raise ContractError("Provide an agent-authored revision plan for this request")
+        if not isinstance(plan, dict) or "seed" not in plan:
+            raise ContractError("Provide a valid revision plan")
+        brief = dict(brief, seed=plan["seed"])
+        self._validate(brief, plan)
+        return self._submit(brief, plan, "full", options, parent=parent)
+
+    def _submit(self, brief, plan, mode, options, *, parent=None, preview=None):
+        from .runner import Runner
+        with self.lock:
+            if self.active is not None:
+                raise ContractError("Wait for or cancel the active production job")
+            store = self.store
+            runner = Runner(self.cfg, self.backend_factory(self.cfg, options))
+            run_id, root = store.create(parent)
+            write_json_atomic(root / "brief.json", brief)
+            write_json_atomic(root / "plan.json", plan)
+            self.active = run_id
+
+            def work():
+                def check():
+                    store.check_cancel(run_id)
+                try:
+                    if preview is not None:
+                        check()
+                        store.status(run_id, "running", "preview", 0)
+                        result = runner.render(*preview, "preview", additional_cancel=check)
+                        check()
+                        if result["status"] != "succeeded":
+                            store.status(run_id, "failed", "preview",
+                                         error={"preview_run_id": result["run_id"],
+                                                "next_action": "Prüfe den Preview-Status."})
+                            return
+                        write_json_atomic(root / "preview.json", {"schema_version": 1,
+                                          "run_id": result["run_id"]})
+                    runner.render(brief, plan, mode, parent=parent, run_id=run_id)
+                except Cancelled:
+                    store.status(run_id, "cancelled", "prepare")
+                except Exception as exc:
+                    if store.inspect(run_id)["status"] in ("queued", "running"):
+                        store.status(run_id, "failed", "prepare", error=type(exc).__name__)
+                finally:
+                    with self.lock:
+                        self.active = None
+
+            try:
+                threading.Thread(target=work, name="sirens-production", daemon=True).start()
+            except Exception:
+                self.active = None
+                store.status(run_id, "failed", "prepare", error="Worker start failed")
+                raise
+        return {"schema_version": 1, "run_id": run_id, "status": "queued"}
+
+    def cancel(self, run_id):
+        self.store.cancel(run_id)
+        return {"schema_version": 1, "run_id": run_id, "cancel_requested": True}
+
+    def audio(self, run_id):
+        root = successful_run(self.store, run_id)
+        path = safe_path(root, "master.wav")
+        validate_wav(path)
+        return path
+
+    def export(self, run_id):
+        result = export_ableton(self.store, run_id, self.options_factory())
+        return {**result, "validated": True,
+                "instructions": "IMPORT.md im lokalen Exportordner lesen; WAV/MIDI ab 1.1.1, Warp aus."}
+
+    def check_return(self, export_id):
+        from .contracts import validate_ableton, validate_return
+        root = ableton_root(self.store)
+        exported = safe_path(root, export_id)
+        manifest = validate_ableton(read_manifest(safe_path(exported, "ableton.json")), root=exported)
+        if manifest["export_id"] != export_id:
+            raise ContractError("Export ID mismatch")
+        inbox = safe_path(root, "return/" + export_id)
+        receipt = safe_path(inbox, "return.json")
+        if receipt.is_file():
+            data = validate_return(read_manifest(receipt), root=inbox)
+            if data["export_id"] != export_id or data["parent_run_id"] != manifest["run_id"]:
+                raise ContractError("Return ID mismatch")
+            path = safe_path(inbox, data["master_file"])
+        elif inbox.is_dir() and {p.name for p in inbox.iterdir()} == {"master.wav"}:
+            path = safe_path(inbox, "master.wav")
+        else:
+            return {"export_id": export_id, "validated": False}
+        validate_wav(path, channels=2)
+        # The final import repeats hash and stability checks before publication.
+        return {"export_id": export_id, "validated": True}
+
+    def take_return(self, export_id, confirm):
+        result = import_ableton(self.store, export_id, confirm)
+        return self.status(result["run_id"])
+
+
+def dispatch(handler, path, query, data=None):
+    """Only called after the existing loopback Host/Origin/JSON guards."""
+    service = handler.app.production
+    action = path.removeprefix("/api/production/v1/")
+    try:
+        if handler.command == "GET":
+            if action == "status":
+                return handler._json(200, service.status(query.get("run")))
+            if action == "audio":
+                return handler._senden(service.audio(query.get("run")))
+            if action == "return":
+                return handler._json(200, service.check_return(query.get("export")))
+        if handler.command == "POST" and isinstance(data, dict):
+            if action == "start":
+                return handler._json(202, service.start(data))
+            if action == "revise":
+                return handler._json(202, service.revise(data))
+            if action == "cancel":
+                return handler._json(200, service.cancel(data.get("run")))
+            if action == "ableton-export":
+                return handler._json(200, service.export(data.get("run")))
+            if action == "export":
+                return handler._json(200, export_master(service.store, data.get("run"),
+                                     data.get("destination"), service.options_factory()))
+            if action == "ableton-import":
+                return handler._json(200, service.take_return(data.get("export"), data.get("confirm")))
+    except (ValueError, OSError, TypeError, KeyError) as exc:
+        # Report fixed action, not arbitrary paths/lyrics from underlying errors.
+        message = str(exc) if isinstance(exc, ContractError) else "Lokale Produktionskonfiguration prüfen."
+        return handler._json(400, {"error": "production", "meldung": message})
+    return handler._json(404, {"error": "not_found", "meldung": "Produktionsaktion nicht verfügbar."})
