@@ -48,7 +48,7 @@ export class MutationScheduler {
     this.intensity=unit(intensity,"Intensität"); this.energy=unit(energy,"Energie");
     this.maxPeak=Math.min(.8,unit(maxPeak,"Pegelgrenze")); this.maxAssets=integer(maxAssets,0,1000,"Asset-Quota");
     this.maxPending=integer(maxPending,1,8,"Warteschlange"); this.switchBars=integer(switchBars,4,64,"Modellwechsel");
-    this.pending=new Map(); this.jobs=new Map(); this.assets=0; this.serial=0; this.running=false;
+    this.pending=new Map(); this.jobs=new Map(); this.prepared=new Map(); this.assets=0; this.serial=0; this.running=false;
     this.lastNeural=null; this.lastSwitch=-Infinity; this.lastFrame=0;
   }
   get backends(){return mutationBackends(this.capabilities(),this.adapters);}
@@ -76,6 +76,7 @@ export class MutationScheduler {
     const amount=clamp(this.intensity*(.5+this.energy)*( .5+random(this.seed,this.block,2)*.5),0,1);
     const p=Object.freeze({token:++this.serial,frame:this.next,endFrame:this.grid.barToFrame(bar+this.bars),bar,block:this.block,backend:b.id,
       kind:b.kind,seed:this.seed,amount,energy:this.energy,peak:this.maxPeak});
+    if(p.endFrame-p.frame>11520000)throw new RangeError("Taktblock zu lang");
     this.assets+=b.assets; this.pending.set(p.token,p);
     if(b.kind==="neural"&&b.id!==this.lastNeural){this.lastNeural=b.id;this.lastSwitch=bar;}
     this.event("plan",this.lastFrame,{plan:p,assets:this.assets});
@@ -84,7 +85,7 @@ export class MutationScheduler {
   // Ein vorbereiteter Block enthält ausschließlich begrenztes PCM. Abbruch zählt
   // weiterhin gegen die Queue, bis der Adapter tatsächlich beendet ist.
   async prepare(plan, input) {
-    if(this.pending.get(plan?.token)!==plan||this.jobs.has(plan.token)||
+    if(this.pending.get(plan?.token)!==plan||this.jobs.has(plan.token)||this.prepared.has(plan.token)||
        this.jobs.size>=this.maxPending) return null;
     const controller=new AbortController();
     this.jobs.set(plan.token,controller);
@@ -95,14 +96,15 @@ export class MutationScheduler {
       if(!(track instanceof Float32Array)||track.length!==plan.endFrame-plan.frame) return null;
       const peak=pcmPeak(track);
       if(peak>this.maxPeak) return null;
-      return {token:plan.token,track,peak,warnings:result.warnings??[]};
+      const prepared={token:plan.token,track,peak,warnings:result.warnings??[]};
+      this.prepared.set(plan.token,prepared);return prepared;
     } catch {
       this.event("error",this.lastFrame,{backend:plan.backend});return null;
     } finally {this.jobs.delete(plan.token);}
   }
   cancelPending(){
     for(const token of this.pending.keys())this.jobs.get(token)?.abort();
-    this.pending.clear();
+    this.pending.clear();this.prepared.clear();
   }
   // Nur exakt am geplanten Quellframe aufrufen. Verspätete Blöcke nie nachholen.
   advance(frame, prepared=null) {
@@ -113,8 +115,9 @@ export class MutationScheduler {
     if(frame<this.next)return false;
     let applied=false;
     const p=prepared&&this.pending.get(prepared.token);
-    if(frame===this.next&&p?.frame===frame&&this.backends.some(b=>b.id===p.backend)&&
-       prepared.track instanceof Float32Array&&prepared.track.length===p.endFrame-p.frame&&\n       pcmPeak(prepared.track)<=this.maxPeak){
+    if(frame===this.next&&p?.frame===frame&&this.prepared.get(p.token)===prepared&&this.backends.some(b=>b.id===p.backend)&&
+       prepared.track instanceof Float32Array&&prepared.track.length===p.endFrame-p.frame&&
+       pcmPeak(prepared.track)<=this.maxPeak){
       try {this.apply(p,prepared);this.event("apply",frame,{plan:p,peak:pcmPeak(prepared.track)});applied=true;}
       catch {this.stop(frame);return false;}
     }else this.event("skip",frame,{reason:"Deadline, Freigabe oder Pegel"});
