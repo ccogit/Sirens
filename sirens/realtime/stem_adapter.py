@@ -58,13 +58,14 @@ def wav_shape(path):
 
 class StemAdapter:
     """Trenner erhält Quelle, privaten Ausgabeordner und Parameter; kein HTTP-Pfad."""
-    def __init__(self, music_root, cache_root, runners):
+    def __init__(self, music_root, cache_root, runners, *, publish_lock=None):
         self.music_root = Path(music_root).resolve()
         self.cache_root = Path(cache_root).resolve()
         if self.cache_root == self.music_root or self.music_root in self.cache_root.parents:
             raise ValueError("Cache darf nicht im Originalordner liegen")
         self.runners = dict(runners)
         self.lock = threading.Lock()
+        self.publish_lock = publish_lock if publish_lock is not None else threading.Lock()
 
     def capabilities(self):
         return [{"id": name, "revision": revision, "stems": list(stems),
@@ -99,6 +100,7 @@ class StemAdapter:
         expected = wav_shape(source)
         def valid(directory):
             return (directory.is_dir() and not directory.is_symlink()
+                    and {path.name for path in directory.iterdir()} == {stem + ".wav" for stem in stems}
                     and all((directory / (stem + ".wav")).is_file()
                             and not (directory / (stem + ".wav")).is_symlink()
                             and wav_shape(directory / (stem + ".wav")) == expected
@@ -117,9 +119,10 @@ class StemAdapter:
                 self.runners[name](source, staging, params)
                 if not valid(staging) or source_hash(source) != digest:
                     raise ValueError("Stem-Format oder Quelle geändert")
-                if cancelled():
-                    raise error("unavailable")
-                staging.rename(target)
+                with self.publish_lock:
+                    if cancelled():
+                        raise error("unavailable")
+                    staging.rename(target)
         return {"model": name, "revision": revision, "key": key,
                 "stems": list(stems), "cache_hit": hit}
 
@@ -163,7 +166,7 @@ class SeparationJobs:
             raise invalid("path")
         if not source.is_file():
             raise error("not_found")
-        if source.suffix.lower() != ".wav" or source.stat().st_size > 512 * 1024**2:
+        if source.suffix.lower() != ".wav" or source.stat().st_size > 160 * 1024**2:
             raise invalid("audio")
         with self.lock:
             if self.closed or any(j["_thread"].is_alive() for j in self.items.values()):
@@ -231,12 +234,13 @@ class SeparationJobs:
             # RoFormer und Demucs liefern derzeit 44,1-kHz-Stereo; kein
             # implizites Resampling und keine ungemessene Sampleausrichtung.
             rate, channels, frames = wav_shape(source)
-            if (rate, channels) != (44100, 2):
-                raise invalid("audio")
+            with wave.open(str(source), "rb") as audio:
+                if (rate, channels) != (44100, 2) or audio.getsampwidth() not in (2, 3) or frames > 44100 * 600:
+                    raise invalid("audio")
             runners = {name: (lambda src, dst, params, name=name:
                        self._runner(job, name, src, dst, params))
                        for name in ("roformer", "htdemucs")}
-            result = StemAdapter(self.cfg.music_root, self.cache, runners).separate(
+            result = StemAdapter(self.cfg.music_root, self.cache, runners, publish_lock=self.lock).separate(
                 relative, job["model"], cancelled=stop.is_set)
             paths = {"original": source, **{stem: self.cache / result["key"] / (stem + ".wav")
                                           for stem in result["stems"]}}
@@ -352,3 +356,7 @@ class SeparationJobs:
             ids = list(self.items)
         for jid in ids:
             self.job(jid, cancel=True)
+            thread = self.items[jid]["_thread"]
+            thread.join(timeout=15)
+            if thread.is_alive():
+                raise error("unavailable")
