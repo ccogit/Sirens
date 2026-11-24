@@ -6,6 +6,9 @@ import subprocess
 import sys
 import threading
 import unittest
+from unittest.mock import patch
+from tempfile import TemporaryDirectory
+import wave
 
 from workers.magenta.adapter import Companion, HOP, RATE
 from sirens.realtime.model_registry import ModelRegistry
@@ -143,6 +146,44 @@ class TestMagentaCompanion(unittest.TestCase):
         self.assertFalse(replies["0"]["available"])
         self.assertTrue(replies["2"]["loaded"])
         self.assertFalse(replies["4"]["loaded"])
+
+    def test_installer_without_opt_in(self):
+        from workers.magenta import install
+        with patch.object(install, "obtain") as obtain, patch.object(install.subprocess, "run") as run:
+            self.assertEqual(install.main([]), 0)
+            obtain.assert_not_called()
+            run.assert_not_called()
+        items = install.manifest()
+        self.assertEqual(len(items), 6)
+        for item in items:
+            self.assertRegex(item["sha256"], r"^[0-9a-f]{64}$")
+            self.assertGreater(item["size_bytes"], 0)
+
+    def test_benchmark_short_mock(self):
+        from benchmarks.companion import messen
+        from benchmarks import result
+
+        class Sampler:
+            proc_peak = gpu_peak = None
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                pass
+
+        machine = {k: None for k in
+                   ("os", "python", "node", "ffmpeg", "gpus", "wsl", "disk", "git", "notes")}
+        with TemporaryDirectory() as tmp, patch.object(messen.runner, "Sampler", Sampler), \
+                patch.object(messen.baseline, "collect", return_value=machine):
+            directory = Path(tmp) / "result"
+            data = messen.run(FakeModel, directory, 1)
+            self.assertEqual(result.read(directory / "result.json"), data)
+            self.assertEqual(data["gate"], "nicht_gemessen")
+            self.assertTrue(data["profil"]["stop_ok"])
+            with wave.open(str(directory / "companion.wav"), "rb") as wav:
+                self.assertEqual(wav.getnframes(), RATE)
+                self.assertEqual(wav.getnchannels(), 2)
 
 
 if __name__ == "__main__":
