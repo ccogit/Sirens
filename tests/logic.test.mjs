@@ -4,6 +4,7 @@ import { test } from "node:test";
 import * as L from "../web/js/logic.js";
 import { katalogEintraege } from "../web/js/live_lab.js";
 import * as DJ from "../web/js/auto_logic.js";
+import { toolWahl, recentAdd, filterTools, readList, validateTools, createSession } from "../web/js/signal_model.js";
 
 const lage = (dran, extra = {}) => ({ dran, claude_auch_dran: dran === "claude", station: 1, offene_bewertungen: 0, ...extra });
 
@@ -229,4 +230,46 @@ test("Auto-DJ: Tempoübernahme über mehrere Tracks hält reale Taktlängen kons
   assert.ok(Math.abs(cue.bpm-129.6)<.01);
   assert.ok(Math.abs(cue.rateB-129.6/125)<.01);
   assert.ok(Math.abs(cue.dauer*1.08-16)<.01);
+});
+
+test("Signal Room: Suche, Filter, Favoriten und letzte Sessions sind registerbasiert",()=>{
+  const tools=[
+    {id:"a",titel:"Emblem & Wellen",gruppe:"Live",tags:["Klangfläche"]},
+    {id:"b",titel:"Kick-Tausch",gruppe:"KI",tags:["Stem-Trennung"],experimental:true},
+    {id:"c",titel:"Neues Tool",gruppe:"Live",tags:["Klangfläche"]}
+  ];
+  assert.equal(toolWahl(tools,"c").id,"c");
+  assert.equal(toolWahl(tools,"alt").id,"a");
+  assert.equal(toolWahl([],null),null);
+  assert.deepEqual(filterTools(tools,{query:"klangflache Wellen"}).map(t=>t.id),["a"]);
+  assert.deepEqual(filterTools(tools,{filter:"group:Live"}).map(t=>t.id),["a","c"]);
+  assert.deepEqual(filterTools(tools,{filter:"experimental"}).map(t=>t.id),["b"]);
+  assert.deepEqual(filterTools(tools,{filter:"favorites",favorites:["b","c"],query:"neues"}).map(t=>t.id),["c"]);
+  assert.deepEqual(filterTools(tools,{filter:"recent",recent:["c","a"]}).map(t=>t.id),["c","a"]);
+  assert.deepEqual(recentAdd(["b","a","c"],"a"),["a","b","c"]);
+  assert.equal(recentAdd(["1","2","3","4","5","6"],"7").length,6);
+  assert.deepEqual(readList({getItem:()=>JSON.stringify(["c","c","old","b"])}, "key",tools),["c","b"]);
+  assert.deepEqual(readList({getItem:()=>"{broken"}, "key",tools),[]);
+  assert.deepEqual(readList({getItem:()=>{throw Error("blocked");}}, "key",tools),[]);
+});
+test("Signal Room: nur eine echte Session; Aktivierung erst nach Mount, Cleanup auch bei Fehler",()=>{
+  const log=[];
+  const host={append(el){log.push("append:"+el);},replaceChildren(){log.push("clear");}};
+  const context={isProducing:()=>true};
+  const tool=id=>({mount(ctx){
+    assert.equal(ctx,context);log.push("mount:"+id);
+    return {el:id,activate(){log.push("activate:"+id);},destroy(){log.push("destroy:"+id);}};
+  }});
+  const controller=createSession(host,context);
+  controller.open(tool("a"));controller.open(tool("b"));controller.close();
+  assert.deepEqual(log,["clear","mount:a","append:a","activate:a","destroy:a","clear","mount:b","append:b","activate:b","destroy:b","clear"]);
+  let failed=false;
+  try { controller.open({mount:()=>({el:"error",activate(){throw Error("bad");},destroy(){log.push("error-cleaned");}})}); } catch { failed=true; }
+  assert.equal(failed,true);assert.equal(log.includes("error-cleaned"),true);
+});
+test("Signal Room: Register lehnt doppelte IDs ab, Vorschau darf fehlen",()=>{
+  const t={id:"new-tool",titel:"Neu",gruppe:"Live",slogan:"NEW",sub:"Test",kategorie:"LIVE",text:"Beschreibung",voraussetzung:"Sofort",farbe:"#aabbcc",mount(){}};
+  assert.equal(validateTools([t])[0],t);
+  let rejected=false;try{validateTools([t,t]);}catch{rejected=true;}
+  assert.equal(rejected,true);
 });
