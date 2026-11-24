@@ -4,10 +4,11 @@ import os
 import signal
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from ..store import write_json_atomic, jetzt
+from ..store import write_json_atomic
 from .contracts import ContractError, read_manifest, safe_path, validate_status
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
@@ -18,13 +19,24 @@ class Cancelled(Exception):
 
 
 class RunStore:
-    def __init__(self, cfg):
+    def __init__(self, cfg, *, clock=None):
+        self.clock = clock if clock is not None else time.time
         data = Path(cfg.data_dir)
         data.mkdir(parents=True, exist_ok=True)
         self.root = safe_path(data, "production")
         self.root.mkdir(exist_ok=True)
         self.runs = safe_path(self.root, "runs")
         self.runs.mkdir(exist_ok=True)
+
+    def _now(self):
+        return datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+    @staticmethod
+    def _seconds(started, finished):
+        # Persisted UTC timestamps also work after process restart/recovery.
+        # A backwards wall-clock correction must not create negative durations.
+        return max(0.0, (datetime.fromisoformat(finished) -
+                         datetime.fromisoformat(started)).total_seconds())
 
     def create(self, parent=None):
         if parent is not None:
@@ -33,7 +45,8 @@ class RunStore:
         path = self.get(run_id, exists=False)
         path.mkdir()
         status = dict(schema_version=1, status="queued", stage=None, progress=None,
-                      error=None, timestamps={"queued": jetzt()}, run_id=run_id,
+                      error=None, timestamps={"queued": self._now()}, run_id=run_id,
+                      stages=[], total_seconds=None,
                       parent_run_id=parent)
         write_json_atomic(path / "status.json", status)
         return run_id, path
@@ -52,7 +65,7 @@ class RunStore:
     def inspect(self, run_id):
         return validate_status(read_manifest(safe_path(self.get(run_id), "status.json")))
 
-    def status(self, run_id, state, stage=None, progress=None, error=None):
+    def status(self, run_id, state, stage=None, progress=None, error=None, *, before_write=None):
         path = self.get(run_id)
         old = self.inspect(run_id)
         if old["status"] in TERMINAL:
@@ -61,9 +74,30 @@ class RunStore:
             raise ContractError("invalid transition")
         if old["status"] == "queued" and state == "succeeded":
             raise ContractError("queued run cannot succeed")
+        now = self._now()
+        stages = old.setdefault("stages", [])
+        # Only an actual running stage is timed. Repeated progress updates
+        # preserve its start; a terminal transition never starts a new stage.
+        active = stages[-1] if stages and stages[-1]["finished"] is None else None
+        if active is not None and (state in TERMINAL or active["stage"] != stage):
+            active["finished"] = now
+            active["seconds"] = self._seconds(active["started"], now)
+            active = None
+        if state == "running" and stage is not None and active is None:
+            stages.append(dict(stage=stage, started=now, finished=None, seconds=None))
         old.update(status=state, stage=stage, progress=progress, error=error)
-        old["timestamps"][state] = jetzt()
+        if state == "running":
+            old["timestamps"].setdefault("running", now)
+        else:
+            old["timestamps"][state] = now
+        # Total is elapsed execution time (not queue wait). Old manifests
+        # remain readable; their unavailable historical stages are not invented.
+        started = old["timestamps"].get("running")
+        old["total_seconds"] = self._seconds(started, now) if started else (
+            0.0 if state in TERMINAL else None)
         validate_status(old)
+        if before_write is not None:
+            before_write(old)
         write_json_atomic(path / "status.json", old)
         return old
 

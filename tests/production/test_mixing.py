@@ -107,6 +107,53 @@ class MixingTests(unittest.TestCase):
             self.assertNotEqual(data[12000*6:12001*6], bytes(6))
             self.assertEqual(report["mastering"]["requested_gain_db"], 0)
 
+    @unittest.skipUnless(shutil.which("ffmpeg"), "local ffmpeg required")
+    def test_gear_bass_stays_stereo_and_explicit_sub_is_mono(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            outputs = {}
+            for variant, patch_name, sidechain in (
+                ("bass", "gear_bass", False),
+                ("bass_ducked", "gear_bass", True),
+                ("sub", "mono_sub", True),
+            ):
+                with self.subTest(variant=variant):
+                    root = Path(tmp) / variant
+                    root.mkdir()
+                    plan, stems = fixture(root)
+                    # A sustained key reliably crosses the sidechain threshold;
+                    # the original single-sample alignment fixture need not.
+                    kick_path = root / "kick.wav"
+                    samples = bytearray()
+                    for i in range(48000):
+                        val = (round(7000000 * math.sin(2 * math.pi * 100 * i / 48000))
+                               if 12000 <= i < 16800 else 0)
+                        samples.extend(val.to_bytes(3, "little", signed=True))
+                    with wave.open(str(kick_path), "wb") as wav:
+                        wav.setparams((1, 3, 48000, 48000, "NONE", ""))
+                        wav.writeframes(samples)
+                    stems["stems"][0]["sha256"] = hashlib.sha256(kick_path.read_bytes()).hexdigest()
+                    track = plan["tracks"][-1]
+                    stem = stems["stems"][-1]
+                    track.update(role="bass", patch=patch_name)
+                    stem.update(role="bass")
+                    stem["source"]["patch"] = patch_name
+                    plan["mix"]["tracks"]["tone"] = {"pan": .7}
+                    if variant == "bass_ducked":
+                        plan["mix"]["tracks"]["tone"]["sidechain"] = True
+                    report = mix(plan, stems, root)
+                    cfg = report["settings"][-1]
+                    self.assertEqual(cfg["sub"], variant == "sub")
+                    self.assertEqual(cfg["sidechain"], sidechain)
+                    with wave.open(str(root / "mix.wav"), "rb") as wav:
+                        self.assertEqual(wav.getnframes(), 48000)
+                        data = wav.readframes(48000)
+                    self.assertEqual(
+                        any(data[i:i+3] != data[i+3:i+6]
+                            for i in range(0, len(data), 6)),
+                        variant != "sub")
+                    outputs[variant] = data
+            self.assertNotEqual(outputs["bass"], outputs["bass_ducked"])
+
     def test_invalid_stem_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -141,7 +188,7 @@ class MixingTests(unittest.TestCase):
                                    delta=.1, msg=version)
             self.assertAlmostEqual(report["measured"]["true_peak_dbtp"], -4.18,
                                    delta=.1, msg=version)
-            for repeat in range(5):
+            for repeat in range(10):
                 with self.subTest(repeat=repeat + 1, ffmpeg=version):
                     if repeat:
                         second = Path(tmp) / f"repeat-{repeat}"
