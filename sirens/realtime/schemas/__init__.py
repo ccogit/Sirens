@@ -3,9 +3,9 @@ import json
 import math
 import re
 from pathlib import Path
-from .contracts import invalid
+from ..contracts import invalid
 
-SCHEMAS = Path(__file__).parent / "schemas"
+SCHEMAS = Path(__file__).parent
 TYPES = {"object": lambda v: isinstance(v, dict),
          "array": lambda v: isinstance(v, list),
          "string": lambda v: isinstance(v, str),

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from ..contracts import Ablehnung
 from .contracts import invalid, validate_command
-from .schema import matches
+from .schemas import matches
 
 FRAME = 6
 HEADER = 44
