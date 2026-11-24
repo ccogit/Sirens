@@ -37,6 +37,9 @@ import hashlib
 import socket
 import struct
 import time
+import wave
+import urllib.request
+import urllib.error
 from dataclasses import replace
 
 from hilfe import ServerFall
@@ -173,3 +176,38 @@ class MockHTTP(ServerFall):
                                    headers={"Origin": "https://example.invalid"})[0], 403)
         self.assertEqual(self.request("GET", "assets/" + FIXTURE_ID)["id"], FIXTURE_ID)
         self.assertEqual(self.http("GET", "/api/health")[1]["status"], "ok")
+
+    def test_wav_resolution_and_recording(self):
+        rel = "test/fixture.wav"
+        path = self.cfg.music_root / rel
+        path.parent.mkdir()
+        with wave.open(str(path), "wb") as wav:
+            wav.setnchannels(2)
+            wav.setsampwidth(2)
+            wav.setframerate(48000)
+            wav.writeframes(struct.pack("<hh", 8192, -4096) * 48000)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        a = self.request("POST", "assets/resolve", {"pfad": rel}, 201)
+        self.assertEqual(a["nframes"], 48000)
+        self.assertEqual(self.request("POST", "assets/resolve", {"pfad": "../fixture.wav"}, 400)["error"], "invalid_path")
+        s = self.request("POST", "sessions", {"capability_id": "mock", "sample_rate": 48000}, 201)
+        self.command(s, "load", {"asset_id": a["id"]})
+        s = self.wait_state(s["id"], "ready")
+        endpoint = "sessions/" + s["id"]
+        code, dry, _ = self.http("GET", self.PREFIX + endpoint + "/dry", roh=True)
+        self.assertEqual(code, 200)
+        self.assertEqual(dry[:8], struct.pack("<ff", .25, -.125))
+        record = self.request("POST", endpoint + "/recordings", {"name": "test", "sample_rate": 48000}, 201)
+        route = endpoint + "/recordings/" + record["id"]
+        req = urllib.request.Request(self.basis+self.PREFIX+route+"/blocks/0",
+                                     data=struct.pack("<ff", .25, -.125)*256,
+                                     method="PUT", headers={"Content-Type": "application/octet-stream"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            self.assertEqual(response.status, 200)
+        finished = self.request("POST", route + "/close", {})
+        self.assertEqual(finished["next_frame"], 256)
+        exported = finished["assets"][0]
+        self.assertEqual((exported["kind"], exported["nframes"]), ("recording", 256))
+        self.assertEqual(self.request("GET", "assets/"+exported["id"]), exported)
+        self.request("POST", endpoint + "/close", {})
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
