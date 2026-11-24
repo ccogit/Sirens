@@ -13,21 +13,22 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 |---|---|---|---|---|
 | KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | gemergt |
 | KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | gemergt |
-| KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | vergeben (24.11.2026) |
+| KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | gemergt |
+| KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | offen |
 | KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | vergeben (24.11.2026) |
 | KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 gemergt | vergeben (24.11.2026) |
 | KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | vergeben (24.11.2026) |
 | KETTE-24 | Welle 2: BeatGrid, Tonart, MIDI | 10 | KETTE-11 gemergt | vergeben (24.11.2026) |
 | KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 gemergt | vergeben (24.11.2026) |
-| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-12 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
-| KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-12 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | offen |
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | vergeben (24.11.2026) |
-| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
-| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | offen |
+| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | vergeben (24.11.2026) |
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | offen |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt, ein neuronaler Pfad freigegeben | gesperrt (optional, wartet auf neuronalen Pfad und Freigabe) |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt | offen |
@@ -45,7 +46,7 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | Kette | Eigene Dateien |
 |---|---|
 | KETTE-11 | `docs/realtime/*.md`, `docs/realtime/adr/`, `docs/realtime/examples/`, `sirens/realtime/contracts.py`, `pcm.py`, `mock.py`, `routes.py`, `schemas/`, `web/js/realtime/pcm.js`, `mock_api.js`, Weiche in `sirens/server.py`, `sirens/config.py`, `.env.example` |
-| KETTE-12 | `benchmarks/spikes/` |
+| KETTE-12, KETTE-13 | `benchmarks/spikes/` |
 | KETTE-21 | `sirens/realtime/gpu_manager.py`, `worker_supervisor.py`, `model_registry.py`, `telemetry.py`, `workers/mock/`; in `routes.py` nur die Adressen `gpu` und `capabilities` |
 | KETTE-22 | `web/js/realtime/audio_core.js`, `clock.js`, `ringbuffer.js`, `transport.js`, `worklet_processor.js`, `stem_adapter.js`, `sirens/realtime/sidecar.py`, `benchmarks/audio_core/` |
 | KETTE-23 | `web/js/realtime/shell.js`, `api.js`, `capabilities.js`, `gpu_panel.js`, `controls.js`, `web/realtime.css`; Registrierung in `web/js/live_lab.js`, `web/js/main.js`, `web/index.html` |

@@ -50,6 +50,7 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 | 18 | `AUFGABE-18-INFINITE-MUTATION.md` | Automatisierte Performance (optional) | 10, 14, 16 |
 | 19 | `AUFGABE-19-SYSTEMABNAHME.md` | Regression, Soak-Skripte, Gate G4 | 17 |
 | 20 | `AUFGABE-20-ROLLOUT.md` | Installer, Runbook, Release Candidate | 19 |
+| 21 | `AUFGABE-21-SPIKES-MESSPFADE.md` | Rest von WP02: Pins, Gewichte, lauffähige Messpfade | 02 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 

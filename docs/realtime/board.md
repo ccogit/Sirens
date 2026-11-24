@@ -6,7 +6,16 @@ Anfangsstand gemäß AUFGABE-00. A0 pflegt den Stand beim Merge oder Capability-
 |---|---|---|---|---|---|---|---|---|---|
 | WP00 | KETTE-00 | – | extern/KETTE-00 | b2be62ec | CI: 91 Tests, 4 bestehende Skips | nicht_gemessen | Zielrechner nicht gemessen | A0: Review und Baseline | review |
 | WP01 | – | 00 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
-| WP02 | – | 00 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
+| WP02 (demon) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (stable-audio-3) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (magenta-realtime) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (rave) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (after) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (roformer-drumsep) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (sam-audio) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (gpu-audio-sdk) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (beat-this-live) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
+| WP02 (signalsmith-stretch) | KETTE-12 | 00 | extern/KETTE-12 | siehe PR #9 | Teiltests siehe Ergebnisdatei | nicht_gemessen | Installation und Zielrechner offen | A0: Übergabe prüfen | review |
 | WP03 | – | 01 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
 | WP04 | – | 01 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
 | WP05 | – | 01 | – | – | – | nicht_gemessen | – | Zuweisung durch A0 | queued |
