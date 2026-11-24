@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "magenta",
+  "interpreter_env": "SIRENS_RT_MAGENTA_PYTHON",
+  "script": "worker.py",
+  "args": [],
+  "capability": {
+    "id": "magenta",
+    "mock": false,
+    "available": false,
+    "mode": "offline",
+    "sample_rates": [
+      48000
+    ],
+    "channels": 2,
+    "context_frames": 0,
+    "hop_frames": 1920,
+    "latency_frames": 0,
+    "controls": [
+      {
+        "name": "gain",
+        "min": 0,
+        "max": 2,
+        "default": 1
+      },
+      {
+        "name": "bypass",
+        "min": 0,
+        "max": 1,
+        "default": 0
+      }
+    ],
+    "vram_peak_bytes": "unknown",
+    "device": "cuda",
+    "license": "Apache-2.0 (Code); CC-BY-4.0 (Gewichte)",
+    "model_revision": "7803d987f43f7142cfc7d68ba3361c5f83023931"
+  }
+}
