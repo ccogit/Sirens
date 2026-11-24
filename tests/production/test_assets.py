@@ -8,7 +8,8 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from sirens.production.assets import (
-    AMMSamples, AssetError, Candidate, SecondRoom, Worker, approved_source,
+    AMMSamples, AssetError, AssetStage, Candidate, SecondRoom, Worker, approved_source,
+    g1_requests,
     inspect_wav, local_candidate, render_assets, selected_delivery,
 )
 from sirens.production.contracts import ContractError, validate_assets
@@ -125,12 +126,12 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(all(item["cache_hit"] for item in cached["assets"]))
         self.assertEqual([a["sha256"] for a in result["assets"]],
                          [a["sha256"] for a in cached["assets"]])
-        # A corrupted cache entry is not returned as successful audio.
-        for file in (self.root / "cache").glob("*.wav"):
+        # P00's immutable cache fails closed on corruption, with no regeneration.
+        for file in (self.root / "cache").rglob("*.wav"):
             file.write_bytes(b"corrupt")
-        repaired = render_assets(p, self.run_dir("three"), **opts)
-        self.assertEqual(len(worker.calls), 4)
-        self.assertFalse(any(a["cache_hit"] for a in repaired["assets"]))
+        blocked = render_assets(p, self.run_dir("three"), **opts)
+        self.assertEqual(len(worker.calls), 2)
+        self.assertTrue(all("error" in a for a in blocked["assets"]))
 
     def test_error_coverage_gap_cancel_and_missing_lease(self):
         p = plan(request(), request("sample", "sample"))
@@ -173,6 +174,32 @@ class AssetTests(unittest.TestCase):
                                          {"status": "succeeded"}]
         self.assertEqual(selected_delivery(sr, "project", "delivery", self.root,
                                            commercial=True).path, path)
+
+    def test_worker_timeout_reaps_process_and_g1_prompts(self):
+        worker = Worker(sys.executable, timeout=.02)
+        script = self.root / "sleep.py"
+        script.write_text("import time\ntime.sleep(10)\n", encoding="utf-8")
+        worker.script = script
+        with self.assertRaisesRegex(AssetError, "timed out"):
+            worker.convert(self.root / "unused.wav", self.root / "never.wav")
+        self.assertTrue(worker.stopped())
+        cues = g1_requests("Exact.\nWords.", seed=10)
+        self.assertEqual([r["id"] for r in cues],
+                         ["bell-buoy", "seagulls", "foghorn", "ship-bell", "spoken-cue"])
+        self.assertEqual([r["seed"] for r in cues], list(range(10, 15)))
+        self.assertEqual(cues[-1]["text"], "Exact.\nWords.")
+
+    def test_coordinated_worker_and_runner_stage(self):
+        gpu = Mock()
+        worker = Worker.coordinated(sys.executable, gpu, peak_bytes=123, user_action=True)
+        worker.lease()
+        self.assertEqual(gpu.worker_lease.call_args.args, (123,))
+        self.assertIs(gpu.worker_lease.call_args.kwargs["user_action"], True)
+        self.assertTrue(gpu.worker_lease.call_args.kwargs["stopped"]())
+        adapter = AssetStage(resolve=lambda req: None)
+        p = plan(request())
+        result = adapter.assets({}, p, self.run_dir("stage"), lambda: None)
+        self.assertIn("error", result["assets"][0])
 
     def test_amm_selected_sample_and_licence(self):
         transport = Mock()
