@@ -16,8 +16,8 @@ G1 SAM Audio small: **nicht gemessen**, keine Freigabe. Offline-Kandidat.
   validiert beide Dateien, Pfade, Shape und exakte PCM-Summe vor atomarer Publikation.
   Abbruch vor Publikation; Koordinator/WP25 muss Cancel/Publish im Job-Lock serialisieren und
   Prozessbaum/privates Staging bei Abbruch aufräumen.
-- Gesperrtes schema-konformes Manifest (manifest.pending.json), Wheelhouse-Installer, Teil-Lock
-  und Snapshot-Receipt-Prüfung; kein Download. Keine Registry-Anmeldung vor lokaler Installation/G1.
+- Gesperrtes schema-konformes Manifest (manifest.json), Wheelhouse-Installer, Teil-Lock
+  und Snapshot-Receipt-Prüfung; kein Download. Registry-Descriptor ist sichtbar, aber available=false bis lokaler Installation/G1.
   UI-Platzhalter, Preview/Dry, Route, Job- und Cache-Einbau in docs/realtime/hooks/WP13.md.
 - Messskript für fünf Beschreibungen in benchmarks/semantic/messen.py, JSON/Markdown nach
   benchmarks/result.py und lokaler Hörbericht; keine Audiodateien im Repo.
@@ -29,8 +29,9 @@ G1 SAM Audio small: **nicht gemessen**, keine Freigabe. Offline-Kandidat.
    tests/realtime/test_semantic_stem.py **ok** (Job-Lebenszyklus IPC, Abbruch, Cache/Revision/Prompt,
    PCM-Rekonstruktion einschließlich Extremwerten, Fake-SAM-Schnittstelle, Snapshot-Hash-Prüfung,
    gesperrte Capability). Keine GPU, kein Netz, keine echten Gewichte.
-   Danach Registrierung auf Manifestvorlage umgestellt (siehe unten) und Capability-Test um
-   simulierte lokale Freigabe mit/ohne Interpreter ergänzt. Diesen neuen Stand erneut in PR-CI prüfen.
+   Danach Capability-Test um simulierte lokale Freigabe mit/ohne Interpreter ergänzt. Der
+   Integrationszweig enthält inzwischen die angepassten Registry-Tests der Pads-Kette; das
+   kanonische gesperrte Manifest wird wieder registriert. Diesen Stand in PR-CI prüfen.
    Kein produktiver Supervisor-Dateijob-Test möglich, solange WP25 nicht eingebaut ist.
 2. Hardware-/Hörmessung **nicht gemessen**. Nach Audit, lokaler Installation, Netzisolation und
    Lizenzfreigabe durch den Koordinator, fünf passende lokale PCM16-Stereo-Tracks (Lead Vocals,
@@ -48,9 +49,10 @@ G1 SAM Audio small: **nicht gemessen**, keine Freigabe. Offline-Kandidat.
    `realtime.test_rt_contracts.HTTP.test_switch_and_security` (Zeile 169) und
    `realtime.test_worker_supervisor.Workers.test_oom_and_rejection` (Zeile 67):
    AssertionError: capabilities mit gesperrtem sam_audio-Descriptor != [].
-   Korrektur ausschließlich in eigenen Dateien: manifest.pending.json bleibt außerhalb
-   Registry-Glob, UI-Hook zeigt bei fehlender Capability ausdrücklich „nicht installiert /
-   nicht gemessen“. Keine Bestands-Tests geändert. Neue CI maßgeblich.
+   Zwischenzeitliche Korrektur ausschließlich in eigenen Dateien durch Manifestvorlage.
+   Nach Merge von Integration 5286fd20baf58f7f48b34adf74ddd867ab181bb5 erlauben die
+   Bestandstests gesperrte Nicht-Mock-Deskriptoren; deshalb zurück zum kanonischen manifest.json
+   (available=false). Keine eigenen Änderungen an Bestands-Tests. Neue CI maßgeblich.
    Lokaler vollständiger Checkout nicht möglich: git ls-remote meldet
    "Could not resolve host: github.com"; daher keine lokalen Tests.
    Standardbefehl: python -m unittest discover -s tests -v (Python 3.11, Node 22).
@@ -80,8 +82,7 @@ G1 SAM Audio small: **nicht gemessen**, keine Freigabe. Offline-Kandidat.
   ADR 0006 verlangt Controls-Validierung. WP25/Koordinator muss textuellen Prompt explizit
   für diesen Dateijob zulassen. Kein Schema-/Supervisor-Umbau in dieser Kette.
   WP25 war bei letztem Integrationsabgleich nicht gemergt. Hook enthält angenommene IPC-Felder.
-- Capability bleibt nicht registriert, bis eine geprüfte lokale manifest.json aus der
-  Vorlage erstellt wird. KETTE-43 muss den nicht anklickbaren UI-Platzhalter auch bei
+- Capability bleibt deaktiviert. KETTE-43 muss den nicht anklickbaren UI-Platzhalter auch bei
   fehlendem Descriptor anzeigen und vor Freigabe Receipt/Gate/Interpreter abgleichen.
 
 ## Übergabe
@@ -101,8 +102,8 @@ vollständigen Hash-Lock erstellen, G1 messen und erst dann passende lokale Mani
 mit Peak freigeben. Hook einbauen; G3/Hörprüfung durchführen.
 
 Fehlerausgabe: Run 45461751592 "FAILED (failures=2, skipped=4)", oben beide Assertions;
-Manifestkorrektur danach gepusht. Git-Checkout lokal: "Could not resolve host: github.com".
+Manifestkorrektur und aktueller Integrationsstand danach gepusht. Git-Checkout lokal: "Could not resolve host: github.com".
 Keine gemessenen G1-Werte. Kein Merge durch Bearbeiter.
 
-Rollback: PR nicht mergen bzw. nur WP13-Dateien revertieren; lokale Aktivierungsdatei entfernen,
+Rollback: PR nicht mergen bzw. nur WP13-Dateien revertieren; Manifest auf available=false setzen,
 Worker beenden, optional lokalen Cache und venv entfernen. Keine Originaldateien überschreiben.

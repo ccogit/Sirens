@@ -74,15 +74,15 @@ class SemanticTests(unittest.TestCase):
                 self.assertTrue(-32768 <= a <= 32767 and -32768 <= b <= 32767)
 
     def test_registry_disabled_even_with_interpreter(self):
-        template = ROOT / "workers" / "sam_audio" / "manifest.pending.json"
+        template = ROOT / "workers" / "sam_audio" / "manifest.json"
         manifest = json.loads(template.read_text(encoding="utf-8"))
         cap = validate("capability", manifest["capability"])
         self.assertFalse(cap["available"])
         self.assertFalse(cap["mock"])
         for env in ({}, {"SIRENS_RT_SAM_AUDIO_PYTHON": sys.executable}):
             reg = ModelRegistry(ROOT, env=env)
-            self.assertFalse(any(c["id"] == "sam_audio" and c["available"]
-                                 for c in reg.capabilities()))
+            descriptor = next(c for c in reg.capabilities() if c["id"] == "sam_audio")
+            self.assertFalse(descriptor["available"])
         # Simulierte lokale Freigabe: Registry verlangt zusätzlich Interpreter.
         worker = self.root / "workers" / "sam_audio"
         worker.mkdir(parents=True)
