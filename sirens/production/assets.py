@@ -237,7 +237,7 @@ def _cache_key(request, source, input_hash, plan):
 
 def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None,
                   gap_ids=(), cache_dir=None, commercial=False, allow_test=False,
-                  cancelled=lambda: False):
+                  cancelled=lambda: False, measure=None):
     """Produce one manifest entry per validated request, including explicit errors.
 
     resolve(request) MUST try the existing AMM/SecondRoom sources first and return
@@ -329,7 +329,10 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                 if request["kind"] not in ("speech", "loop") and abs(
                         info["measured"]["duration_seconds"] - request["duration_seconds"]) > max(.1, .1 * request["duration_seconds"]):
                     raise AssetError("asset duration differs from request")
-                # The upstream measurements are evidence, never plan guesses.
+                # Delegate optional measured BPM/key to an existing analyzer;
+                # never substitute requested values for measurements.
+                if measure is not None:
+                    measured.update(measure(pending, request))
                 for field in ("bpm", "key"):
                     info["measured"][field] = measured.get(field)
                 if request["kind"] == "loop":
@@ -538,7 +541,8 @@ class AssetStage:
     rechecks rights before restoring each asset through the shared P00 cache.
     """
     def __init__(self, *, resolve, worker_factory=None, generated_sources=None,
-                 gap_ids=(), cache_dir=None, commercial=False):
+                 gap_ids=(), cache_dir=None, commercial=False, measure=None):
+        self.measure = measure
         self.resolve = resolve
         self.worker_factory = worker_factory
         self.generated_sources = generated_sources
@@ -551,4 +555,4 @@ class AssetStage:
         return render_assets(plan, root, resolve=self.resolve, worker=worker,
                              generated_sources=self.generated_sources, gap_ids=self.gap_ids,
                              cache_dir=self.cache_dir, commercial=self.commercial,
-                             cancelled=cancelled)
+                             cancelled=cancelled, measure=self.measure)
