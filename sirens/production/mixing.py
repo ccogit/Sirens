@@ -19,6 +19,7 @@ def fetch_chain(role: str, *, timeout: float = 5.0, opener=urlopen) -> dict:
 
 
 import math
+import re
 import os
 import shutil
 import subprocess
@@ -33,6 +34,12 @@ def _number(value, lo, hi, name):
     return value
 
 
+def _sub_identifier(value):
+    """Recognize explicit sub markers, not arbitrary words like 'subtle'."""
+    return any(re.fullmatch(r"(?:sub|subbass)[0-9]*", token)
+               for token in re.split(r"[_.-]+", value.lower()))
+
+
 def _settings(plan, stems):
     tracks = {track["id"]: track for track in plan["tracks"]}
     overrides = plan["mix"].get("tracks", {})
@@ -44,22 +51,32 @@ def _settings(plan, stems):
         if role != tracks[name]["role"].lower():
             raise ValueError("stem role mismatch")
         kick = name.lower().startswith("kick") or role == "kick"
-        sub = role in ("bass", "sub") or name.lower().startswith("sub")
+        sub = (role == "sub" or _sub_identifier(name)
+               or _sub_identifier(tracks[name]["patch"]))
+        bass = role == "bass" and not sub and not kick
         defaults = dict(gain_db=-6 if kick or sub else -9, pan=0,
                         highpass_hz=20 if kick or sub else 80,
-                        eq_hz=300, eq_db=0, reverb_send=0, delay_send=0)
+                        eq_hz=300, eq_db=0, reverb_send=0, delay_send=0,
+                        sidechain=sub and not kick)
+        if bass:
+            # The musical bass has its own EQ and dynamics; leave its
+            # upper stereo content intact and reserve kick ducking for
+            # the sub unless the plan explicitly enables it.
+            defaults.update(highpass_hz=45, eq_hz=250, eq_db=-2)
         if role in ("spoken", "vocals", "voice", "synths", "synth"):
             defaults.update(reverb_send=.08, delay_send=.03)
         custom = overrides.get(name, {})
         if not isinstance(custom, dict) or set(custom) - set(defaults):
             raise ValueError("invalid track settings")
         defaults.update(custom)
+        if type(defaults["sidechain"]) is not bool:
+            raise ValueError("invalid sidechain")
         for key, bounds in dict(gain_db=(-60, 12), pan=(-1, 1),
                                 highpass_hz=(10, 2000), eq_hz=(20, 20000),
                                 eq_db=(-12, 12), reverb_send=(0, .5),
                                 delay_send=(0, .5)).items():
             _number(defaults[key], *bounds, key)
-        result.append(dict(track_id=name, kick=kick, sub=sub, **defaults))
+        result.append(dict(track_id=name, kick=kick, sub=sub, bass=bass, **defaults))
     return result
 
 
