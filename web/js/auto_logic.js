@@ -22,7 +22,7 @@ export function katalogSongs(daten) {
 }
 
 export function tempoAngleichung(bpm, ziel) {
-  if (!(bpm > 0) || !(ziel > 0)) return null;
+  if (!Number.isFinite(bpm) || !Number.isFinite(ziel) || !(bpm > 0) || !(ziel > 0)) return null;
   const normalized = [bpm / 2, bpm, bpm * 2].reduce((a,b) =>
     Math.abs(Math.log(b/ziel)) < Math.abs(Math.log(a/ziel)) ? b : a);
   const rate = ziel / normalized;
@@ -75,9 +75,21 @@ export function waehleNaechsten(songs, history = [], ziel = null, zufall = Math.
 }
 
 
-export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19, zielEnergie=null, aktuelleRate=1) {
+// Zeitdifferenz in realen Sekunden relativ zum gemeinsamen Cue; keine Modulo-
+ // Operation: auch ein ganzer verlorener Beat muss erkannt werden.
+export function syncFehler(zeitA, zeitB, cue) {
+  return (zeitA-cue.startA)/cue.rateA - (zeitB-cue.startB)/cue.rateB;
+}
+
+export function syncRate(zeitA, zeitB, cue) {
+  const fehler=syncFehler(zeitA,zeitB,cue);
+  const korrektur=Math.abs(fehler)<.012 ? 0 : Math.max(-.03,Math.min(.03,fehler*.6));
+  return cue.rateB*(1+korrektur);
+}
+
+export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichung=0.19, zielEnergie=null, aktuelleRate=1, normalA=von?.bpm) {
   if (!(von?.bpm>0) || !(nach?.bpm>0)) return null;
-  const effektivesBpm=von.bpm*aktuelleRate;
+  const effektivesBpm=normalA*aktuelleRate;
   const t=tempoAngleichung(nach.bpm,effektivesBpm);
   if (!t || Math.abs(1-t.rate)>erlaubteAbweichung) return null;
   const dauer=taktzahl*240/effektivesBpm;
@@ -93,7 +105,7 @@ export function findeUebergang(von, nach, jetzt=0, taktzahl=8, erlaubteAbweichun
       .08*Math.max(0,1-t.abweichung*6)+.10*dramaturgie;
     if(!beste||beste.score<score) beste={
       startA:a.zeit,startB:b.zeit,rateB:t.rate,normalB:t.normalized,
-      bpm:effektivesBpm,bars:taktzahl,dauer,rateA:aktuelleRate,score,
+      bpm:effektivesBpm,bars:taktzahl,dauer,rateA:aktuelleRate,normalA,sync:true,score,
       ausgang:a.grund,eingang:b.grund,energieA:a.energie,energieB:b.energie,
       confidence:Math.min(von.confidence||0,nach.confidence||0,
         von.phrase_confidence||0,nach.phrase_confidence||0)
