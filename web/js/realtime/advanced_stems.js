@@ -1,7 +1,7 @@
 // Offline-Mix vorbereiten; kein zweiter AudioContext.
 export function mixStems(original, stems, settings = {}, dry = false) {
     const length = original.length;
-    if (!(original instanceof Float32Array) || !length || !Array.from(original).every(Number.isFinite))
+    if (!(original instanceof Float32Array) || !length || !original.every(Number.isFinite))
         throw new Error("Ungültige Quelle");
     if (dry) return original.slice();
     const entries = Object.entries(stems);
@@ -134,6 +134,14 @@ export function createSeparationApi(fetcher = globalThis.fetch) {
         start: (pfad, model) => json("POST", "separation/jobs", {pfad, model}),
         job: id => json("GET", jobPath(id)),
         cancel: id => json("POST", jobPath(id) + "/cancel", {}),
+        async exportMix(id, wav) {
+            const response = await fetcher("/api/rt/v1/" + jobPath(id) + "/export", {
+                method: "PUT", headers: {"Content-Type": "application/octet-stream"}, body: wav,
+                signal: AbortSignal.timeout(60000)});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.meldung || "Export fehlgeschlagen");
+            return result;
+        },
         async audio(id) {
             if (!validId(id)) throw new Error("Ungültige Asset-ID");
             const r = await fetcher("/api/rt/v1/assets/" + id + "/audio",
@@ -217,8 +225,10 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
             };
             unmount = mountAdvancedStems(mixer, {original, stems: data, rate: 44100,
                 onMix: play, onExport: wav => {
-                    if (!onExport) throw new Error("Kein freigegebener Exportpfad eingebunden");
-                    onExport(wav, job.id);
+                    const exported = onExport ? onExport(wav, job.id) : api.exportMix(job.id, wav);
+                    Promise.resolve(exported).then(result => {
+                        if (active && result?.file) status.textContent = "Gespeichert im RT-Ordner: " + result.file;
+                    }).catch(error);
                 }});
             play(original);
             status.textContent = (job.fallback_from ? "Rückfall auf Demucs · " : "") +
