@@ -29,16 +29,13 @@ def loader(args, fixture, torch):
     from acestep.constants import TASK_INSTRUCTIONS
     from acestep.nodes.types import Audio
 
-    def reject_download(*args, **kwargs):
-        raise RuntimeError("Automatischer Modellbezug gesperrt")
-
     # Der gepinnte ModelContext ruft diese Methode vor dem Laden auf.
     # Der lokale Snapshot wurde bereits vollständig geprüft.
     with patch.object(ModelContext, "_ensure_downloaded", staticmethod(lambda *a, **k: None)):
         with torch.inference_mode():
-            session = Session(project_root=str(model), config_path="acestep-v15-turbo",
+            session = Session(project_root=str(model.parent), config_path="acestep-v15-turbo",
                               device=args.device, decoder_backend="eager",
-                              vae_backend="eager", use_flash_attention=False,
+                              vae_backend="eager", vae_window=0.36, use_flash_attention=False,
                               offload_text_encoder=args.device == "cuda")
             waveform = torch.tensor(fixture.samples, dtype=torch.float32).reshape(-1, 2).T.contiguous()
             if args.rate != 48000:
@@ -59,9 +56,9 @@ def loader(args, fixture, torch):
             # Ein Runner-Sample umfasst alle Ticks bis zur nächsten fertigen
             # Ausgabe inklusive Decode. Kein RTF aus leeren Warmup-Ticks.
             for _ in range(64):
-                latent = handle.tick()
+                latent = handle.tick(seed=seed, denoise=0.35 if seed < 2 else 0.75)
                 if latent is not None:
-                    audio = handle.decode(latent)
+                    audio = handle.decode(latent, t_start=0.0)
                     wave = audio.waveform
                     if wave.ndim == 3:
                         wave = wave.squeeze(0)

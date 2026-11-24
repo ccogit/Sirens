@@ -96,7 +96,17 @@ def main(argv=None):
         (directory / "verified.json").write_text(json.dumps({"revision": info["revision"], "files": records}, indent=2), encoding="utf-8")
         verify_snapshot(directory)
     print("Geprüfter Snapshot:", directory)
-    print("Paketinstallation separat, siehe Bericht")
+    # Upstream-Lock ist im festgelegten Stand nicht über die API lesbar.
+    # Wenn vorhanden, ausschließlich dessen Wheels installieren; niemals neu auflösen.
+    if not (vendor / "uv.lock").is_file():
+        raise RuntimeError("Upstream uv.lock fehlt; Paketpins vervollständigen, siehe Bericht")
+    import os
+    env = dict(os.environ, UV_PROJECT_ENVIRONMENT=str(venv), UV_PYTHON_DOWNLOADS="never")
+    subprocess.run(["uv", "sync", "--locked", "--no-dev", "--no-build",
+                    "--no-install-project", "--project", str(vendor)], env=env, check=True)
+    subprocess.run([sys.executable, "-m", "pip", "check"], check=True)
+    (venv / "installed.lock").write_text(subprocess.check_output(
+        [sys.executable, "-m", "pip", "freeze"], text=True), encoding="utf-8")
     return 0
 
 
