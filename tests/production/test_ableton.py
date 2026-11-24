@@ -155,7 +155,10 @@ class AbletonExchangeTests(unittest.TestCase):
                               revision_id="revision1", stability_seconds=0)
             self.assertFalse((self.runs / "revision1").exists())
         (inbox / "master.wav").unlink()
-        (inbox / "master.wav").symlink_to(self.run / "mix.wav")
+        try:
+            (inbox / "master.wav").symlink_to(self.run / "mix.wav")
+        except OSError:  # Windows ohne Symlink-Recht (WinError 1314)
+            self.skipTest("Symlinks nicht erlaubt")
         write_json(inbox / "return.json", {**manifest, "export_id": "exp1"})
         with self.assertRaises(ContractError):
             import_return(self.exports, "exp1", self.runs, confirm=True, stability_seconds=0)
