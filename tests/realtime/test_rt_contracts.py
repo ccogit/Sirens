@@ -180,6 +180,8 @@ class HTTP(ServerFall):
         status, body = self.http("GET","/api/rt/v1/gpu")[:2]
         self.assertEqual(status, 200)
         validate("telemetry", body)
-        self.assertEqual(self.http("POST","/api/rt/v1/sessions",{})[0],503)
+        # WP06 implementiert sessions: leerer Body verletzt session_create.
+        status, body, _ = self.http("POST", "/api/rt/v1/sessions", {})
+        self.assertEqual((status, body["error"]), (400, "invalid"))
         self.assertEqual(self.http("GET","/api/health")[1]["status"],"ok")
         self.assertEqual(self.http("GET","/api/unbekannt")[0],404)
