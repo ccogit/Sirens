@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/CPJKU/beat_this_live (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: Live / Large / Zero (ISMIR 2026). Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/CPJKU/beat_this_live (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: Live / Large / Zero (ISMIR 2026). Geprüfter README-Stand: [353065f154b50442b1bddfa5c020a40f0e64c564](https://github.com/CPJKU/beat_this_live/blob/353065f154b50442b1bddfa5c020a40f0e64c564/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 

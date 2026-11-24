@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/Stability-AI/stable-audio-3 (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: small-music / medium. Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/Stability-AI/stable-audio-3 (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: small-music / medium. Geprüfter README-Stand: [790793b89ddceea612be9ce42ff6830d18f6fa57](https://github.com/Stability-AI/stable-audio-3/blob/790793b89ddceea612be9ce42ff6830d18f6fa57/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 
@@ -19,3 +19,5 @@ Quellenbasierter Kandidatenmodus: `lookahead`, keine Freigabe. README: Models, U
 ## Messplan und Risiken
 
 Small CPU/CUDA, 4/8 s und mehrere Seeds; Medium erst danach. Kalt/Warm, erste Ausgabe, Block-RTF p50/p95/p99, Peak-VRAM für Prozess und ganze GPU, CPU/GPU, Hörprobe und Artefakte, tatsächliche Control-to-audio-Latenz. Keine fremde Leistungszahl als eigene Messung. Exakte Hop-/Kontextwerte, Abhängigkeitspins und Gewichtshashes soweit nicht oben angegeben offen. Keine Installation ohne Prüfung des fremden Codes. Zielhardware nicht gemessen.
+
+[pyproject.toml](https://github.com/Stability-AI/stable-audio-3/blob/790793b89ddceea612be9ce42ff6830d18f6fa57/pyproject.toml): Version 0.1.0, Python >=3.10, Torch/torchaudio 2.7.1. [Inference Methods](https://github.com/Stability-AI/stable-audio-3/blob/790793b89ddceea612be9ce42ff6830d18f6fa57/docs/workflows/inference.md): Seed, Device, Init-Audio.

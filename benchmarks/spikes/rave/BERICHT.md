@@ -4,11 +4,11 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/acids-ircam/RAVE (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: v2.4 beta. Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/acids-ircam/RAVE (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: v2.4 beta. Geprüfter README-Stand: [7280bd5c11890b2043c5591f8da0ea5f4d5bf647](https://github.com/acids-ircam/RAVE/blob/7280bd5c11890b2043c5591f8da0ea5f4d5bf647/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 
-Code: LICENSE: separate Lizenzprüfung offen, keine Freigabe.
+Code: CC BY-NC 4.0 (LICENSE; nicht kommerziell, Namensnennung; kommerzielle Nutzung separat klären).
 
 Gewichte: README: pretrained models / Export; nur selbst exportiertes oder geprüftes lokales TorchScript, Größe und Gewichtslizenz offen. Keine Weitergabe ohne Prüfung der konkreten Lizenz.
 

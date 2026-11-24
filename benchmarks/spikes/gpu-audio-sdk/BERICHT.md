@@ -4,11 +4,11 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/gpuaudio/gpuaudio-sdk (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: SDK (Version offen). Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/gpuaudio/gpuaudio-sdk (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: SDK (Version offen). Geprüfter README-Stand: [4cde62009594e0f4f1db712d27be4fea8b0d06c8](https://github.com/gpuaudio/gpuaudio-sdk/blob/4cde62009594e0f4f1db712d27be4fea8b0d06c8/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 
-Code: LICENSE: konkrete Rechte/SDK-Laufzeit separat prüfen.
+Code: CC BY-NC-SA 4.0 (LICENSE enthält diese Lizenz; konkrete Zuordnung der Komponenten/SDK-Laufzeit und Weitergabe prüfen).
 
 Gewichte: Keine Modellgewichte für Gain-Beispiel; SDK-Binaries und Lizenz vor Installation prüfen. Keine Weitergabe ohne Prüfung der konkreten Lizenz.
 

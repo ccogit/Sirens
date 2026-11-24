@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/Signalsmith-Audio/signalsmith-stretch (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: C++ Bibliothek (Version offen). Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/Signalsmith-Audio/signalsmith-stretch (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: C++ Bibliothek (Version offen). Geprüfter README-Stand: [88061fd4eda56a2353c5d65c74aa3f4ccf76f9da](https://github.com/Signalsmith-Audio/signalsmith-stretch/blob/88061fd4eda56a2353c5d65c74aa3f4ccf76f9da/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 

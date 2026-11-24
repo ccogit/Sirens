@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/facebookresearch/sam-audio (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: sam-audio-small / base / large. Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/facebookresearch/sam-audio (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: sam-audio-small / base / large. Geprüfter README-Stand: [bb4c6999d2677c7402360e426afc01ddfad6dce0](https://github.com/facebookresearch/sam-audio/blob/bb4c6999d2677c7402360e426afc01ddfad6dce0/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 

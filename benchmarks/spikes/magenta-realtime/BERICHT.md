@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/magenta/magenta-realtime (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: mrt2_small / mrt2_base. Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/magenta/magenta-realtime (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: mrt2_small / mrt2_base. Geprüfter README-Stand: [694a545e4ba0b88bf1150137b129582166d3e07f](https://github.com/magenta/magenta-realtime/blob/694a545e4ba0b88bf1150137b129582166d3e07f/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 

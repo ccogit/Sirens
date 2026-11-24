@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/ZFTurbo/Music-Source-Separation-Training (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: MSST + pymss (2.2+ Python 3.11). Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/ZFTurbo/Music-Source-Separation-Training (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: MSST + pymss (2.2+ Python 3.11). Geprüfter README-Stand: [1523206d12a521bdb20673726562524cf0f9635b](https://github.com/ZFTurbo/Music-Source-Separation-Training/blob/1523206d12a521bdb20673726562524cf0f9635b/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 
@@ -19,3 +19,5 @@ Quellenbasierter Kandidatenmodus: `offline`, keine Freigabe. MSST README Code de
 ## Messplan und Risiken
 
 Einzelmodell vor Ensemble; RoFormer Vocals und DrumSep separat, kleine Chunks gegen Artefakte, Demucs-Bestand als Rückfall. Kalt/Warm, erste Ausgabe, Block-RTF p50/p95/p99, Peak-VRAM für Prozess und ganze GPU, CPU/GPU, Hörprobe und Artefakte, tatsächliche Control-to-audio-Latenz. Keine fremde Leistungszahl als eigene Messung. Exakte Hop-/Kontextwerte, Abhängigkeitspins und Gewichtshashes soweit nicht oben angegeben offen. Keine Installation ohne Prüfung des fremden Codes. Zielhardware nicht gemessen.
+
+Zweiter README-Pin: [pymss e545e10](https://github.com/pymss-project/pymss/blob/e545e10a4a85306e9c78a9d64f91e0d43d170ad2/README.md). MSST `inference.py` lädt mit `torch.load(..., weights_only=False)`; untrusted Pickle ist nicht zulässig. Sicheren Loader oder überprüften Export vorsehen.

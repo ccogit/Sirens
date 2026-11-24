@@ -4,7 +4,7 @@ Gate: `nicht_gemessen`.
 
 ## Quellen und Version
 
-https://github.com/daydreamlive/DEMON (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: ACE-Step v1.5 Turbo, Stable Audio 3 small. Unveränderlicher Commit-Pin noch offen; vor Installation festlegen.
+https://github.com/daydreamlive/DEMON (README und dort genannte Abschnitte, Abruf 24.11.2026). Untersuchte Variante: ACE-Step v1.5 Turbo, Stable Audio 3 small. Geprüfter README-Stand: [96acc905204d54bfd3055084ca8e9df8a6d9a33f](https://github.com/daydreamlive/DEMON/blob/96acc905204d54bfd3055084ca8e9df8a6d9a33f/README.md). Abhängigkeitspins und Gewichts-Hashes separat.
 
 ## Lizenz und Gewichte
 
@@ -19,3 +19,5 @@ Quellenbasierter Kandidatenmodus: `streaming`, keine Freigabe. README: Quickstar
 ## Messplan und Risiken
 
 SA3 small statt ACE-Step; Ringtiefe 1/4, 10 min echte Ausgabe und Kontrollsprung messen. Kalt/Warm, erste Ausgabe, Block-RTF p50/p95/p99, Peak-VRAM für Prozess und ganze GPU, CPU/GPU, Hörprobe und Artefakte, tatsächliche Control-to-audio-Latenz. Keine fremde Leistungszahl als eigene Messung. Exakte Hop-/Kontextwerte, Abhängigkeitspins und Gewichtshashes soweit nicht oben angegeben offen. Keine Installation ohne Prüfung des fremden Codes. Zielhardware nicht gemessen.
+
+[Session-API und TRT 10.16.x](https://github.com/daydreamlive/DEMON/blob/96acc905204d54bfd3055084ca8e9df8a6d9a33f/docs/ACESTEP.md): `prepare_source`, `encode_text`, `stream`, `tick`, `decode`; Web-Demo lädt beim ersten Gebrauch Fixtures und installiert Frontend, daher nicht als abgeschotteten Messweg verwenden.

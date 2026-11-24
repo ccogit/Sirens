@@ -21,4 +21,14 @@ Alle Gates `nicht_gemessen`. Lizenzampel ist nur Vorprüfung, keine Gate-Freigab
 4. Kandidaten einzeln CPU/GPU prüfen, keine parallelen Modelle, dann unter normaler Visualisierungslast wiederholen. Berichte enthalten den jeweiligen Messplan. Keine Freigabe allein durch RTF < 1.
 5. Nur A0 entscheidet Gates; JSON und Hörproben lokal, keine Musik oder Gewichte committen. KETTE-26: Separation; 27: SAM; 33: DEMON; 34: RAVE/AFTER; 35: SA3; 36: Magenta.
 
-Installations- und Inferenzskripte noch in Arbeit; Berichte sind Quellen-Vorprüfung, keine getestete Installation.
+## Aktueller Teilstand
+
+Installationsskripte erzeugen/leeren nur die isolierten Umgebungen; Bezug ist bis zur Prüfung der Abhängigkeiten und Gewichte absichtlich gesperrt. Drei experimentelle Inferenzpfade (RAVE, SA3, SAM Audio) sind vorhanden; die übrigen vier Modellpfade fehlen. Aufruf im Repo-Root ohne Modell:
+
+```powershell
+python -m benchmarks.spikes.rave.messen --dry-run
+python -m benchmarks.spikes.stable-audio-3.messen --dry-run
+python -m benchmarks.spikes.sam-audio.messen --dry-run
+```
+
+Nach manuell geprüfter Installation im jeweiligen venv: `python -m benchmarks.spikes.<kandidat>.messen --model <lokaler Pfad> --device cpu` bzw. `--device cuda`. RAVE benötigt zusätzlich `--sha256 <Hash>` des TorchScript-Exports; SA3 erwartet den lokalen HF-Cache, SAM den lokalen Snapshot. Kein vollständiger Hardware- oder Streaming-Nachweis. RAVE/AFTER/GPU Audio SDK haben nichtkommerzielle Lizenzbestandteile; keine kommerzielle Freigabe.
