@@ -8,5 +8,5 @@
   "task_token": "K\\d\\d",
   "task_file": "AUFGABE-(K\\d\\d)-.*\\.md$",
   "stack": "Python 3.11 (Standardbibliothek im Hauptprozess; Audio-/Modellbibliotheken nur in Worker-venvs unter workers/), ES-Module ohne Build, Node 22 für Tests",
-  "rules": "Zielzweig ist integration/sirens-production (nicht main); Branch extern/KETTE-P0x statt feat/production-…; nur die Owner-Dateien der eigenen Kette laut Register in KETTEN.md plus docs/aufgaben/sirens-production/ergebnisse/K0x.md; REUSE-AMM.md ist verbindlich (AMM/SecondRoom/Producer Pal zuerst); kein Modell-Import im Paket sirens/; keine Audiodateien, Bewertungen, Modellgewichte oder Downloads im Repo; CI ohne Netz, GPU, Plugins, Live"
+  "rules": "Zielzweig ist integration/sirens-production (nicht main); Branch extern/KETTE-P0x statt feat/production-…; nur die Owner-Dateien der eigenen Kette laut Register in KETTEN.md plus docs/aufgaben/sirens-production/ergebnisse/K0x.md; REUSE-AMM.md ist verbindlich (AMM/SecondRoom/Producer Pal zuerst); kein Modell-Import im Paket sirens/; keine Audiodateien, Bewertungen, Modellgewichte oder Downloads im Repo; CI ohne Netz, GPU, Plugins, Live; GitHub Actions ist abgeschaltet: keine CI, nicht darauf warten, Ready setzen, wenn fertig – der Koordinator testet lokal unter Windows"
 }
