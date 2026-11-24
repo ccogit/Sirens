@@ -7,7 +7,8 @@
 - `web/js/signal_model.js`: reine Such-/Speicherlogik und exklusiver Session-Lifecycle.
 - `web/js/signal_art.js`: interaktive SVG-Vorschauen, keine GPU-/Audio-Berechnung.
 - `web/js/lab_pult.js`: aus der bisherigen Ansicht extrahiertes DJ-Pult.
-- `web/signal_room.css`: isolierte visuelle Sprache; kein Framework, kein Build.
+- `web/signal_room.css`: Discovery und Werkzeug-Sessions; kein Framework, kein Build.
+- `web/theme.css`: globales Signal-Room-Designsystem für alle Routen, zuletzt geladen. Dunkel ist Standard, eine gespeicherte helle Variante bleibt verfügbar. Tool-Akzente bleiben lokal in der Signal Room Session.
 - Die bestehenden Module für Auto-DJ, Stem Studio, Spielwiese und Kick-Tausch behalten
   ihre eigentlichen Audio- und Server-Funktionen.
 
