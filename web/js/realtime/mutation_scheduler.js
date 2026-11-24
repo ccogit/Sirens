@@ -85,13 +85,13 @@ export class MutationScheduler {
   // Ein vorbereiteter Block enthält ausschließlich begrenztes PCM. Abbruch zählt
   // weiterhin gegen die Queue, bis der Adapter tatsächlich beendet ist.
   async prepare(plan, input) {
-    if(!plan||this.pending.get(plan.token)!==plan||this.jobs.has(plan.token)||this.attempted.has(plan.token)||
+    if(!plan||this.pending.get(plan.token)!==plan||!this.backends.some(b=>b.id===plan.backend)||this.jobs.has(plan.token)||this.attempted.has(plan.token)||
        this.jobs.size>=this.maxPending) return null;
     const controller=new AbortController();
     this.jobs.set(plan.token,controller);this.attempted.add(plan.token);
     try {
       const result=await this.adapters.get(plan.backend)(plan,input,controller.signal);
-      if(controller.signal.aborted||this.pending.get(plan.token)!==plan) return null;
+      if(controller.signal.aborted||this.pending.get(plan.token)!==plan||!this.backends.some(b=>b.id===plan.backend)) return null;
       const track=result?.track;
       if(!(track instanceof Float32Array)||track.length!==plan.endFrame-plan.frame) return null;
       const peak=pcmPeak(track);
@@ -131,7 +131,7 @@ export class MutationScheduler {
   }
   override(frame,{intensity=this.intensity,energy=this.energy}={}) {
     integer(frame,0,Number.MAX_SAFE_INTEGER,"Quellframe");
-    this.intensity=unit(intensity,"Intensität");this.energy=unit(energy,"Energie");
+    unit(intensity,"Intensität");unit(energy,"Energie");this.intensity=intensity;this.energy=energy;
     this.cancelPending();this.event("override",frame,{intensity,energy});
   }
   stop(frame=this.lastFrame) {
