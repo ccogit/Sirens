@@ -48,7 +48,7 @@ export class MutationScheduler {
     this.intensity=unit(intensity,"Intensität"); this.energy=unit(energy,"Energie");
     this.maxPeak=Math.min(.8,unit(maxPeak,"Pegelgrenze")); this.maxAssets=integer(maxAssets,0,1000,"Asset-Quota");
     this.maxPending=integer(maxPending,1,8,"Warteschlange"); this.switchBars=integer(switchBars,4,64,"Modellwechsel");
-    this.pending=new Map(); this.jobs=new Map(); this.prepared=new Map(); this.assets=0; this.serial=0; this.running=false;
+    this.pending=new Map(); this.jobs=new Map(); this.prepared=new Map(); this.attempted=new Set(); this.assets=0; this.serial=0; this.running=false;
     this.lastNeural=null; this.lastSwitch=-Infinity; this.lastFrame=0;
   }
   get backends(){return mutationBackends(this.capabilities(),this.adapters);}
@@ -85,10 +85,10 @@ export class MutationScheduler {
   // Ein vorbereiteter Block enthält ausschließlich begrenztes PCM. Abbruch zählt
   // weiterhin gegen die Queue, bis der Adapter tatsächlich beendet ist.
   async prepare(plan, input) {
-    if(this.pending.get(plan?.token)!==plan||this.jobs.has(plan.token)||this.prepared.has(plan.token)||
+    if(!plan||this.pending.get(plan.token)!==plan||this.jobs.has(plan.token)||this.attempted.has(plan.token)||
        this.jobs.size>=this.maxPending) return null;
     const controller=new AbortController();
-    this.jobs.set(plan.token,controller);
+    this.jobs.set(plan.token,controller);this.attempted.add(plan.token);
     try {
       const result=await this.adapters.get(plan.backend)(plan,input,controller.signal);
       if(controller.signal.aborted||this.pending.get(plan.token)!==plan) return null;
@@ -104,7 +104,7 @@ export class MutationScheduler {
   }
   cancelPending(){
     for(const token of this.pending.keys())this.jobs.get(token)?.abort();
-    this.pending.clear();this.prepared.clear();
+    this.pending.clear();this.prepared.clear();this.attempted.clear();
   }
   // Nur exakt am geplanten Quellframe aufrufen. Verspätete Blöcke nie nachholen.
   advance(frame, prepared=null) {
