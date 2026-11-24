@@ -55,6 +55,7 @@ export function createRtApi({mock=false, fetcher=globalThis.fetch}={}) {
     record: (session,name,rate) => request("POST",sessionPath(session.id)+"/recordings",{name,sample_rate:rate}),
     recordBlock: (session,rid,start,bytes) => binary("PUT",sessionPath(session.id)+"/recordings/"+rid+"/blocks/"+start,bytes),
     recordClose: (session,rid) => request("POST",sessionPath(session.id)+"/recordings/"+rid+"/close",{}),
+    exportSource: session => request("GET",sessionPath(session.id)+"/export-source"),
     exportSession: (session,data) => request("POST",sessionPath(session.id)+"/exports",data),
   };
 }
