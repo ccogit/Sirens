@@ -1,5 +1,6 @@
 """Steuer-API v1; PCM ausschließlich auf dem privaten Sidecar-Pfad."""
 import threading
+from pathlib import Path
 
 from ..contracts import Ablehnung
 from .contracts import error, invalid, uint
@@ -9,6 +10,32 @@ from .stem_adapter import SeparationJobs
 from .telemetry import read_gpu
 
 _LOCK = threading.Lock()
+
+# Ergänzende UI-Diagnose, ohne den eingefrorenen Capability-Descriptor zu ändern.
+# Die Existenz eines Berichts ist ausdrücklich keine Freigabe oder Prüfung seines Inhalts.
+_HOOK_GATES = {
+    "demon": "demon.md", "separation": "roformer.md", "rave": "rave.md",
+    "after": "after.md", "stable_audio": "stable-audio-3.md",
+    "sam_audio": "sam-audio.md", "magenta": "magenta.md",
+}
+
+
+def hook_status(registry):
+    descriptors = {c["id"]: c for c in registry.capabilities()}
+    result = {}
+    for name, filename in _HOOK_GATES.items():
+        entry = registry.entries.get(name, {})
+        command = entry.get("command", ())
+        interpreter = Path(command[0]) if command else None
+        installed = bool(interpreter and interpreter.is_absolute() and interpreter.is_file())
+        report = (registry.root / "benchmarks" / "results" / "g1" / filename).is_file()
+        result[name] = {
+            "interpreter_present": installed,
+            "gate_report_present": report,
+            "available": descriptors.get(name, {}).get("available") is True,
+        }
+    return result
+
 
 
 class _RealtimeSessions(Sessions):
@@ -64,6 +91,8 @@ def dispatch(handler, path, body):
     if method == "GET" and parts == ["capabilities"]:
         return handler._json(200, {"protocol_version": 1,
                                    "capabilities": ModelRegistry(mock_enabled=cfg.rt_mock).capabilities()})
+    if method == "GET" and parts == ["hook-status"]:
+        return handler._json(200, {"models": hook_status(ModelRegistry(mock_enabled=cfg.rt_mock))})
     if method == "GET" and parts == ["gpu"]:
         snapshot = read_gpu().as_dict()
         sessions = getattr(handler.app, "rt_sessions", None)

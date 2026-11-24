@@ -9,6 +9,8 @@ function validate(path, body) {
   if (path === "capabilities" && (body.protocol_version !== 1 || !Array.isArray(body.capabilities) ||
       !body.capabilities.every(c => isObject(c) && typeof c.id === "string" && typeof c.available === "boolean" &&
         typeof c.mock === "boolean" && ["streaming","lookahead","offline"].includes(c.mode)))) throw invalid();
+  if (path === "hook-status" && (!isObject(body.models) || !Object.values(body.models).every(m=>isObject(m) &&
+      ["interpreter_present","gate_report_present","available"].every(k=>typeof m[k]==="boolean")))) throw invalid();
   if (path === "gpu" && typeof body.available !== "boolean") throw invalid();
   if (/^sessions(?:\/[a-f0-9]{32}(?:\/(?:commands|close))?)?$/.test(path) && (!id(body.id) || !Number.isInteger(body.epoch) ||
       !["created","loading","ready","playing","paused","stopping","closed","error"].includes(body.state))) throw invalid();
@@ -41,6 +43,7 @@ export function createRtApi({mock=false, fetcher=globalThis.fetch}={}) {
   return {
     capabilities: signal => request("GET","capabilities",undefined,signal),
     gpu: signal => request("GET","gpu",undefined,signal),
+    hookStatus: signal => request("GET","hook-status",undefined,signal),
     profile: signal => request("GET","profile",undefined,signal),
     setProfile: (profile,signal) => request("POST","profile",{profile},signal),
     create: (capability_id,sample_rate=48000) => request("POST","sessions",{capability_id,sample_rate}),

@@ -3,7 +3,10 @@ import { api as catalogApi } from "../api.js";
 import { createRtApi, MOCK_ASSET } from "./api.js";
 import { AudioCore } from "./audio_core.js";
 import { Recorder } from "./recorder.js";
-import { filterCatalog, sessionExport, unavailableTools } from "./integration.js";
+import { filterCatalog, sessionExport } from "./integration.js";
+import { mountHookTools } from "./hook_tools.js";
+import { mountSeparationJobs } from "./advanced_stems.js";
+import { createOfflinePreview } from "./offline_preview.js";
 import { createBeatGrid } from "./beat_grid.js";
 import { deriveState, modeLabel } from "./capabilities.js";
 import { gpuText, latencyText } from "./gpu_panel.js";
@@ -292,7 +295,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const resources=createResources(timerHost), abort=new AbortController();
     let active=true, caps=null, gpu=null, mock=false, client=remote, controller=null, error=null,
       entries=[], stemGeneration=0, polling=false, busy=false, preset={...DEFAULT_PRESET}, muted=false, slot="A";
-    let profile=null, profileBusy=false, profileEpoch=0, profileError="";
+    let profile=null, profileBusy=false, profileEpoch=0, profileError="", diagnostics=null;
     const status=h("p",{role:"status","aria-live":"polite"},"Fähigkeiten werden geladen");
     const catalogStatus=h("p",{role:"status"},"Bibliothek wird geladen");
     const gpuInfo=h("p",{},"GPU-Telemetrie wird geladen");
@@ -321,19 +324,53 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const buttons=[play,stop,panic,bypass,ab,save,restore,wet,gain,seek,seekButton];
     const label=(text,el)=>h("label",{},text,el);
     const refresh=btn("Status erneut laden");
+    const hookHost=h("div",{"class":"rt-grid"}), advancedHost=h("div",{});
+    const previewButton=btn("Offline-Mix vorhören"), previewStatus=h("p",{role:"status"},"Kein Offline-Mix");
+    let unmountAdvanced=null, operationEpoch=0, advancedClosing=null;
+    const hookCards=mountHookTools(hookHost,{document:root.ownerDocument||globalThis.document});
+    const preview=createOfflinePreview({beforePlay:async()=>{await controller?.reset();},onStatus:()=>paint()});
+    const stopPreview=(clear=false)=>preview.stop(clear).catch(e=>{if(active){error=e;paint();}});
+    const clearAdvanced=()=>{
+      operationEpoch++;
+      const old=unmountAdvanced;unmountAdvanced=null;
+      const previous=advancedClosing;
+      // Sperre setzen, bevor stopPreview synchron paint auslöst.
+      advancedClosing=Promise.resolve();
+      const closing=old?.();
+      advancedHost.replaceChildren();
+      const pending=Promise.all([previous,Promise.resolve(closing),stopPreview(true)]);
+      advancedClosing=pending;
+      const finished=()=>{if(advancedClosing===pending){advancedClosing=null;paint();}};
+      pending.then(finished,finished);
+      return pending;
+    };
+    const canSeparate=name=>active&&!!caps&&!error&&!!song.value&&song.value!=="fixture"&&
+      (name==="htdemucs"||(diagnostics?.separation?.available&&diagnostics.separation.interpreter_present&&diagnostics.separation.gate_report_present&&caps.capabilities.some(c=>c.id==="separation"&&c.available)));
+    function paintAdvanced(){
+      if(advancedClosing)return;
+      if(!caps||error||!song.value||song.value==="fixture"){
+        if(unmountAdvanced)void clearAdvanced().catch(()=>{});
+        advancedHost.textContent="Advanced Stem Studio · Offline – Song und RT-Dienst erforderlich";
+      }else if(!unmountAdvanced){
+        advancedHost.replaceChildren();
+        unmountAdvanced=mountSeparationJobs(advancedHost,{selectedPath:()=>song.value,canStart:canSeparate,
+          onMix:(samples,rate)=>preview.prepare(samples,rate).catch(e=>{if(active){error=e;paint();}})});
+      }
+      unmountAdvanced?.paint?.();
+    }
     root.replaceChildren(h("section",{class:"rt-shell","aria-label":"RTX Neural Lab"},
       h("h2",{},"RTX Neural Lab"),status,
-      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Vorhandene Demucs-Cache-Stems (PCM16, 44,1/48 kHz) einzeln im Mock; keine neue Trennung."),
+      h("p",{},"Testmodus: CPU-Mock mit Audio-Ausgabe, keine KI und keine Echtzeitfreigabe. 48-kHz-PCM16-WAV oder synthetisches Testsignal; Vorhandene Demucs-Cache-Stems einzeln im Mock; Offline-Trennung getrennt vom Original."),
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Suche",search),label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
           label("GPU-Profil",profileSelect),profileInfo,refresh,
-          h("p",{},"RoFormer · Offline: freigegeben für G1, produktiver Jobpfad noch nicht installiert / angebunden."),
-          h("ul",{},unavailableTools.map(name=>h("li",{},name+" · nicht installiert / nicht freigegeben"))))),
+          h("p",{},"Nicht freigegebene Funktionen sind unten gesperrt."))),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
       h("section",{},h("h3",{},"Transport & Mischung"),transport,beatInfo,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore,record,exportButton,pad),exportInfo,
         label("Quellframe (48 kHz im Mock)",seek),seekButton,label("Dry/Wet",wet),wetValue,label("Gain (Mock)",gain),gainValue,
         h("p",{},"Tastatur: Leertaste = Transport, Esc = Panic, B = Bypass, A = A/B. MIDI-Zuordnung vorbereitet; kein Gerät verbunden.")),
+      h("section",{},advancedHost,previewButton,previewStatus),hookHost,
       h("details",{},h("summary",{},"Installationshilfe"),h("p",{},
         "SIRENS_RT_ENABLED=1 und SIRENS_RT_MOCK=1 in der lokalen Konfiguration setzen und Dienst neu starten. Modelle und GPU-Worker erst nach Freigabe separat installieren. Kein automatischer Download."))));
     function selected() {return caps?.capabilities.find(c=>c.id===capability.value);}
@@ -350,8 +387,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const enabled=state.enabled && Boolean(song.value) && !busy && !!controller;
       for(const b of buttons)b.disabled=!enabled;
       // Panic darf während eines ausstehenden Befehls angefordert werden.
-      panic.disabled=!controller;
-      stop.disabled=!controller;
+      panic.disabled=!controller&&!unmountAdvanced&&!preview.ready;
+      stop.disabled=panic.disabled;
       song.disabled=!entries.length && !mock;
       model.disabled=!song.value || song.value==="fixture";
       stem.disabled=model.disabled || stem.options.length<=1;
@@ -368,6 +405,13 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       exportButton.disabled=!enabled||!controller?.export||!!detail?.recording||!["ready","playing","paused"].includes(controller?.state);
       exportInfo.textContent=(detail?.recorded??0)+" Aufnahmesegmente · "+(detail?.lastExport?"Sitzungsdatei gespeichert: "+detail.lastExport:"noch kein Sitzungsexport")+" · kein vollständiges Replay";
       beatInfo.textContent=detail?.grid?"BeatGrid vorhanden (Quantisierung noch gesperrt)":"BeatGrid: unsicher / nicht verfügbar";
+      hookCards.paint(caps?.capabilities,error,diagnostics);
+      paintAdvanced();
+      panic.disabled=!controller&&!unmountAdvanced&&!preview.ready&&!advancedClosing;
+      stop.disabled=panic.disabled;
+      previewButton.disabled=busy||!preview.ready||!!error;
+      previewButton.textContent=preview.playing?"Offline-Vorschau stoppen":"Offline-Mix vorhören";
+      previewStatus.textContent=preview.playing?"Offline-Vorschau läuft":preview.ready?"Offline-Mix vorbereitet":"Kein Offline-Mix";
       transport.textContent="Transport: "+(muted?"Panic / stumm":controller?.state || "bereit")+(detail?.fallback?" · Dry-Rückfall":"")+" · nicht gemessen"+(detail?.underruns===undefined?"":" · Underrun-Frames: "+detail.underruns)+(detail?.fault?" · "+detail.fault.message:"");
     }
     function fillSongs() {
@@ -442,6 +486,9 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
           fillSongs();
         }
         caps=next;error=null;
+        try{diagnostics=remote.hookStatus?(await remote.hookStatus(abort.signal)).models:null;}
+        catch{diagnostics=null;}
+        if(!active)return;
         const previous=capability.value;
         capability.replaceChildren(...caps.capabilities.map(c=>h("option",{value:c.id,disabled:!c.available},c.id+" · "+modeLabel(c.mode)+(c.mock?" · Testmodus":"")+(c.available?"":" · gesperrt"))));
         if(caps.capabilities.some(c=>c.id===previous))capability.value=previous;
@@ -453,7 +500,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       }catch(e){
         if(active){
           // 503 beim ersten GET ist der ausgeschaltete oder nicht verfügbare Dienst.
-          error=e;gpu=null;
+          error=e;gpu=null;diagnostics=null;
           if(controller){await controller.destroy().catch(()=>{});controller=null;}
           mock=false;client=remote;
           if(!caps){capsInfo.replaceChildren();capability.replaceChildren();}
@@ -464,7 +511,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const run=async fn=>{
       if(!active || !controller || busy || !deriveState({capabilities:caps,gpu,mock,songs:entries.length || (song.value==="fixture"?1:0),error,capabilityId:capability.value}).enabled || !song.value)return;
       busy=true;paint();
-      try{await controller.run(fn);}
+      const current=operationEpoch;
+      try{await stopPreview();if(active&&current===operationEpoch)await controller?.run(fn);}
       catch(e){if(active)error=e;}
       finally{busy=false;paint();}
     };
@@ -474,10 +522,10 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       await command("bypass",{enabled:preset.bypass || preset.wet===0});
     };
     const doPanic=()=>{
-      if(!controller)return;
-      controller.silence?.();muted=true;preset={...preset,wet:0,bypass:true};paint();
+      controller?.silence?.();muted=true;preset={...preset,wet:0,bypass:true};
+      void clearAdvanced().catch(e=>{if(active){error=e;paint();}});paint();
       // Close stoppt die Sitzung auch dann, wenn gerade ein Befehl aussteht.
-      controller.reset().then(()=>{muted=true;preset={...preset,wet:0,bypass:true};paint();}).catch(e=>{if(active){error=e;paint();}});
+      controller?.reset().then(()=>{muted=true;preset={...preset,wet:0,bypass:true};paint();}).catch(e=>{if(active){error=e;paint();}});
     };
     const getStorage=()=>{try{return storage ?? globalThis.localStorage;}catch{return null;}};
     const actions={
@@ -493,15 +541,20 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     on(exportButton,"click",()=>{controller?.export?.(preset).then(paint).catch(e=>{if(active){exportInfo.textContent=e.message;}});});
     on(record,"click",()=>{controller?.record?.().then(paint).catch(e=>{if(active){error=e;paint();}});});
     on(play,"click",actions.transport);on(panic,"click",actions.panic);on(bypass,"click",actions.bypass);on(ab,"click",actions.ab);
-    on(stop,"click",()=>{controller?.reset().then(()=>{muted=false;paint();}).catch(e=>{if(active){error=e;paint();}});});
+    on(previewButton,"click",()=>{
+      if(!active||busy||previewButton.disabled)return;
+      if(preview.playing){void stopPreview();return;}
+      busy=true;paint();preview.play().catch(e=>{if(active){error=e;}}).finally(()=>{busy=false;paint();});
+    });
+    on(stop,"click",()=>{void clearAdvanced().catch(()=>{});controller?.reset().then(()=>{muted=false;paint();}).catch(e=>{if(active){error=e;paint();}});});
     on(seekButton,"click",()=>{const frame=Number(seek.value);if(Number.isSafeInteger(frame)&&frame>=0)run(cmd=>cmd("seek",{source_frame:frame}));});
     on(wet,"input",()=>{preset.wet=Number(wet.value);paint();});on(wet,"change",()=>run(apply));
     on(gain,"input",()=>{preset.gain=Number(gain.value);paint();});on(gain,"change",()=>run(apply));
     on(save,"click",()=>{if(!savePreset(getStorage(),slot,preset))status.textContent="Preset konnte nicht gespeichert werden.";});
     on(restore,"click",()=>{preset=normalizePreset(readPresets(getStorage())[slot]);run(apply);paint();});
-    on(song,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();paint();});
-    on(model,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();});on(stem,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});});
-    on(capability,"change",paint);on(refresh,"click",refreshStatus);
+    on(song,"change",()=>{void clearAdvanced().catch(()=>{});controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();paint();});
+    on(model,"change",()=>{void clearAdvanced().catch(()=>{});controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();});on(stem,"change",()=>{void clearAdvanced().catch(()=>{});controller?.reset().catch(e=>{if(active){error=e;paint();}});});
+    on(capability,"change",()=>{void clearAdvanced().catch(()=>{});controller?.reset().catch(()=>{});paint();});on(refresh,"click",refreshStatus);
     on(profileSelect,"change",changeProfile);
     if(keyboard)on(keyboard,"keydown",event=>{
       const action=keyAction(event);
@@ -511,10 +564,11 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     resources.interval(refreshStatus,5000);
     paint();loadCatalog();refreshStatus();
     dispose=()=>{
-      active=false;abort.abort();resources.clear();root.replaceChildren();
+      active=false;abort.abort();resources.clear();
+      const previewClosing=clearAdvanced();hookCards.destroy();root.replaceChildren();
       const closing=controller?.destroy();
       controller=null;dispose=null;
-      return closing?.catch(()=>{});
+      return Promise.allSettled([previewClosing,closing]);
     };
   }
   function destroy(){return dispose?.();}
