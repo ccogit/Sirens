@@ -62,14 +62,17 @@ class GPUManager:
                     return True
         return False
 
-    def acquire(self, peak_bytes, priority, unload, *, user_action=False):
+    def acquire(self, peak_bytes, priority, unload, *, user_action=False, max_leases=None):
         if (type(peak_bytes) is not int or peak_bytes <= 0 or
                 not isinstance(priority, Priority) or not callable(unload)):
             raise invalid("lease")
+        if max_leases is not None and (type(max_leases) is not int or max_leases <= 0):
+            raise invalid("max_leases")
         if user_action is not True:
             raise error("unavailable")
         with self._lock:
-            while self._free() < peak_bytes:
+            while (self._free() < peak_bytes or
+                   (max_leases is not None and len(self._leases) >= max_leases)):
                 if not self._evict(priority):
                     raise error("busy_gpu")
             lease = Lease(uuid4().hex, peak_bytes, priority)
