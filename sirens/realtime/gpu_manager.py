@@ -157,10 +157,15 @@ class ManagedClaudeStarter(ClaudeStarter):
         self.admission_lock = admission_lock
         self._gpu_lease = None
         self._lease_manager = None
+        self._raise_busy = False
 
-    def starten(self, grund=""):
+    def starten(self, grund="", *, raise_busy=False):
         with self.admission_lock:
-            return super().starten(grund)
+            self._raise_busy = raise_busy
+            try:
+                return super().starten(grund)
+            finally:
+                self._raise_busy = False
 
     def _release_gpu(self):
         if self._gpu_lease is not None:
@@ -175,6 +180,8 @@ class ManagedClaudeStarter(ClaudeStarter):
             except Ablehnung as exc:
                 self.letzter = {"beendet_am": jetzt(), "exit_code": None,
                                 "protokoll": "", "fehler": str(exc)}
+                if self._raise_busy:
+                    raise
                 return
             self._lease_manager = manager
         try:
