@@ -29,3 +29,12 @@ export class Clock {
         if (this.playing && ++this.source === this.loopEnd) this.seek(this.loopStart);
     }
 }
+
+// Quantisierung nur bei ausreichender Konfidenz; sonst kein automatischer Wechsel.
+export function quantize(frame, rate, {bpm,beat0,confidence}, beats=1) {
+    if(!Number.isFinite(confidence)||confidence<.7) return frame;
+    if(!Number.isFinite(bpm)||bpm<=0||!Number.isFinite(beat0)||!Number.isInteger(beats)||beats<1)
+        throw new RangeError("BeatGrid");
+    const step=rate*60/bpm*beats;
+    return Math.max(frame,Math.round(beat0+Math.ceil((frame-beat0)/step)*step));
+}

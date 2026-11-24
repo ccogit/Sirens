@@ -66,3 +66,29 @@ test("Dry bitgleich, Limiter, nicht-endliche Samples und Jitter-Fallback",()=>{
     for(const v of [NaN,Infinity,-Infinity,2,-2,0]){const x=limit(v);assert.ok(Number.isFinite(x)&&Math.abs(x)<=CEILING);}
     p.reset(1,100);assert.equal(p.wet.write(0,100,new Float32Array([.5,.5])),false);
 });
+
+test("Worklet: variable Quanten, Start und Loop an exakten Frames",async()=>{
+    let Processor;
+    globalThis.AudioWorkletProcessor=class {
+        constructor(){this.port={postMessage:m=>{this.status=m;}};}
+    };
+    globalThis.registerProcessor=(_,p)=>{Processor=p;};
+    globalThis.sampleRate=48000;globalThis.currentFrame=0;
+    try {
+        await import("../../web/js/realtime/worklet_processor.js?fixture");
+        const p=new Processor({processorOptions:{latencies:[0]}});
+        const send=data=>p.port.onmessage({data});
+        send({type:"reset",epoch:1,frame:3,source:7,active:true,loopLength:5});
+        for(const n of [4,3,5]){
+            const input=new Float32Array(n).fill(.125),out=[new Float32Array(n),new Float32Array(n)];
+            p.process([[input,input]],[out]);
+            for(let i=0;i<n;i++)assert.equal(out[0][i],currentFrame+i<3?0:.125);
+            globalThis.currentFrame+=n;
+        }
+        send({type:"status"});assert.equal(p.status.cursor,12);assert.equal(p.status.epoch,2);
+        assert.equal(p.status.source,11);assert.equal(p.status.streams[0].underruns,0);
+        send({type:"reset",epoch:3,frame:12,source:0,active:false});
+        const out=[new Float32Array(7),new Float32Array(7)];
+        p.process([[new Float32Array(7).fill(1)]],[out]);assert.ok(out[0].every(v=>v===0));
+    } finally {for(const k of ["AudioWorkletProcessor","registerProcessor","sampleRate","currentFrame"])delete globalThis[k];}
+});
