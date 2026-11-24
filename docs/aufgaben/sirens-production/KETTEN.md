@@ -15,6 +15,10 @@ Ziel: integration/sirens-production. Jede Kette erhält einen Branch feat/produc
 
 Jede Kette darf ausschließlich eigene Pfade ändern und docs/aufgaben/sirens-production/ergebnisse/K0X.md hinzufügen. Neue Tests mit eindeutigen Dateinamen, kein gemeinsames Testfile bearbeiten. Gemeinsame Dateien (server.py, config.py, .env.example, signal_tools.js, index.html, CI, README, CONTRACT.md) nur K0. Keine individuellen Änderungen an Realtime-GPU-Policy. Bei Schnittstellenbedarf PR-Kommentar mit Vorschlag; Lead entscheidet. K6 liefert UI-Modul ohne Registereintrag; K0 bindet es erst nach funktionierendem CLI-Durchstich ein.
 
+## Wiederverwendung ist Abnahmekriterium
+
+Vor jeder Implementierung REUSE-AMM.md lesen. K07 prüft zuerst den bereits vorhandenen Producer-Pal-/SecondRoom-/WB-Pfad, kein neues Live-Steuerungsframework. K03 verwendet vorhandene Instrument-/Preset-/Offline-Renderer, K05 deliver_chain und mastering_engine, K04 vorhandene Sample-/Lieferpfade, K01 AMM-Geschmacksdaten, K02 bestehende Plan-/Groove-Werkzeuge, K06 vorhandene Blindtest-/Messlogik. Alle Ketten liefern Reuse-Tabelle. Nur K00 koordiniert nötige kleine Upstream-PRs; keine neue DB/GUI/Writer. Realer Live-Pilot nur über Claude/Producer Pal, WB-Capture nach exklusivem Handoff. Codex kann parallel planen und entwickeln, nicht gleichzeitig Live verändern.
+
 ## Wellen
 
 Welle A: Alle acht Ketten sofort parallel mit Contract/Mocks. Mit zwei Agenten Codex K0/K3/K5, Claude K1/K2/K4; K6 an den zuerst freien. K07 als zusätzliche Agentensitzung möglichst sofort, sonst nach K0/K1: kurzer Live-Capability-Spike vor oder parallel zur K03-Hostwahl. K03 startet mit Offline-Host/Mock unabhängig. K07 besitzt alle Ableton-Dateien und nutzt Mock-WAV/MIDI; K03/K05 verwenden nur den Adaptervertrag. K06 nutzt Mock-Capabilities; K0 verdrahtet die CLI/UI.  A0 kann auch ein separater Lead sein. K0-PR (Mock) zuerst mergen; die restlichen PRs können nach eigenem Test in beliebiger Reihenfolge folgen, sofern Imports nicht auf fehlende Nachbarn angewiesen sind (lazy adapter / mocks). 

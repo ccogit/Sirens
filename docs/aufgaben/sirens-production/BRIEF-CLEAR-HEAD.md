@@ -36,3 +36,7 @@ A sober view.
 Outro ~5 s: dawn, lamp clicks off, groove stops. 
 
 Ableton-Qualitätstest: Kick/Sub/gear bass/Boje/Mandoline/Cello/Atmosphäre/Sprache als ausgerichtete Einzelspuren, MIDI für spielbare Instrumente, 126 BPM, Locators für Chorus/Verse/Bridge/Interludes. Standardrender ohne Live-Bedienung, optional editierbares Set oder Importpaket. Teste eine eigene Mix-/Arrangementänderung in Live und bestätigte Rückübernahme als neue Version. Keine manuelle Änderung für Standardproduktion voraussetzen.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. Erster Versuch: Claude über vorhandenen Producer Pal in einem autorisierten isolierten Live-Set; vorhandene Instrument-/Sample-Inventur, SecondRoom-Ketten, AMM-Referenzdaten. Nur fehlende maritime Assets generieren. A/B gegen bisherigen Prototyp/Suno. Bei fehlendem gesicherten Capture den vorhandenen unabhängigen Renderer nutzen oder optionalen Live-Export klar melden.

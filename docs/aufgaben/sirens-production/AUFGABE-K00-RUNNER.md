@@ -11,3 +11,7 @@ Ergebnisbericht: ergebnisse/K00.md, tatsächliche Tests, Messungen, offene Punkt
 
 ## Ableton und Einfachheit
 K07-Adapter aus CONTRACT.md in CLI/Jobstatus integrieren; keine zusätzliche DAW-Engine im Runner. Ein Klick „Song erstellen“ orchestriert Preview/Prüfung/Vollsong ohne Pflicht-Zwischenschritte. Host/Referenzen automatisch. Ableton-Probe, Export und bestätigter Return als neue Revision; niemals fremdes Live-Set verändern. Bei unavailable unabhängig rendern. Exklusive Live-Job-Sperre und vorhandene GPU-Leases. Gemeinsam mit K06 End-to-End-Test der drei einfachen Nutzeraktionen; bestehende Nachlauf-Ableton-Funktion unverändert.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K00: Bestehende lokale SecondRoom-HTTP-/MCP-Fassade und AMM/WB-Dienste anbinden, keine Duplikate. Claude-Pal-Handoff aus bestehendem Sirens-Skill; Codex Plan/Review. Live-Writer-Guard/Receipts und GPU-Leases gemeinsam beachten. Minimaler Dienstadapter, keine neue Plattform/DB. Falls Upstream-Lücke, mit Owner koordinieren.

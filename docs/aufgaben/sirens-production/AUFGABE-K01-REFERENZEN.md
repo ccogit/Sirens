@@ -10,3 +10,7 @@ Abnahme: Fixtures mit widersprüchlichen Bewertungen, Dubletten, fehlenden Metad
 Ergebnisbericht: ergebnisse/K01.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 Ableton: Eigene vorhandene, bereits im Katalog registrierte Ableton-Fassungen als Referenz berücksichtigen, sofern Herkunft erkennbar; kein automatisches Scannen beliebiger Live-Projekte oder Templates. Manuelle Returns sind neue Versionen derselben Songfamilie; keine Holdout-Leaks.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K01: AMM .claude/skills/sirens/SKILL.md und taste-capture.md als primäre Quellen für vorhandene Prompts, Negative Tags, Lyrics, reale Parameter, song_evaluations und Features. Bestehende lesende Referenzauflösung nutzen. Keine neue Datenbank; keine Wiederbefragung des Nutzers. Keine freien DB-Mutationen.

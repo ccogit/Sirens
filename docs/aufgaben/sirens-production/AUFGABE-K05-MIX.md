@@ -10,3 +10,7 @@ Abnahme: künstliche Impuls-/Sinus-Stems, Länge/Alignment, keine NaN/Clipping, 
 Ergebnisbericht: ergebnisse/K05.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 Ableton: vorhandene verifizierte Rack-/Effektketten optional via K07 nutzen, sofern automatisierbar. Premaster, Master und trockene bzw. tatsächlich verarbeitete Spuren klar unterscheiden; kein doppeltes Mastering bei Ableton-Return. Stereo-Return als neue Variante analysieren, keine erfundenen Stems. Benutzer muss keine Effekte wählen.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K05: SecondRoom deliver_chain/GET /api/chains/{role}, vorhandene AMM mastering_engine, Sound-Learning-Messungen, Rack- und Plugin-Karten verwenden; Claude setzt geprüfte Parameter via Pal, kein WB-Rack-Apply parallel. Kein eigener Mixer/Mastering-DSP sofern Bestand ausreicht. Historische Parameterprüfung nicht als Hörqualität ausgeben.

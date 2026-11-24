@@ -10,3 +10,7 @@ Abnahme: deterministische Fixture-Tests, gemessene 126 BPM/Beatpositionen, echte
 Ergebnisbericht: ergebnisse/K03.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 Ableton: pro Instrument vollständiges ausgerichtetes Audio und MIDI/Automation/semantische Patch-ID für K07 liefern. Kein doppeltes MIDI+Audio im Set. Native Live-Instrumente nur nach nachgewiesenem Adapter; bei manueller Live-Bearbeitung keine automatische Überschreibung. Host-Auswahl intern.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K03: Vorrang für nachgewiesenen Producer Pal 2.5.0-Pfad und AMM/WB-Inventar, Presets, Racks, knowledge.search, vorhandene Offline-Renderer. Keine neue Live-Bridge oder konkurrierende Writer. Nur tatsächliche Lücke mit neuem Adapter schließen. K07 ist Besitzer der Integration; vorhandene native Instrumente und Sample-Library nutzen.

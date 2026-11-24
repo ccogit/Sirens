@@ -10,3 +10,7 @@ Abnahme: Validierung, taktgenaue Events/Automation, keine abgeschnittenen Lyrics
 Ergebnisbericht: ergebnisse/K02.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 Ableton: stabile Trackrollen, MIDI-Events, Locator-Abschnitte und Automation so planen, dass K07 sie ohne Neuinterpretation exportieren kann. Semantische Patches statt Ableton-spezifischer Pfade; vorhandene Live-Instrumente bevorzugen, wenn K07 sie nachgewiesen hat. Die Nutzerentscheidung bleibt musikalisch (Klartext), nie technisch.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K02: bestehende AMM tools/production/planner.py, harmony_tools.py, relational_groove.py, phrase_variation.py, motif_development.py und knowledge.py prüfen/wiederverwenden. Producer Pal als Live-Ausführer über Claude, Codex liefert Plan/MIDI und Review. Kein generischer neuer Musikplaner, wenn vorhandener reicht.

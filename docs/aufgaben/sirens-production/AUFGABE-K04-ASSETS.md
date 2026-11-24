@@ -10,3 +10,7 @@ Abnahme: Offline-Mock-Tests, mindestens drei reale Klangbausteine und ein vollst
 Ergebnisbericht: ergebnisse/K04.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 Ableton: Assets als einzeln austauschbare, lizenzierte WAV-Dateien mit stabilen IDs liefern; K07 kann sie ohne Modellinstallation in Live nutzbar machen. Keine Live-spezifische Parallelentwicklung.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K04: zuerst SecondRoom vorhandene deliver_generate/list/job/used, AMM Sample-DB, Signature-Kits und KETTE-98 (tatsächlich vorhandene Endpunkte prüfen). Keine neue Sample-Bibliothek oder ACE-Engine, ACE nicht Pflicht. Lizenz/Guard/Hostpfad/Jobstatus der vorhandenen Dienste beibehalten. Stable Audio und TTS nur für belegte Lücken.

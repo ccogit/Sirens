@@ -10,3 +10,7 @@ Abnahme: CPU-CI ohne Netzwerk/GPU, Blindtest-Fixture mit entblindeter Auswertung
 Ergebnisbericht: ergebnisse/K06.md, tatsächliche Tests, Messungen, offene Punkte. Keine Daten/Modelle im Git.
 
 UX-Abnahme: keine Pflichtauswahl von Modellen, Plugins, MIDI, GPU, Referenzen oder Mastering, keine Pflicht-Zwischenfreigabe. Ein Klick Produktion und ein Klick Abspielen. Ableton-Knopf zeigt tatsächliches Set oder ehrlichen Importpaket-Fallback, Return nur nach validiertem Eingang, klare Fehlermeldung. Test Standardweg ohne Live und optionalen Roundtrip; bestehende A/B-Gates sind Entwicklungsabnahme und keine Alltagshürde.
+
+## Verbindliche Wiederverwendung (Revision)
+
+Lies REUSE-AMM.md vor der Umsetzung. K06: SecondRoom strategy/blindtest.py und AMM Audio-/Sound-Learning-Metriken prüfen/wiederverwenden; Sirens-UI bleibt einziger täglicher Einstieg, SecondRoom/WB im Hintergrund. Keine zweite Bewertungstabelle. Minimaler A/B-Adapter statt Neuimplementierung.
