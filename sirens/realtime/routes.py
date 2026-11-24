@@ -5,16 +5,29 @@ from ..contracts import Ablehnung
 from .contracts import error, invalid, uint
 from .model_registry import ModelRegistry
 from .sessions import Sessions
+from .stem_adapter import SeparationJobs
 from .telemetry import read_gpu
 
 _LOCK = threading.Lock()
+
+
+class _RealtimeSessions(Sessions):
+    def __init__(self, cfg, origins):
+        super().__init__(cfg, origins)
+        self.separation = SeparationJobs(cfg, self.registry, self.gpu)
+
+    def close(self):
+        try:
+            self.separation.close()
+        finally:
+            super().close()
 
 
 def service(handler):
     with _LOCK:
         app = handler.app
         if getattr(app, "rt_sessions", None) is None:
-            app.rt_sessions = Sessions(app.cfg, {f"http://{h}" for h in handler._erlaubte_hosts()})
+            app.rt_sessions = _RealtimeSessions(app.cfg, {f"http://{h}" for h in handler._erlaubte_hosts()})
         return app.rt_sessions
 
 
@@ -126,13 +139,39 @@ def dispatch(handler, path, body):
             return
         if method == "POST" and tail == ["render"]:
             return handler._json(202, s.render(body))
+    if method == "POST" and parts == ["separation", "jobs"]:
+        return handler._json(202, service(handler).separation.start(body))
+    if method == "GET" and len(parts) == 3 and parts[:2] == ["separation", "jobs"]:
+        detail = service(handler).separation.job(parts[2])
+        if detail is None:
+            raise error("not_found")
+        return handler._json(200, detail)
+    if method == "PUT" and len(parts) == 3 and parts[0] == "jobs" and parts[2] == "export":
+        try:
+            length = int(handler.headers.get("Content-Length", "0"))
+        except ValueError:
+            raise invalid("audio") from None
+        if (handler.headers.get("Transfer-Encoding") is not None
+                or handler.headers.get("Content-Type", "").lower() != "application/octet-stream"):
+            raise invalid("audio")
+        old_timeout = handler.connection.gettimeout()
+        handler.connection.settimeout(15)
+        try:
+            result = service(handler).separation.export(parts[1], handler.rfile, length)
+        finally:
+            handler.connection.settimeout(old_timeout)
+        return handler._json(201, result)
     if len(parts) >= 2 and parts[0] == "jobs":
         if method == "GET" and len(parts) == 2:
-            return handler._json(200, service(handler).job(parts[1]))
+            manager = service(handler)
+            job = manager.separation.job(parts[1])
+            return handler._json(200, manager.separation.contract_job(job) if job is not None else manager.job(parts[1]))
         if method == "POST" and parts[2:] == ["cancel"]:
             if body != {}:
                 raise invalid("body")
-            return handler._json(200, service(handler).job(parts[1], cancel=True))
+            manager = service(handler)
+            job = manager.separation.job(parts[1], cancel=True)
+            return handler._json(200, manager.separation.contract_job(job) if job is not None else manager.job(parts[1], cancel=True))
     if method == "POST" and parts == ["assets", "cached-stem"]:
         if not isinstance(body, dict) or set(body) != {"pfad", "modell", "stem"}:
             raise invalid("asset")
@@ -144,6 +183,13 @@ def dispatch(handler, path, body):
         return handler._json(201, service(handler).sources.register(body["pfad"]))
     if method == "GET" and len(parts) == 3 and parts[0] == "assets" and parts[2] == "beatgrid":
         return handler._json(200, service(handler).sources.beatgrid(parts[1]))
+    if method == "GET" and len(parts) == 3 and parts[0] == "assets" and parts[2] == "audio":
+        path = service(handler).separation.asset(parts[1], audio=True)
+        if path is None:
+            raise error("not_found")
+        return handler._senden(path)
     if method == "GET" and len(parts) == 2 and parts[0] == "assets":
-        return handler._json(200, service(handler).asset(parts[1]))
+        manager = service(handler)
+        asset = manager.separation.asset(parts[1])
+        return handler._json(200, asset if asset is not None else manager.asset(parts[1]))
     raise error("unavailable")
