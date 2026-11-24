@@ -98,3 +98,17 @@ class ProductFlow26(ServerFall):
                 self.assertEqual(status, 409, body)
                 self.assertEqual(body["error"], "busy_gpu")
             start.assert_not_called()
+
+    def test_profile_flag_origin_and_manager(self):
+        path = "profile"
+        self.request("GET", path, expected=503)
+        self.server.app.cfg = replace(self.cfg, rt_enabled=True, rt_mock=True)
+        self.assertEqual(self.request("GET", path), {"profile": "Performance"})
+        self.assertIsNone(getattr(self.server.app, "rt_sessions", None))
+        self.request("POST", path, {"profile": []}, 400)
+        self.assertEqual(self.http("POST", self.PREFIX + path, {"profile": "Neural"},
+                                   headers={"Origin": "https://example.invalid"})[0], 403)
+        for name in ("Eco", "Neural", "Training/Render", "Performance"):
+            self.assertEqual(self.request("POST", path, {"profile": name}), {"profile": name})
+            self.assertEqual(self.request("GET", path), {"profile": name})
+            self.assertEqual(self.server.app.rt_sessions.gpu.profile, name)

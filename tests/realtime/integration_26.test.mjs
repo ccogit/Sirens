@@ -82,3 +82,25 @@ test("Panic während HTTP-Play startet keine lokale Audioausgabe",async()=>{
   assert.equal(c.state,"created");
   await c.destroy();
 });
+
+import {visualGpuDrosseln} from "../../web/js/live_lab.js";
+
+test("Neural-Profil nutzt die Visual-Drosselung ohne Claude-Lauf",()=>{
+  assert.equal(visualGpuDrosseln(false,null),false);
+  assert.equal(visualGpuDrosseln(false,"Performance"),false);
+  assert.equal(visualGpuDrosseln(false,"Neural"),true);
+  assert.equal(visualGpuDrosseln(false,"Eco"),true);
+  assert.equal(visualGpuDrosseln(true,null),true);
+});
+
+test("Profil-API verwendet die Integrationsadresse und feste JSON-Struktur",async()=>{
+  const calls=[];
+  const api=createRtApi({fetcher:async(path,options)=>{
+    calls.push([path,options.method,options.body]);
+    return {status:200,json:async()=>({profile:"Neural"})};
+  }});
+  assert.deepEqual(await api.profile(),{profile:"Neural"});
+  assert.deepEqual(await api.setProfile("Neural"),{profile:"Neural"});
+  assert.deepEqual(calls,[["/api/rt/v1/profile","GET",undefined],
+    ["/api/rt/v1/profile","POST",JSON.stringify({profile:"Neural"})]]);
+});

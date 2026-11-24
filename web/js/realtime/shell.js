@@ -47,6 +47,7 @@ export function createSessionController(api) {
     },
   };
 }
+const GPU_PROFILES=Object.freeze(["Eco","Performance","Neural","Training/Render"]);
 const wait = ms => new Promise(resolve=>setTimeout(resolve,ms));
 const timed = (promise,ms) => {
   let timer;
@@ -283,13 +284,15 @@ export function catalogEntries(data) {
 // Jede Mount-Generation hat genau einen Satz Listener und höchstens einen Poll-Timer.
 // WP05 erstellt weder AudioContext noch Audioelemente und startet keine Worker.
 export function createLabShell({remote=createRtApi(), mockFactory=null,
-  catalog=catalogApi, timerHost=globalThis, keyboard=globalThis.window, storage}={}) {
+  catalog=catalogApi, timerHost=globalThis, keyboard=globalThis.window, storage,
+  onProfile=()=>{}}={}) {
   let dispose=null;
   function mount(root) {
     if(dispose) return;
     const resources=createResources(timerHost), abort=new AbortController();
     let active=true, caps=null, gpu=null, mock=false, client=remote, controller=null, error=null,
       entries=[], stemGeneration=0, polling=false, busy=false, preset={...DEFAULT_PRESET}, muted=false, slot="A";
+    let profile=null, profileBusy=false, profileEpoch=0, profileError="";
     const status=h("p",{role:"status","aria-live":"polite"},"Fähigkeiten werden geladen");
     const catalogStatus=h("p",{role:"status"},"Bibliothek wird geladen");
     const gpuInfo=h("p",{},"GPU-Telemetrie wird geladen");
@@ -303,6 +306,8 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     const model=select("Stem-Modell",[["htdemucs","Demucs · 4 Stems"],["htdemucs_6s","Demucs · 6 Stems"]]);
     const stem=select("Stem",[["","Original"]]);
     const capability=select("Fähigkeit");
+    const profileSelect=select("GPU-Profil", [["","Profil nicht geladen"],...GPU_PROFILES.map(name=>[name,name])]);
+    const profileInfo=h("p",{role:"status"},"GPU-Profil wird geladen");
     const btn=t=>h("button",{type:"button"},t);
     const play=btn("Abspielen / Pause"), stop=btn("Stop"), panic=btn("Panic · stumm / Dry"),
       bypass=btn("Bypass"), ab=btn("A/B: A"), save=btn("Preset speichern"), restore=btn("Preset laden"), record=btn("Aufnahme starten"), exportButton=btn("Sitzungsdatei exportieren");
@@ -322,7 +327,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Suche",search),label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
-          h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh,
+          label("GPU-Profil",profileSelect),profileInfo,refresh,
           h("p",{},"RoFormer · Offline: freigegeben für G1, produktiver Jobpfad noch nicht installiert / angebunden."),
           h("ul",{},unavailableTools.map(name=>h("li",{},name+" · nicht installiert / nicht freigegeben"))))),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
@@ -337,6 +342,10 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       const state=deriveState({capabilities:caps,gpu,mock,songs:entries.length || (song.value==="fixture"?1:0),error,capabilityId:capability.value});
       status.textContent=state.text || "Bereit";
       gpuInfo.textContent=gpuText(gpu);
+      profileSelect.value=profile??"";
+      profileSelect.disabled=!profile||profileBusy||!!error;
+      profileInfo.textContent=profileError || (profile===null?"GPU-Profil nicht verfügbar":
+        "Profil: "+profile+" · GPU-Worker-Limit; Mock bleibt CPU. Keine Modellfreigabe durch Profilwechsel.");
       latency.textContent=latencyText(selected());
       const enabled=state.enabled && Boolean(song.value) && !busy && !!controller;
       for(const b of buttons)b.disabled=!enabled;
@@ -390,6 +399,32 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
       }catch{if(active && generation===stemGeneration)catalogStatus.textContent="Stem-Cache nicht verfügbar; Original wählbar.";}
       paint();
     }
+    function acceptProfile(value) {
+      if(!GPU_PROFILES.includes(value?.profile))throw new Error("Ungültiges GPU-Profil");
+      profile=value.profile;profileError="";onProfile(profile);
+    }
+    async function refreshProfile() {
+      if(!remote.profile||profileBusy)return;
+      const epoch=profileEpoch;
+      try{
+        const value=await remote.profile(abort.signal);
+        if(active&&epoch===profileEpoch&&!profileBusy)acceptProfile(value);
+      }catch(e){
+        if(active&&epoch===profileEpoch&&!profileBusy)profileError="GPU-Profil nicht abrufbar: "+e.message;
+      }
+    }
+    async function changeProfile() {
+      if(!active||!profile||profileBusy||!remote.setProfile)return;
+      const next=profileSelect.value;
+      if(!GPU_PROFILES.includes(next))return;
+      profileBusy=true;profileEpoch++;paint();
+      try{
+        const value=await remote.setProfile(next,abort.signal);
+        if(active)acceptProfile(value);
+      }catch(e){
+        if(active)profileError="Profilwechsel abgelehnt: "+e.message;
+      }finally{profileBusy=false;paint();}
+    }
     async function refreshStatus() {
       if(!active || polling)return;
       polling=true;
@@ -414,6 +449,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
         capsInfo.replaceChildren(...caps.capabilities.map(c=>h("li",{},c.id+": "+modeLabel(c.mode)+" · "+(c.available?"gemeldet verfügbar":"nicht freigegeben")+(c.mock?" · Testmodus":""))));
         const nextGpu=await client.gpu(abort.signal);
         if(active)gpu=nextGpu;
+        await refreshProfile();
       }catch(e){
         if(active){
           // 503 beim ersten GET ist der ausgeschaltete oder nicht verfügbare Dienst.
@@ -466,6 +502,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=null,
     on(song,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();paint();});
     on(model,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});loadStems();});on(stem,"change",()=>{controller?.reset().catch(e=>{if(active){error=e;paint();}});});
     on(capability,"change",paint);on(refresh,"click",refreshStatus);
+    on(profileSelect,"change",changeProfile);
     if(keyboard)on(keyboard,"keydown",event=>{
       const action=keyAction(event);
       const target={transport:play,panic,bypass,ab}[action];
