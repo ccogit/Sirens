@@ -1,0 +1,19 @@
+{
+  "id": "beat-this-live",
+  "available": false,
+  "mock": false,
+  "gate": "nicht_gemessen",
+  "candidate_mode": "streaming",
+  "source": "https://github.com/CPJKU/beat_this_live",
+  "source_revision": "353065f154b50442b1bddfa5c020a40f0e64c564",
+  "code_license": "MIT",
+  "weights_license": "MIT laut WP02; konkrete Datei noch prüfen",
+  "weights_sha256": null,
+  "dependency_lock": null,
+  "worker_entrypoint": null,
+  "context_frames": null,
+  "hop_frames": null,
+  "latency_frames": null,
+  "vram_peak_bytes": "unknown",
+  "report": "benchmarks/spikes/beat-this-live/BERICHT.md"
+}

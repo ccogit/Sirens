@@ -1,7 +1,8 @@
 """Einzige RT-Weiche: WP01 stellt nur capabilities bereit."""
 from ..contracts import Ablehnung
 from .contracts import error
-from .mock import MockAdapter
+from .model_registry import ModelRegistry
+from .telemetry import read_gpu
 
 def dispatch(handler, path, body):
     origin = handler.headers.get("Origin")
@@ -12,5 +13,7 @@ def dispatch(handler, path, body):
         raise error("unavailable")
     if handler.command == "GET" and path == "/api/rt/v1/capabilities":
         return handler._json(200, {"protocol_version": 1,
-                                   "capabilities": [MockAdapter().probe()] if cfg.rt_mock else []})
+                                   "capabilities": ModelRegistry(mock_enabled=cfg.rt_mock).capabilities()})
+    if handler.command == "GET" and path == "/api/rt/v1/gpu":
+        return handler._json(200, read_gpu().as_dict())
     raise error("unavailable")
