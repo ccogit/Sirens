@@ -57,6 +57,16 @@ def dispatch(handler, path, body):
             if body != {}:
                 raise invalid("body")
             return handler._json(200, s.transport())
+        if method == "GET" and tail == ["dry"]:
+            raw = s.dry_audio()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/octet-stream")
+            handler.send_header("Content-Length", str(len(raw)))
+            handler.send_header("Cache-Control", "no-store")
+            handler.send_header("X-Content-Type-Options", "nosniff")
+            handler.end_headers()
+            handler.wfile.write(raw)
+            return
         if method == "POST" and tail == ["render"]:
             return handler._json(202, s.render(body))
     if len(parts) >= 2 and parts[0] == "jobs":
@@ -66,6 +76,12 @@ def dispatch(handler, path, body):
             if body != {}:
                 raise invalid("body")
             return handler._json(200, service(handler).job(parts[1], cancel=True))
+    if method == "POST" and parts == ["assets", "resolve"]:
+        if not isinstance(body, dict) or set(body) != {"pfad"}:
+            raise invalid("asset")
+        return handler._json(201, service(handler).sources.register(body["pfad"]))
+    if method == "GET" and len(parts) == 3 and parts[0] == "assets" and parts[2] == "beatgrid":
+        return handler._json(200, service(handler).sources.beatgrid(parts[1]))
     if method == "GET" and len(parts) == 2 and parts[0] == "assets":
         return handler._json(200, service(handler).asset(parts[1]))
     raise error("unavailable")
