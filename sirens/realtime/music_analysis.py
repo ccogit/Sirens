@@ -14,7 +14,7 @@ import threading
 from .. import beat
 from ..dramaturgie import analyse_abschnitte
 from .contracts import invalid, error, uint, finite
-from .schema import validate
+from .schemas import validate
 
 MIN_CONFIDENCE = .5
 NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
