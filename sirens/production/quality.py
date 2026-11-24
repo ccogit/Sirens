@@ -6,6 +6,8 @@ import hashlib
 import json
 import math
 import random
+import re
+import shutil
 import statistics
 import subprocess
 import wave
@@ -69,6 +71,40 @@ def mastering_analyzer(worker_python, engine_root):
     return analyze
 
 
+def ffmpeg_analyzer(executable="ffmpeg"):
+    """Use FFmpeg's EBU R128 integrated loudness and oversampled true peak."""
+    def analyze(path):
+        process = subprocess.run(
+            [str(executable), "-hide_banner", "-nostdin", "-nostats", "-i",
+             str(Path(path).resolve(strict=True)), "-af", "ebur128=peak=true",
+             "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=600, check=True)
+        summary = process.stderr.rsplit("Summary:", 1)[-1]
+        def metric(pattern):
+            match = re.search(pattern, summary, re.MULTILINE)
+            if not match:
+                return None
+            value = float(match.group(1))
+            return value if math.isfinite(value) else None
+        return {"lufs": metric(r"^\s*I:\s*([-+\d.]+|[-+]?inf)\s*LUFS"),
+                "true_peak_dbtp": metric(r"^\s*Peak:\s*([-+\d.]+|[-+]?inf)\s*dBFS"),
+                "lra": metric(r"^\s*LRA:\s*([-+\d.]+|[-+]?inf)\s*LU"),
+                "measurement_method": "ffmpeg ebur128=peak=true"}
+    return analyze
+
+
+def configured_analyzer(options):
+    """Prefer the existing isolated AMM worker, otherwise local FFmpeg."""
+    if options.get("analysis_python") and options.get("analysis_root"):
+        try:
+            return mastering_analyzer(options["analysis_python"], options["analysis_root"])
+        except (OSError, ValueError):
+            # Stale worker paths need not prevent an offline measurement.
+            pass
+    executable = shutil.which(options.get("ffmpeg") or "ffmpeg")
+    return ffmpeg_analyzer(executable) if executable else None
+
+
 def inspect_run(root, analyzer=None):
     """Audit immutable run inputs, not perceived musical quality."""
     root = Path(root)
@@ -103,8 +139,13 @@ def inspect_run(root, analyzer=None):
                         value = measured.get(metric)
                         technical[name][metric] = value if type(value) in (int, float) and math.isfinite(value) else None
                     technical[name]["measurement_method"] = measured.get("measurement_method")
+                    if any(technical[name][metric] is None for metric in ("lufs", "true_peak_dbtp")):
+                        technical[name]["measurement_reason"] = "analyzer returned no finite LUFS/true peak"
                 except (ValueError, OSError, subprocess.SubprocessError, KeyError, IndexError) as exc:
-                    missing.append(name + ": external measurement unavailable (" + type(exc).__name__ + ")")
+                    technical[name]["measurement_reason"] = "external measurement unavailable (" + type(exc).__name__ + ")"
+                    missing.append(name + ": " + technical[name]["measurement_reason"])
+            else:
+                technical[name]["measurement_reason"] = "no analyzer available (configure analysis_python/analysis_root or ffmpeg)"
             if technical[name]["clipped_samples"]:
                 errors.append(name + ": clipping")
         except (ValueError, OSError) as exc:
@@ -246,7 +287,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if bool(args.analysis_python) != bool(args.analysis_root):
         parser.error("both analysis options are required together")
-    analyzer = mastering_analyzer(args.analysis_python, args.analysis_root) if args.analysis_python else None
+    analyzer = configured_analyzer({"analysis_python": args.analysis_python, "analysis_root": args.analysis_root})
     result = benchmark(args.manifest, analyzer)
     if args.output:
         _write_new(args.output, result)

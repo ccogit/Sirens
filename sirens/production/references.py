@@ -8,6 +8,7 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
+from datetime import datetime, timezone
 
 from ..catalog import ACHSEN, Katalog, bekannte_bewertungen
 from ..store import Store, write_json_atomic
@@ -75,7 +76,9 @@ def _raw(row, source):
     favorite = row.get("favorit", row.get("favorite"))
     return {"score": score, "favorite": favorite if type(favorite) is bool else None,
             "comment": _text(row.get("kommentar", row.get("comment"))),
-            "source": source, "axes": _axes(row.get("achsen", row.get("axes")))}
+            "source": source, "axes": _axes(row.get("achsen", row.get("axes"))),
+            **({"scope": "song", "evaluation_id": row["evaluation_id"]}
+               if source == "amm" and row.get("scope") == "song" and row.get("evaluation_id") else {})}
 
 
 def _export_index(export):
@@ -90,6 +93,63 @@ def _export_index(export):
                         row.get("title"), row.get("version"))
         index[key].append(row)
     return index
+
+
+def amm_export(rows, music_root):
+    """Project local AMM job/package rows; no database or network access."""
+    from ..contracts import parse_pfad
+    from .contracts import validate_relative_path
+
+    packages, evaluations = {}, defaultdict(dict)
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("AMM JSONL: expected objects")
+        relative = row.get("local_file_path")
+        if not isinstance(relative, str):
+            continue
+        relative = relative.replace("\\", "/")
+        if relative.startswith("./"):
+            relative = relative[2:]
+        if relative.casefold().startswith("generated-music/"):
+            relative = relative[len("generated-music/"):]
+        try:
+            validate_relative_path(relative)
+            if not safe_path(music_root, relative).is_file():
+                continue
+        except (OSError, ValueError):
+            continue
+        identity = parse_pfad(relative, music_root)
+        key = _identity(identity["artist_slug"], identity["release_slug"],
+                        identity["titel"], identity["version"])
+        song_key = str(row.get("song_id") or _id(*key[:3]))
+        for evaluation in row.get("song_evaluations") or []:
+            if not isinstance(evaluation, dict):
+                raise ValueError("AMM JSONL: expected evaluation objects")
+            item = {k: evaluation.get(k) for k in ("outcome_score", "favorite", "comment", "axes")}
+            eid = str(evaluation.get("id") or _id(item))
+            item.update(scope="song", evaluation_id=_id(song_key, eid))
+            evaluations[song_key][eid] = item
+        stamp = row.get("package_created_at")
+        try:
+            created = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            rank = (created.astimezone(timezone.utc), int(row.get("package_id") or 0))
+        except (AttributeError, ValueError, TypeError, OverflowError):
+            raise ValueError("AMM JSONL: package_created_at and numeric package_id required") from None
+        projected = {"artist_slug": identity["artist_slug"], "release_slug": identity["release_slug"],
+                     "title": identity["titel"], "version": identity["version"],
+                     **{k: row.get(k) for k in ("style_prompt", "negative_tags", "lyrics", "parameters", "axes")}}
+        if key not in packages or rank > packages[key][0]:
+            packages[key] = rank, song_key, projected
+        elif rank == packages[key][0] and (song_key, projected) != packages[key][1:]:
+            raise ValueError("AMM JSONL: conflicting package rows")
+    songs = []
+    for key in sorted(packages, key=repr):
+        _, song_key, projected = packages[key]
+        projected["song_evaluations"] = [evaluations[song_key][eid] for eid in sorted(evaluations[song_key])]
+        songs.append(projected)
+    return {"schema_version": 1, "songs": songs}
 
 
 def collect(cfg, *, amm_export=None):
@@ -182,13 +242,19 @@ def collect(cfg, *, amm_export=None):
                 })
     for track in tracks:
         track["song_family"] = find(track["song_family"])
+    # Song-level evidence may be visible on multiple versions, but count it once.
+    unique_ratings = {}
+    for track in tracks:
+        for i, rating in enumerate(track["raw_ratings"]):
+            key = rating.get("evaluation_id") or (track["id"], i)
+            unique_ratings[key] = rating
     coverage = {"catalog_status": tree["zustand"], "orders": len(orders),
                 "amm_available": amm_export is not None, "amm_ambiguous": ambiguous,
                 "skipped_files": skipped, "tracks": len(tracks),
                 "families": len({t["song_family"] for t in tracks}),
                 "unrated": sum(t["rating"] is None for t in tracks),
-                "raw_ratings": sum(len(t["raw_ratings"]) for t in tracks),
-                "comments": sum(len(t["raw_comments"]) for t in tracks),
+                "raw_ratings": len(unique_ratings),
+                "comments": sum(bool(r["comment"]) for r in unique_ratings.values()),
                 "favorites": sum(t["favorite"] is True for t in tracks),
                 "positive": sum(t["rating"] in (1, 2) for t in tracks),
                 "with_axes": sum(bool(t["axes"]) for t in tracks),
@@ -363,12 +429,29 @@ def validate_references(value):
 def main(argv=None):
     from ..config import load, umgebung
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("inventory", "references"))
+    parser.add_argument("action", choices=("inventory", "references", "amm-export"))
     parser.add_argument("--brief", type=Path)
+    parser.add_argument("--input", type=Path, help="Local AMM JSONL export rows")
+    parser.add_argument("--out", type=Path)
     parser.add_argument("--amm-export", type=Path)
     parser.add_argument("--analyse", action="store_true", help="local mix analysis of rated training tracks")
     args = parser.parse_args(argv)
     cfg = load(umgebung())
+    if args.action == "amm-export":
+        if args.input is None or args.out is None:
+            parser.error("amm-export requires --input and --out")
+        repo = Path(__file__).resolve().parents[2]
+        if any(p.resolve().is_relative_to(repo) for p in (args.input, args.out)):
+            parser.error("AMM data must be outside the repository")
+        try:
+            with args.input.open(encoding="utf-8-sig") as stream:
+                projection = amm_export((json.loads(line, parse_constant=_invalid_constant)
+                                         for line in stream if line.strip()), cfg.music_root)
+            write_json_atomic(args.out, projection)
+        except (OSError, ValueError, TypeError, KeyError):
+            parser.error("AMM export failed; check local input format and paths")
+        print(json.dumps({"songs": len(projection["songs"])}))
+        return 0
     if args.action == "references" and args.brief is None:
         parser.error("references requires --brief")
     # Never write private reference data into the checkout.
