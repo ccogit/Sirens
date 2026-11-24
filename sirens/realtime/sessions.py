@@ -344,6 +344,7 @@ class Session:
         self.asset = None
         self.dry = None
         self.dropped = 0
+        self.last_error = None
 
     def snapshot(self):
         with self.lock:
@@ -432,6 +433,8 @@ class Session:
             raise invalid("render")
         with self.lock:
             if self.data["state"] != "playing":
+                if self.last_error == "busy_gpu":
+                    raise error("busy_gpu")
                 raise error("unavailable")
             epoch = uint(body["epoch"], "epoch", 2**32-1)
             if epoch != self.data["epoch"]:
@@ -513,6 +516,7 @@ class Session:
             with self.lock:
                 if not self.stop.is_set():
                     self._state("error")
+                    self.last_error = exc.code if isinstance(exc, Ablehnung) else "unavailable"
                     self.token = None
                     if self.job and self.job["state"] in ("queued", "running"):
                         self._job_state("error")
@@ -553,7 +557,13 @@ class Session:
                 with self.lock:
                     self._state("error")
                 raise error("unavailable")
-        self.manager.recordings.close_session(self.data["id"])
+        try:
+            self.manager.recordings.close_session(self.data["id"])
+        except (Ablehnung, OSError):
+            with self.lock:
+                if self.data["state"] == "stopping":
+                    self._state("error")
+            raise error("unavailable") from None
         with self.lock:
             if self.data["state"] == "stopping":
                 self._state("closed")
@@ -637,6 +647,9 @@ class Sessions:
         self.stop.set()
         try:
             for s in sessions:
-                s.close()
+                try:
+                    s.close()
+                except (Ablehnung, OSError):
+                    logging.warning("RT: Sitzung konnte nicht vollständig geschlossen werden.")
         finally:
             self.reconciler.join(timeout=3)
