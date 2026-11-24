@@ -8,7 +8,7 @@ test("alle Hooks unabhängig von Reihenfolge und Registry-Vollständigkeit sicht
   for(const id of ids){
     assert.equal(hookState(id,[]).enabled,false);
     assert.match(hookState(id,[]).text,/nicht gemessen/i);
-    const cap={id,available:true,controls:[]};
+    const cap={id:id==="roformer"?"separation":id,available:true,controls:[]};
     assert.equal(hookState(id,[{id:"mock",available:true},cap]).enabled,false);
     assert.equal(hookState(id,[cap],{wired:true,measured:true}).enabled,true);
     assert.equal(hookState(id,[cap],{wired:true,measured:true,error:new Error("503")}).enabled,false);
@@ -44,4 +44,14 @@ test("Karten enthalten deaktivierte Aktionen und dynamische Regler",()=>{
   cards.paint([],new Error("API"));
   assert.match(rave.children[1].textContent,/Fehler/);
   cards.destroy();assert.equal(host.children.length,0);
+});
+
+test("Diagnose trennt fehlenden Interpreter und fehlenden G1-Bericht",()=>{
+  const cap={id:"rave",available:false,controls:[]};
+  const diagnostics={rave:{interpreter_present:false,gate_report_present:true,available:false}};
+  assert.match(hookState("rave",[cap],{diagnostics}).text,/nicht installiert/i);
+  diagnostics.rave.interpreter_present=true;
+  diagnostics.rave.gate_report_present=false;
+  assert.match(hookState("rave",[cap],{diagnostics}).text,/nicht gemessen/i);
+  assert.equal(hookState("rave",[cap],{diagnostics}).enabled,false);
 });
