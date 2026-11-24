@@ -7,6 +7,7 @@ import { spielAnhalten, spielwiese } from "./spielwiese.js";
 import { autoDjAnsicht } from "./auto_dj.js";
 import { kickTausch } from "./kicktausch.js";
 import { stemSpiel } from "./stems.js";
+import { labWerkzeugNavigation, labWerkzeugWahl } from "./lab_library.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -153,38 +154,9 @@ export function liveLabAnsicht(el) {
   }, h("span", {}, label), h("kbd", {}, key)));
 
   const autoToy = autoDjAnsicht(() => produktionLaeuft);
-  // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "auto", "kick", "stems"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
   const kick = kickTausch();
   const stems = stemSpiel(() => produktionLaeuft);
-  const kisten = {};
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"], ["stems", "🎚 KI Stem Studio & Warp Stage"]].map(([key, label]) =>
-    h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
-  function waehlen(key) {
-    spielzeug = key;
-    try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
-    for (const b of spielzeugKnoepfe) b.setAttribute("aria-pressed", String(b.dataset.toy === key));
-    for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
-    if (key !== "pult") for (const audio of engine.decks) audio.pause();
-    if (key !== "wiese") spielAnhalten();
-    if (key !== "kick") kick.anhalten();
-    if (key !== "stems") stems.pausieren();
-    if (key === "auto") autoToy.activate(); else { autoToy.deactivate(); autoToy.stop(); }
-  }
-
-  el.append(h("div", { class: "lab-page" },
-    h("header", { class: "lab-header" },
-      h("div", {},
-        h("p", { class: "lab-eyebrow" }, "SIRENS · INTERACTIVE MUSIC SPACE"),
-        h("h1", {}, "Die Wartezeit wird zum Auftritt."),
-        h("p", {}, "DJ-Pult, Auto-DJ, Kick-Tausch und KI Stem Studio mit audioreaktivem RTX Warp Stage.")),
-      h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
-    h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
-    kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
-    kisten.auto = h("div", { class: "lab-toy" }, autoToy.el),
-    kisten.kick = h("div", { class: "lab-toy" }, kick.el),
-    kisten.stems = h("div", { class: "lab-toy" }, stems.el),
-    kisten.pult = h("div", { class: "lab-toy" },
+  const pult = h("div", { class: "lab-toy" },
     h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
       canvas, hud,
       h("div", { class: "lab-stage-top" }, h("span", { class: "lab-live" }, "● VISUAL ENGINE"), status),
@@ -205,10 +177,67 @@ export function liveLabAnsicht(el) {
     h("section", { class: "lab-pads" },
       h("div", {}, h("h2", {}, "Mach deinen eigenen Beat."),
         h("p", {}, "Tippen oder Tasten A · S · D · F · G spielen. Original-Sounds, live synthetisiert.")),
-      h("div", { class: "lab-pad-row" }, pads))),
+      h("div", { class: "lab-pad-row" }, pads)));
+
+  // Ein Eintrag je Werkzeug: Karte, Panel und Lebenszyklus bleiben zusammen.
+  const werkzeuge = [
+    { id: "pult", titel: "DJ-Pult & Beat-Pads", kategorie: "LIVE MIX", symbol: "🎛", farbe: "mint",
+      beschreibung: "Mische zwei Songs, forme ihren Sound mit Live-Effekten und spiele eigene Beats dazu.",
+      hinweis: "Sofort spielbar · Zwei Decks · A S D F G", motiv: [35, 68, 45, 92, 60, 84, 35, 65, 45, 80, 55, 30],
+      panel: pult, anhalten: () => engine.decks.forEach((audio) => audio.pause()), beenden: () => engine.beenden() },
+    { id: "wiese", titel: "Emblem & Wellen", kategorie: "SOUND & VISUALS", symbol: "🌀", farbe: "violet",
+      beschreibung: "Verbiege einen Lieblingssong mit der Maus: Filter, Echo, Stottern, Rückwärts und Tempo. Forme sein audioreaktives Emblem.",
+      hinweis: "Sofort spielbar · Klangfläche · 12 Emblem-Achsen", motiv: [22, 40, 68, 90, 65, 30, 22, 40, 68, 90, 65, 30],
+      panel: spielwiese(), anhalten: spielAnhalten, beenden: spielAnhalten },
+    { id: "auto", titel: "Auto-DJ & Endlos-Set", kategorie: "SMART DJ", symbol: "♾", farbe: "blue",
+      beschreibung: "Lass Sirens passende Songs auswählen, Tempo und Phrasen abschätzen und fließende Übergänge mischen.",
+      hinweis: "Lokale Analyse · Mindestens zwei Songs · ffmpeg", motiv: [20, 32, 45, 62, 81, 93, 80, 66, 48, 32, 48, 73],
+      panel: autoToy.el, aktivieren: () => autoToy.activate(),
+      anhalten: () => { autoToy.deactivate(); autoToy.stop(); }, beenden: () => autoToy.destroy() },
+    { id: "kick", titel: "Kick-Tausch", kategorie: "SOUND DESIGN", symbol: "🥁", farbe: "amber",
+      beschreibung: "Gib einem Song die Kick eines anderen – Groove, Pausen und Dynamik bleiben erhalten. Vergleiche das Ergebnis direkt mit dem Original.",
+      hinweis: "Vorbereitung nötig · Zwei Songs · Stem-Trennung", motiv: [100, 56, 25, 10, 94, 50, 20, 10, 100, 55, 25, 10],
+      panel: kick.el, anhalten: () => kick.anhalten(), beenden: () => kick.anhalten() },
+    { id: "stems", titel: "KI Stem Studio & Warp Stage", kategorie: "KI & 3D", symbol: "🎚", farbe: "pink",
+      beschreibung: "Trenne einen Song in Instrumentenspuren, mische sie neu und entdecke alternative Klangfarben in audioreaktiven 3D-Welten.",
+      hinweis: "Lokale KI · Demucs · Basic Pitch optional", motiv: [80, 80, 25, 50, 50, 25, 95, 95, 25, 65, 65, 25],
+      panel: stems.el, anhalten: () => stems.pausieren(), beenden: () => stems.beenden() },
+  ];
+  for (const tool of werkzeuge) {
+    if (tool.id !== "pult") tool.panel = h("div", { class: "lab-toy" }, tool.panel);
+    tool.panel.id = "lab-panel-" + tool.id;
+    tool.panel.hidden = true;
+  }
+  let spielzeug;
+  const navigation = labWerkzeugNavigation(werkzeuge, waehlen);
+  function waehlen(key) {
+    if (spielzeug !== key) {
+      for (const tool of werkzeuge) {
+        tool.panel.hidden = tool.id !== key;
+        if (tool.id !== key) tool.anhalten?.();
+      }
+      werkzeuge.find((tool) => tool.id === key)?.aktivieren?.();
+      spielzeug = key;
+    }
+    try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
+    navigation.anzeigen(key);
+  }
+  let gespeichert;
+  try { gespeichert = localStorage.getItem("sirens.spielzeug"); } catch { /* ohne Speicher */ }
+
+  el.append(h("div", { class: "lab-page" },
+    h("header", { class: "lab-header" },
+      h("div", {},
+        h("p", { class: "lab-eyebrow" }, "SIRENS · INTERACTIVE MUSIC SPACE"),
+        h("h1", {}, "Dein Sound. Dein Labor."),
+        h("p", {}, "Entdecke Live-Effekte, kreative Klangexperimente und lokale KI-Werkzeuge. Wähle ein Tool und mach Musik zu deinem Spielfeld.")),
+      h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
+    navigation.bibliothek,
+    navigation.arbeitskopf,
+    werkzeuge.map((tool) => tool.panel),
     h("p", { class: "lab-foot" },
       "Performance-Modus: begrenzte Auflösung und Bildrate, um die eigentliche Musikproduktion nicht zu behindern. Audio läuft lokal im Browser.")));
-  waehlen(spielzeug);
+  waehlen(labWerkzeugWahl(werkzeuge, gespeichert));
   cross.addEventListener("input", () => engine.setCrossfade(cross.value));
   const removeKeyboard = (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
@@ -268,10 +297,6 @@ export function liveLabAnsicht(el) {
     clearInterval(statusTimer);
     window.removeEventListener("keydown", removeKeyboard);
     stopVisual();
-    spielAnhalten();
-    autoToy.destroy();
-    kick.anhalten();
-    stems.beenden();
-    engine.beenden();
+    for (const tool of werkzeuge) tool.beenden?.();
   };
 }
