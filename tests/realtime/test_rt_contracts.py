@@ -177,7 +177,9 @@ class HTTP(ServerFall):
             for method, endpoint, data in (("GET",path,None),("POST","/api/rt/v1/sessions",{})):
                 status,body,_ = self.http(method,endpoint,data,headers=headers)
                 self.assertEqual((status,body["error"]),(403,code))
-        self.assertEqual(self.http("GET","/api/rt/v1/gpu")[0],503)
+        status, body = self.http("GET","/api/rt/v1/gpu")[:2]
+        self.assertEqual(status, 200)
+        validate("telemetry", body)
         self.assertEqual(self.http("POST","/api/rt/v1/sessions",{})[0],503)
         self.assertEqual(self.http("GET","/api/health")[1]["status"],"ok")
         self.assertEqual(self.http("GET","/api/unbekannt")[0],404)
