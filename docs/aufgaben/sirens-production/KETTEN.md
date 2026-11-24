@@ -8,22 +8,24 @@ Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinat
 
 | Kette | Titel | Aufgaben | Voraussetzung | Stand |
 |---|---|---|---|---|
-| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | offen |
-| KETTE-P01 | Persönliches Referenzwissen | K01 | – | offen |
-| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | offen |
-| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | offen |
-| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | offen |
-| KETTE-P05 | Mixing und Mastering | K05 | – | offen |
-| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | offen |
-| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | offen |
+| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | vergeben (24.11.2026) |
+| KETTE-P01 | Persönliches Referenzwissen | K01 | – | vergeben (24.11.2026) |
+| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | vergeben (24.11.2026) |
+| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | vergeben (24.11.2026) |
+| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | vergeben (24.11.2026) |
+| KETTE-P05 | Mixing und Mastering | K05 | – | vergeben (24.11.2026) |
+| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | vergeben (24.11.2026) |
+| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | vergeben (24.11.2026) |
 | KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | offen |
 
 ### Regeln für Bearbeiter (gelten vor den Formulierungen weiter unten)
 
-1. **Früh pushen, die CI prüft.** Nach dem ersten Commit sofort `extern/KETTE-P0x` pushen und einen Draft-PR auf
-   `integration/sirens-production` öffnen. Die CI des PR (`python -m unittest discover -s tests -v`) ist die
-   maßgebliche Prüfung; Fehler anhand der CI-Ausgabe beheben. „Lokal nicht ausführbar“ ist nie ein Grund, nicht
-   zu pushen.
+1. **Früh pushen, keine CI.** Nach dem ersten Commit sofort `extern/KETTE-P0x` pushen und einen Draft-PR auf
+   `integration/sirens-production` öffnen. GitHub Actions ist abgeschaltet (seit 24.11.2026): Es gibt keine
+   CI-Läufe, nicht darauf warten. Die maßgebliche Prüfung (`py -3.11 -m unittest discover -s tests -v` unter
+   Windows) macht der Koordinator nach „Ready for review“. Tests müssen unter Linux und Windows laufen (keine
+   Symlinks ohne `try/except OSError` + skip, Pfade mit `pathlib`, Textdateien mit `encoding="utf-8"`).
+   „Lokal nicht ausführbar“ ist nie ein Grund, nicht zu pushen.
 2. **Nie ohne PR enden.** Bei Blockade: Stand pushen, in `ergebnisse/K0x.md` einen Abschnitt „Übergabe“ (fertig,
    offen, nächster Schritt), PR mit Titelanfang `ÜBERGABE` auf Ready for review. Der Koordinator übernimmt.
 3. **Was nur am Zielrechner geht** (Live, Plugins, GPU, lokaler Katalog, AMM/SecondRoom-Dienste, Hörtests):
