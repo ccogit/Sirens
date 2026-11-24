@@ -31,11 +31,11 @@ export class PadController {
     this.epoch=0; this.job=null; this.buffer=null; this.opening=null;
   }
   async open(userAction=false) {
-    if(!this.enabled || userAction!==true || this.state!=="closed") return false;
+    if(!this.enabled || userAction!==true || this.state!=="closed" || this.opening) return false;
     const epoch=++this.epoch;
     this.state="loading";
     try {
-      this.opening=Promise.resolve().then(()=>this.backend.open());
+      this.opening=Promise.resolve(this.backend.open());
       await this.opening;
       if(epoch!==this.epoch)return false;
       this.state="ready";return true;
