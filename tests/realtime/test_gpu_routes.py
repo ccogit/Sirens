@@ -23,4 +23,5 @@ class GPURoutes(ServerFall):
         status, body, _ = self.http("GET", "/api/rt/v1/capabilities")
         self.assertEqual(status, 200)
         validate("capabilities", body)
-        self.assertTrue(body["capabilities"][0]["mock"])
+        # Reihenfolge der Registry ist alphabetisch; echte Worker (z. B. "demon") können vor "mock" stehen.
+        self.assertTrue(any(c["mock"] for c in body["capabilities"]))
