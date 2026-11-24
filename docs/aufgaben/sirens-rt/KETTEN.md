@@ -49,20 +49,30 @@ reservieren nichts und ändern diese Datei nicht.
    wurde, je Abnahmepunkt der Beleg (Test, Befehl, Ausgabe), was nicht geprüft werden konnte („nicht
    gemessen“ samt Skript und Aufruf für den Koordinator), Abweichungen von der Aufgabe mit Grund, Versionen,
    Pins und Lizenzen fremder Projekte, offene Risiken, Rückbau.
-4. **Qualität.** `python -m unittest discover -s tests -v` ist vor jedem Push grün. Die CI des PR ist grün.
+4. **Früh pushen, die CI prüft.** Nach dem ersten Commit sofort pushen und den Draft-PR öffnen; danach in
+   kleinen Schritten weiter pushen. Maßgeblich ist die CI des PR (sie führt
+   `python -m unittest discover -s tests -v` aus), nicht die eigene Umgebung. Wer das Repo nicht vollständig
+   auschecken oder die Tests nicht lokal ausführen kann, pusht trotzdem und behebt Fehler anhand der
+   CI-Ausgabe. Ein lokal nicht geprüfter Stand ist nie ein Grund, nicht zu pushen oder keinen PR zu öffnen.
    Tests zu jeder Änderung, ohne Netz, ohne GPU, ohne Modellgewichte.
-5. **Aktuell bleiben.** Regelmäßig `origin/integration/sirens-rt` in den Branch mergen (kein Force-Push, kein
+5. **Nie ohne PR enden.** Jede Antwort im Chat, die die Arbeit beendet, setzt einen gepushten Stand und einen
+   PR voraus. Ist alles fertig und die CI grün: Ready for review. Geht es nicht weiter (Blockade, CI bleibt
+   rot, Umfang nicht zu schaffen): Stand pushen, in der Ergebnisdatei einen Abschnitt „Übergabe“ schreiben
+   (fertig, offen, nächster Schritt, Fehlerausgabe) und den PR **trotzdem auf Ready for review** setzen, mit
+   „ÜBERGABE“ am Anfang des PR-Titels. Der Koordinator übernimmt dann den Branch. Ein Draft, an dem niemand
+   arbeitet, ist der einzige falsche Zustand.
+6. **Aktuell bleiben.** Regelmäßig `origin/integration/sirens-rt` in den Branch mergen (kein Force-Push, kein
    Rebase nach dem ersten Push), Konflikte selbst lösen.
-6. **Grenzen.** Kein Torch- oder Modell-Import im Paket `sirens/`. Keine Modellgewichte, Musikdateien oder
+7. **Grenzen.** Kein Torch- oder Modell-Import im Paket `sirens/`. Keine Modellgewichte, Musikdateien oder
    Downloads im Repo. Gemeinsame Dateien (README, Abschnitt 4, Punkt 7) nur ändern, wenn die Aufgabe es
    ausdrücklich erlaubt; sonst den Einbau als Hook in `docs/realtime/hooks/WPnn.md` beschreiben. Keine
    Secrets. Nichts außerhalb des Umfangs der Aufgaben ändern; Auffälliges außerhalb des Umfangs steht in der
    Ergebnisdatei unter „Beobachtungen“.
-7. **Keine erfundenen Messwerte.** Was die Zielhardware, einen Browser mit Tonausgabe oder ein echtes Modell
+8. **Keine erfundenen Messwerte.** Was die Zielhardware, einen Browser mit Tonausgabe oder ein echtes Modell
    braucht, wird als Skript geliefert und als „nicht gemessen“ ausgewiesen. Der Koordinator misst.
-8. **Durcharbeiten.** Ohne Rückfrage Aufgabe für Aufgabe weiter. Bei einer echten Blockade die Annahme in der
+9. **Durcharbeiten.** Ohne Rückfrage Aufgabe für Aufgabe weiter. Bei einer echten Blockade die Annahme in der
    Ergebnisdatei festhalten und mit der sinnvollsten Auslegung weiterarbeiten.
-9. **Abschluss.** Sind alle Aufgaben der Kette fertig und die CI grün: PR auf „Ready for review“ setzen, im
+10. **Abschluss.** Sind alle Aufgaben der Kette fertig und die CI grün: PR auf „Ready for review“ setzen, im
    PR-Text je Aufgabe: WP, Depends-on, Änderungen, Tests, Hardwaremessung oder ausdrücklich „nicht gemessen“,
    Risiken, Rollback. Der Koordinator prüft und merged den Ketten-PR als Ganzes. Nacharbeit kommt als
    Nachricht im Chat der Kette; der PR ist dann nicht abgeschlossen.

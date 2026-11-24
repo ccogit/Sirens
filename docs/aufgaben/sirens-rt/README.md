@@ -88,8 +88,9 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 
 ## 5. Regeln für die Umsetzung
 
-- Qualitätsprüfung vor jedem Push: `python -m unittest discover -s tests -v` (Python 3.11, Node 22 im Pfad).
-  Die CI führt genau diesen Befehl aus. Neue Python-Tests müssen davon erfasst werden (Unterordner von
+- Qualitätsprüfung: `python -m unittest discover -s tests -v` (Python 3.11, Node 22 im Pfad). Maßgeblich ist
+  die CI des PR, die genau diesen Befehl ausführt: früh pushen, Draft-PR sofort öffnen, Fehler anhand der
+  CI-Ausgabe beheben. Lokal ausführen, soweit die eigene Umgebung es erlaubt; fehlt sie, hält das nichts auf. Neue Python-Tests müssen davon erfasst werden (Unterordner von
   `tests/` brauchen `__init__.py`); neue Node-Tests heißen `*.test.mjs` und liegen unter `tests/` (ab
   Aufgabe 00 sammelt `tests/test_web.py` sie rekursiv ein).
 - Tests laufen ohne Netz, ohne GPU und ohne Modellgewichte.
