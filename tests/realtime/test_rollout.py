@@ -39,7 +39,7 @@ class RolloutTest(unittest.TestCase):
         if not shell:
             self.skipTest("PowerShell nicht verfügbar")
         result = subprocess.run([shell, "-NoProfile", "-File", str(SCRIPT), "-DryRun"],
-                                capture_output=True, text=True, timeout=30)
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         for worker in WORKERS:
             self.assertIn("workers/" + worker + "/install.ps1", result.stdout)
@@ -67,7 +67,7 @@ class RolloutTest(unittest.TestCase):
             marker.write_text("rave", encoding="utf-8")
             def run(*args):
                 return subprocess.run([shell, "-NoProfile", "-File", str(script), *args],
-                                      capture_output=True, text=True, timeout=30, env=env)
+                                      capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, env=env)
             dry = run("-Worker", "rave", "-Entfernen", "-DryRun")
             self.assertEqual(dry.returncode, 0, dry.stderr)
             self.assertTrue(marker.is_file())
