@@ -23,7 +23,7 @@ export function createSessionController(api) {
       if (closed) return;
       if (!session) {
         session=await api.create("mock");
-        await command("load",{asset_id:MOCK_ASSET});
+        if (!closed) await command("load",{asset_id:MOCK_ASSET});
       }
       if (!closed) return fn(command,()=>session.state);
     }); },
@@ -80,7 +80,7 @@ export function createLabShell({remote=createRtApi(), mockFactory=()=>createRtAp
       h("div",{class:"rt-grid"},h("section",{},h("h3",{},"Bibliothek"),catalogStatus,label("Song",song),
         label("Stem-Modell (vorhandener Cache)",model),label("Stem",stem)),
         h("section",{},h("h3",{},"Fähigkeiten"),label("Fähigkeit",capability),capsInfo,latency,
-          h("p",{},"Qualitätsprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh)),
+          h("p",{},"Einziges Testprofil: Offline-Mock; weitere Profile erst nach Freigabe."),refresh)),
       h("section",{},h("h3",{},"GPU & Warteschlange"),gpuInfo),
       h("section",{},h("h3",{},"Transport & Mischung"),transport,h("div",{class:"rt-actions"},play,stop,panic,bypass,ab,save,restore),
         label("Quellframe (48 kHz im Mock)",seek),seekButton,label("Dry/Wet",wet),wetValue,label("Gain (Mock)",gain),gainValue,
