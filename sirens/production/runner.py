@@ -55,6 +55,34 @@ class Runner:
             self.cache.publish(key, root, [name + ".json", *(item["file"] for item in items)])
             return result
 
+        def independent_stems(assets):
+            """Opt-in adapter guarantees each track depends only on declared inputs."""
+            from .contracts import SAMPLE_RATE
+            items = []
+            for track in plan["tracks"]:
+                cancelled()
+                dependencies = {event["asset_id"] for event in track["events"] if "asset_id" in event}
+                selected = [item for item in assets["assets"] if item["id"] in dependencies]
+                timeline = {key: plan[key] for key in ("bpm", "meter", "ppq", "total_bars", "tail_seconds", "key")}
+                inputs = {"track": track, "timeline": timeline, "assets": selected, "mode": mode}
+                key = cache_key("stem", inputs, self.backend.name, self.backend.revision, plan["seed"])
+                entry_path = "track_cache/" + track["id"] + ".json"
+                if self.cache.restore(key, root):
+                    item = read_manifest(safe_path(root, entry_path))
+                else:
+                    item = self.backend.stem(plan, assets, track, root, cancelled)
+                    validate_stems({"schema_version": 1, "sample_rate": SAMPLE_RATE,
+                                    "frames": expected_frames(plan), "stems": [item]}, root=root)
+                    if item["track_id"] != track["id"]:
+                        raise ContractError("track ID mismatch")
+                    target = safe_path(root, entry_path)
+                    target.parent.mkdir(exist_ok=True)
+                    write_json_atomic(target, item)
+                    self.cache.publish(key, root, [entry_path, item["file"]])
+                items.append(item)
+            return {"schema_version": 1, "sample_rate": SAMPLE_RATE,
+                    "frames": expected_frames(plan), "stems": items}
+
         try:
             # Persist inputs before checking cancellation so a cancelled run can resume.
             manifest("brief", brief, validate_brief)
@@ -71,9 +99,14 @@ class Runner:
             if any(a.get("error") is not None for a in assets["assets"]):
                 raise ContractError("asset generation failed")
             checkpoint("stems", 0.4)
-            stems = cached_stage("stems", {"plan": plan, "assets": assets, "mode": mode},
-                                 lambda: self.backend.stems(plan, assets, root, cancelled),
-                                 validate_stems, plan=plan, root=root)
+            if (getattr(self.backend, "independent_tracks", False) is True
+                    and isinstance(getattr(self.backend, "name", None), str)
+                    and isinstance(getattr(self.backend, "revision", None), str)):
+                stems = manifest("stems", independent_stems(assets), validate_stems, plan=plan, root=root)
+            else:
+                stems = cached_stage("stems", {"plan": plan, "assets": assets, "mode": mode},
+                                     lambda: self.backend.stems(plan, assets, root, cancelled),
+                                     validate_stems, plan=plan, root=root)
             checkpoint("mix", 0.6)
             mix = self.backend.mix(plan, stems, root, cancelled)
             for name in ("mix.wav", "master.wav"):
