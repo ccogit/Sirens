@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import csv
 import json
 import os
@@ -35,7 +36,10 @@ def _require(ok, reason):
 
 def _id(value):
     _require(isinstance(value, str) and _ID.fullmatch(value)
-             and not value.endswith("."), "unsafe identifier")
+             and not value.endswith(".")
+             and value.split(".")[0].upper() not in {"CON", "PRN", "AUX", "NUL",
+                 *("COM" + str(n) for n in range(1, 10)),
+                 *("LPT" + str(n) for n in range(1, 10))}, "unsafe identifier")
     return value
 
 
@@ -101,18 +105,20 @@ def wb_writer(checkout):
     def write(document, destination):
         result = subprocess.run([sys.executable, "-I", str(bridge), str(tools),
                                  str(destination)], input=json.dumps(document),
-                                text=True, capture_output=True, timeout=60, check=False)
+                                text=True, capture_output=True, timeout=60, check=False,
+                                env={k: os.environ[k] for k in ("PATH", "SYSTEMROOT",
+                                     "TEMP", "TMP", "LANG") if k in os.environ})
         _require(result.returncode == 0, "AMM MIDI writer failed")
         return json.loads(result.stdout)
     return write
 
 
-def _midi_header(path):
+def _midi_header(path, *, instrument=True):
     with path.open("rb") as stream:
         header = stream.read(14)
         _require(len(header) == 14 and header[:4] == b"MThd", "invalid MIDI")
         length, kind, tracks, ppq = struct.unpack(">IHHH", header[4:])
-        _require((length, kind, ppq) == (6, 1, 960) and tracks >= 2,
+        _require((length, kind, ppq) == (6, 1, 960) and tracks >= (2 if instrument else 1),
                  "MIDI must be type 1, 960 PPQ with instrument")
         for _ in range(tracks):
             chunk = stream.read(8)
@@ -283,7 +289,8 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
     _require(safe_path(runs, parent).is_dir(), "parent run missing")
     inbox = safe_path(root, "return/" + export_id)
     manifest_path = safe_path(inbox, "return.json")
-    if manifest_path.exists():
+    manual = not manifest_path.exists()
+    if not manual:
         data = read_manifest(manifest_path)
     else:
         _require({p.name for p in inbox.iterdir()} == {"master.wav"},
@@ -311,6 +318,8 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
         manifest_digest = None
     _stable(paths_for_check, stability_seconds)
     before = [sha256_file(p) for p in paths]
+    if manual:
+        data["master_sha256"] = before[0]
     revision_id = _id(revision_id or uuid4().hex)
     with _publish(runs, revision_id) as stage:
         info = _wav_info(paths[0], channels=2)
@@ -327,7 +336,7 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
                 if kind == "stems":
                     _wav_info(path, frames=info["frames"])
                 elif kind == "midi":
-                    _midi_header(path)
+                    _midi_header(path, instrument=False)
             digest = _copy(path, stage / dest, before[i])
             records.append(dict(kind=kind, file=dest, original_file=rel, sha256=digest))
         _require(before == [sha256_file(p) for p in paths], "return changed during import")
@@ -342,16 +351,49 @@ def import_return(exports_root, export_id, runs_root, *, confirm=False,
                       bpm=data.get("bpm"), notes=data["notes"], files=records,
                       mastering_required=False, published=False)
         _json(stage / "return.json", result)
+        # A prepared revision is not a completed production run: K08 measures
+        # and registers the returned audio, without automatic mastering.
+        _json(stage / "status.json", dict(schema_version=1, status="queued",
+              stage="ableton_return", progress=None, error=None,
+              timestamps={"queued": datetime.now(timezone.utc).isoformat()},
+              run_id=revision_id, parent_run_id=parent))
+        if manual:
+            # Exclusive, atomic publication of the derived inbox receipt.
+            with tempfile.TemporaryDirectory(prefix=".receipt-", dir=inbox) as tmp:
+                receipt = Path(tmp) / "return.json"
+                _json(receipt, data)
+                try:
+                    os.link(receipt, manifest_path)
+                except FileExistsError:
+                    raise ContractError("return manifest appeared during import") from None
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["probe"])
-    parser.add_argument("--observations", type=Path)
+    sub = parser.add_subparsers(dest="operation", required=True)
+    sub.add_parser("probe").add_argument("--observations", type=Path)
+    exp = sub.add_parser("export")
+    exp.add_argument("--run-dir", type=Path, required=True)
+    exp.add_argument("--exports-root", type=Path, required=True)
+    exp.add_argument("--amm-checkout", type=Path)
+    exp.add_argument("--export-id")
+    imp = sub.add_parser("import")
+    imp.add_argument("--exports-root", type=Path, required=True)
+    imp.add_argument("--runs-root", type=Path, required=True)
+    imp.add_argument("--export-id", required=True)
+    imp.add_argument("--confirm", action="store_true", required=True)
     args = parser.parse_args()
-    print(json.dumps(probe(read_manifest(args.observations) if args.observations else None),
-                     ensure_ascii=False, indent=2))
+    if args.operation == "probe":
+        result = probe(read_manifest(args.observations) if args.observations else None)
+    elif args.operation == "export":
+        result = export_bundle(args.run_dir, args.exports_root, args.run_dir.name,
+                               args.export_id, midi_writer=wb_writer(args.amm_checkout)
+                               if args.amm_checkout else None)
+    else:
+        result = import_return(args.exports_root, args.export_id, args.runs_root,
+                               confirm=args.confirm)
+    print(json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2))
 
 
 if __name__ == "__main__":
