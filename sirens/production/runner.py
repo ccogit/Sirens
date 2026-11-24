@@ -7,6 +7,7 @@ from .contracts import (ContractError, expected_frames, read_manifest, safe_path
                         validate_assets, validate_brief, validate_mix_report,
                         validate_plan, validate_report, validate_stems, validate_wav)
 from .jobs import Cancelled, RunStore
+from .cache import HashCache, cache_key
 from ..store import write_json_atomic
 
 
@@ -14,6 +15,7 @@ class Runner:
     def __init__(self, cfg, backend):
         self.store = RunStore(cfg)
         self.backend = backend
+        self.cache = HashCache(self.store.root)
 
     def render(self, brief, plan, mode="full", *, parent=None):
         validate_brief(brief)
@@ -37,18 +39,41 @@ class Runner:
         def cancelled():
             self.store.check_cancel(run_id)
 
+        def cached_stage(name, inputs, compute, validator, **kwargs):
+            # Opt-in only for adapters declaring stable backend identity/revision.
+            backend_name = getattr(self.backend, "name", None)
+            revision = getattr(self.backend, "revision", None)
+            if not isinstance(backend_name, str) or not isinstance(revision, str):
+                return manifest(name, compute(), validator, **kwargs)
+            key = cache_key(name, inputs, backend_name, revision, plan["seed"])
+            if self.cache.restore(key, root):
+                return validator(read_manifest(safe_path(root, name + ".json")), **kwargs)
+            result = manifest(name, compute(), validator, **kwargs)
+            items = result[name]
+            if any(item.get("error") is not None for item in items):
+                return result
+            self.cache.publish(key, root, [name + ".json", *(item["file"] for item in items)])
+            return result
+
         try:
-            checkpoint("prepare", 0)
+            # Persist inputs before checking cancellation so a cancelled run can resume.
             manifest("brief", brief, validate_brief)
             manifest("plan", plan, validate_plan)
+            write_json_atomic(root / "run.json", {"schema_version": 1, "mode": mode,
+                                                   "seed": plan["seed"], "parent_run_id": parent,
+                                                   "backend": getattr(self.backend, "name", None),
+                                                   "revision": getattr(self.backend, "revision", None)})
+            checkpoint("prepare", 0)
             checkpoint("assets", 0.2)
-            assets = manifest("assets", self.backend.assets(brief, plan, root, cancelled),
-                              validate_assets, plan=plan, root=root)
+            assets = cached_stage("assets", {"brief": brief, "plan": plan, "mode": mode},
+                                  lambda: self.backend.assets(brief, plan, root, cancelled),
+                                  validate_assets, plan=plan, root=root)
             if any(a.get("error") is not None for a in assets["assets"]):
                 raise ContractError("asset generation failed")
             checkpoint("stems", 0.4)
-            stems = manifest("stems", self.backend.stems(plan, assets, root, cancelled),
-                             validate_stems, plan=plan, root=root)
+            stems = cached_stage("stems", {"plan": plan, "assets": assets, "mode": mode},
+                                 lambda: self.backend.stems(plan, assets, root, cancelled),
+                                 validate_stems, plan=plan, root=root)
             checkpoint("mix", 0.6)
             mix = self.backend.mix(plan, stems, root, cancelled)
             for name in ("mix.wav", "master.wav"):
