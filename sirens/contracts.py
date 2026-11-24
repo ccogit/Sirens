@@ -2,8 +2,10 @@
 import re
 from pathlib import Path, PurePosixPath
 
+from .musikablage import ablage, release_metadaten
+
 SCHEMA_VERSION = 1
-AUDIO_EXT = (".mp3", ".wav")
+AUDIO_EXT = (".mp3", ".wav", ".flac")
 BILD_EXT = (".png", ".jpg", ".jpeg", ".webp")
 TEXT_EXT = (".txt", ".md")
 ID_RE = re.compile(r"^SA-\d{8}-\d{3}$")
@@ -78,14 +80,18 @@ def safe_audio_path(music_root, pfad, feld="pfad", endungen=AUDIO_EXT):
     return target
 
 
-def parse_pfad(pfad):
-    """Künstler, Release, Titel, Version und Fassung aus dem relativen Pfad ableiten. Nichts raten."""
-    parts = PurePosixPath(pfad).parts
+def parse_pfad(pfad, music_root=None):
+    """Stilreferenz, Release, Titel, Version und Fassung aus Pfad und Release-Metadaten."""
+    stil, release, _ = ablage(pfad)
+    if music_root is not None:
+        metadaten = release_metadaten(Path(music_root), pfad)
+        stil = metadaten.get("stilreferenz") or stil
+        release = metadaten.get("slug") or release
     stem = PurePosixPath(pfad).stem
     match = NAME_RE.match(stem)
     return {
-        "artist_slug": parts[0] if len(parts) >= 3 else "",
-        "release_slug": parts[1] if len(parts) >= 3 else "",
+        "artist_slug": stil,
+        "release_slug": release,
         "titel": match.group("titel").strip() if match else stem,
         "version": int(match.group("version")) if match else None,
         "fassung": match.group("fassung").strip() if match else "",
@@ -115,7 +121,7 @@ def _referenzen(value, music_root):
         if pfad in seen:
             continue
         seen.add(pfad)
-        result.append({"pfad": pfad, **parse_pfad(pfad),
+        result.append({"pfad": pfad, **parse_pfad(pfad, music_root),
                        "gewicht": _wahl(ref.get("gewicht"), GEWICHT, feld + ".gewicht", "normal"),
                        "uebernehmen": _text(ref.get("uebernehmen"), feld + ".uebernehmen")})
     return result

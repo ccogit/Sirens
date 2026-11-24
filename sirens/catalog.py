@@ -1,11 +1,16 @@
 """Referenzkatalog: liest den Musikordner (nur lesend) und zeigt die beste bekannte Bewertung je Datei."""
 import json
 import os
+import re
 import threading
 from pathlib import Path
 
-from .contracts import AUDIO_EXT, parse_pfad
+from .contracts import AUDIO_EXT, BILD_EXT, parse_pfad
+from .musikablage import ablage, ist_single, release_metadaten
 from .store import jetzt
+
+EMASTERED = re.compile(r"^eMastered_(.+?)\s+Version\s+(\d+)(.*)$", re.IGNORECASE)
+INTERNE_ORDNER = {"cover-entwürfe", "lyrics-fassungen"}
 
 RICHTUNGSWOERTER = ["treibender", "dreckiger", "mehr Funk", "lustiger", "dunkler", "wärmer", "minimaler",
                     "mehr Bass-Druck", "verspielter", "langsamer", "schneller", "mehr Überraschungen",
@@ -50,12 +55,61 @@ def bekannte_bewertungen(cfg, store):
     return result
 
 
+def _titel_schluessel(titel):
+    return "".join(c for c in titel.casefold() if c.isalnum())
+
+
+def _e_mastered_zuordnen(dateien):
+    """Nur bei eindeutigem Ursprung normalisiert ein eMastered-Export den Songtitel."""
+    bekannte_titel = {}
+    for datei in dateien:
+        if datei["version"] is not None:
+            schluessel = datei["release_pfad"], _titel_schluessel(datei["titel"]), datei["version"]
+            bekannte_titel.setdefault(schluessel, {})[datei["titel"]] = datei
+    for datei in dateien:
+        treffer = EMASTERED.match(datei["titel"])
+        if not treffer:
+            continue
+        version = int(treffer[2])
+        kandidaten = bekannte_titel.get((datei["release_pfad"], _titel_schluessel(treffer[1]), version), {})
+        if len(kandidaten) == 1:
+            original = next(iter(kandidaten.values()))
+            datei.update(titel=original["titel"], version=version, fassung="eMastered" + treffer[3].replace("_", " "),
+                         song_cover=original["song_cover"], track_nummer=original["track_nummer"])
+
+
+def _release_bilder(ordner):
+    bilder = {}
+    for datei in sorted(ordner.iterdir()):
+        if datei.suffix.lower() not in BILD_EXT or not datei.is_file():
+            continue
+        stamm = datei.stem.casefold()
+        if stamm.startswith("album-cover"):
+            bilder.setdefault("", datei.name)
+        elif (treffer := re.fullmatch(r"(.+) - cover(?: \[sc \d+\])?", stamm)):
+            bilder.setdefault(_titel_schluessel(treffer[1]), datei.name)
+    return bilder
+
+
+def _titelfolge(ordner):
+    try:
+        zeilen = (ordner / "Album-info.txt").read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeError):
+        return {}
+    folge = {}
+    for zeile in zeilen:
+        if treffer := re.match(r"^\s*(\d{1,3})[.)]\s+(.+?)(?:\s+[—–]\s+.*)?$", zeile):
+            folge.setdefault(_titel_schluessel(treffer[2]), int(treffer[1]))
+    return folge
+
+
 class Katalog:
     def __init__(self, cfg):
         self.cfg = cfg
         self.zustand = "leer"  # leer, laeuft, bereit, music_root_missing
         self.gelesen_am = None
         self._dateien = []
+        self._alben = []
         self._lock = threading.Lock()
         self._thread = None
 
@@ -63,20 +117,56 @@ class Katalog:
         root = Path(self.cfg.music_root)
         if not root.is_dir():
             with self._lock:
-                self._dateien, self.zustand, self.gelesen_am = [], "music_root_missing", jetzt()
+                self._dateien, self._alben, self.zustand, self.gelesen_am = [], [], "music_root_missing", jetzt()
             return
         dateien = []
+        assets = {}
         for ordner, unterordner, namen in os.walk(root):
-            unterordner.sort()
+            unterordner[:] = sorted(n for n in unterordner
+                                    if not n.startswith((".", "_")) and n.casefold() not in INTERNE_ORDNER)
             teile = Path(ordner).relative_to(root).parts
-            if len(teile) < 2:  # erst ab Künstler/Release
-                continue
             for name in sorted(namen):
-                if os.path.splitext(name)[1].lower() in AUDIO_EXT:
-                    pfad = "/".join(teile + (name,))
-                    dateien.append({"pfad": pfad, **parse_pfad(pfad), "unterordner": "/".join(teile[2:])})
+                if Path(name).suffix.lower() not in AUDIO_EXT:
+                    continue
+                pfad = "/".join(teile + (name,))
+                _, _, tiefe = ablage(pfad)
+                if not tiefe:
+                    continue
+                unterpfad = teile[tiefe:]
+                if "stems" in unterpfad and "premix" not in unterpfad:
+                    continue
+                basis = "/".join(teile[:tiefe])
+                daten = release_metadaten(root, pfad)
+                if basis not in assets:
+                    ordner_pfad = root / basis
+                    assets[basis] = (_release_bilder(ordner_pfad), _titelfolge(ordner_pfad))
+                bilder, folge = assets[basis]
+                song = parse_pfad(pfad, root)
+                titel_key = _titel_schluessel(song["titel"])
+                bild = bilder.get(titel_key)
+                album_bild = bilder.get("")
+                dateien.append({"pfad": pfad, **song, "release_pfad": basis,
+                                "song_cover": f"{basis}/{bild}" if bild else None,
+                                "album_cover": f"{basis}/{album_bild}" if album_bild else None,
+                                "track_nummer": folge.get(titel_key),
+                                "release_titel": daten.get("titel"),
+                                "single": ist_single(pfad), "unterordner": "/".join(unterpfad)})
+        _e_mastered_zuordnen(dateien)
+        alben = []
+        album_ordner = root / "Alben"
+        if album_ordner.is_dir():
+            for ordner in sorted(album_ordner.iterdir()):
+                if not ordner.is_dir() or ordner.name.startswith((".", "_")):
+                    continue
+                basis = ordner.relative_to(root).as_posix()
+                daten = release_metadaten(root, f"{basis}/Album-info.txt")
+                bilder = assets[basis][0] if basis in assets else _release_bilder(ordner)
+                alben.append({"pfad": basis, "slug": daten.get("slug") or ordner.name,
+                              "titel": daten.get("titel") or ordner.name.replace("-", " "),
+                              "stilreferenz": daten.get("stilreferenz", ""), "single": False,
+                              "cover": f"{basis}/{bilder['']}" if "" in bilder else None})
         with self._lock:
-            self._dateien, self.zustand, self.gelesen_am = dateien, "bereit", jetzt()
+            self._dateien, self._alben, self.zustand, self.gelesen_am = dateien, alben, "bereit", jetzt()
 
     def scan_im_hintergrund(self):
         with self._lock:
@@ -92,30 +182,40 @@ class Katalog:
 
     def zahlen(self):
         with self._lock:
-            songs = {(d["artist_slug"], d["release_slug"], d["titel"]) for d in self._dateien}
+            songs = {(d["release_pfad"], d["titel"]) for d in self._dateien}
             return {"zustand": self.zustand, "dateien": len(self._dateien), "songs": len(songs),
                     "gelesen_am": self.gelesen_am}
 
     def baum(self, bewertungen, q="", min_score=None):
-        """Künstler → Releases → Songs → Dateien. `q`: alle Wörter müssen in Künstler, Release oder Titel vorkommen."""
+        """Liefert die Album-/Single-Ansicht sowie die bisherigen nach Stil gruppierten Daten."""
         with self._lock:
-            dateien, zustand = list(self._dateien), self.zustand
+            dateien, alben, zustand, gelesen_am = self._dateien, self._alben, self.zustand, self.gelesen_am
         worte = q.lower().split()
-        kuenstler, baum, anzahl = [], {}, 0
+        kuenstler, baum, release_baum, anzahl = set(), {}, {}, 0
         for d in dateien:
-            if d["artist_slug"] not in kuenstler:
-                kuenstler.append(d["artist_slug"])
+            if d["artist_slug"]:
+                kuenstler.add(d["artist_slug"])
             bewertung = bewertungen.get(d["pfad"])
             if min_score is not None and (bewertung is None or bewertung["score"] < min_score):
                 continue
-            heuhaufen = f"{d['artist_slug']} {d['release_slug']} {d['titel']}".lower()
+            gruppe = "Singles" if d["single"] else ""
+            heuhaufen = f"{d['artist_slug']} {d['release_slug']} {d['release_titel'] or ''} {d['titel']} {gruppe}".lower()
             if any(w not in heuhaufen for w in worte):
                 continue
             anzahl += 1
             songs = baum.setdefault(d["artist_slug"], {}).setdefault(d["release_slug"], {})
-            songs.setdefault(d["titel"], []).append({
-                "pfad": d["pfad"], "version": d["version"], "fassung": d["fassung"],
-                "unterordner": d["unterordner"], "bewertung": bewertung})
+            datei = {"pfad": d["pfad"], "version": d["version"], "fassung": d["fassung"],
+                     "unterordner": d["unterordner"], "bewertung": bewertung}
+            songs.setdefault(d["titel"], []).append(datei)
+            release = release_baum.setdefault(d["release_pfad"], {
+                "pfad": d["release_pfad"], "slug": d["release_slug"],
+                "titel": d["release_titel"] or d["release_slug"].replace("-", " "),
+                "stilreferenz": d["artist_slug"], "single": d["single"], "songs": {},
+                "cover": d["album_cover"],
+            })
+            song = release["songs"].setdefault(d["titel"], {"titel": d["titel"], "dateien": [],
+                "cover": d["song_cover"], "track_nummer": d["track_nummer"]})
+            song["dateien"].append(datei)
         artists = []
         for artist in sorted(baum):
             releases = []
@@ -125,8 +225,23 @@ class Katalog:
                     for titel, eintraege in sorted(baum[artist][release].items())]
                 releases.append({"slug": release, "songs": songs})
             artists.append({"slug": artist, "releases": releases})
-        result = {"zustand": zustand, "gelesen_am": self.gelesen_am, "anzahl_dateien": anzahl,
-                  "kuenstler": sorted(kuenstler), "artists": artists}
+        mit_audio = {d["release_pfad"] for d in dateien}
+        if min_score is None:
+            for album in alben:
+                if album["pfad"] in mit_audio:
+                    continue
+                text = f"{album['titel']} {album['slug']} {album['stilreferenz']}".lower()
+                if all(wort in text for wort in worte):
+                    release_baum[album["pfad"]] = {**album, "songs": {}}
+        katalog_releases = []
+        for release in sorted(release_baum.values(), key=lambda r: (r["single"], r["titel"].casefold(), r["pfad"])):
+            songs = release["songs"].values()
+            release["songs"] = sorted(songs, key=lambda song: (song["track_nummer"] or 999, song["titel"].casefold()))
+            for song in release["songs"]:
+                song["dateien"].sort(key=lambda d: (d["version"] or 0, d["unterordner"], d["fassung"], d["pfad"]))
+            katalog_releases.append(release)
+        result = {"zustand": zustand, "gelesen_am": gelesen_am, "anzahl_dateien": anzahl,
+                  "kuenstler": sorted(kuenstler), "artists": artists, "releases": katalog_releases}
         if zustand == "music_root_missing":
             result.update(error="music_root_missing",
                           meldung=f"Der Musikordner fehlt: {self.cfg.music_root}. „Ich beschreibe es“ geht trotzdem.")

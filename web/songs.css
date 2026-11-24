@@ -67,3 +67,20 @@
   .song-row-actions .song-remaster { padding: .46rem .55rem; }
   .song-row-actions .song-edit { padding: .2rem .4rem; }
 }
+
+/* Katalogansicht mit aufklappbaren Alben und Fassungen. */
+.library-catalog-status { margin: .8rem 1.5rem; }
+.library-groups { display: grid; gap: .5rem; padding: 0 1rem 1rem; }
+.library-group { border: 1px solid var(--linie); border-radius: 12px; }
+.library-group > summary { cursor: pointer; padding: .7rem .9rem; font-weight: 700; }
+.library-group > summary > span { margin-inline-start: .55rem; }
+.library-song-list, .library-takes { list-style: none; padding: 0; margin: 0; }
+.library-song { display: flex; gap: .75rem; padding: .75rem 1rem; border-top: 1px solid var(--linie); }
+.library-song > div { min-width: 0; flex: 1; }
+.library-song > img { flex: none; object-fit: cover; }
+.library-take { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .65rem; margin-top: .4rem; }
+.library-take > span:first-of-type { min-width: min(14rem, 100%); flex: 1; }
+.library-toolbar input[type="search"] { flex: 1; min-width: 0; }
+.library-album-cover { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; vertical-align: middle; margin-inline-start: .4rem; }
+.library-group .library-group { margin: .45rem .75rem; }
+.library-single-grouper { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin: .65rem .75rem; }
