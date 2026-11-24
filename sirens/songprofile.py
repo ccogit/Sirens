@@ -20,9 +20,9 @@ def kurzprofil(release, song):
     tempos = {int(bpm) for text in ausdruecklich for bpm in
               re.findall(r"\b(\d{2,3})\s*BPM\b", text, re.I) if 40 <= int(bpm) <= 240}
     if beschreibung:
-        zweiter_satz = re.match(r".{35,}?[.!?](?=\s|$)", beschreibung)
-        if zweiter_satz:
-            beschreibung = zweiter_satz.group()
+        erster_satz = re.match(r".{35,}?[.!?](?=\s|$)", beschreibung)
+        if erster_satz:
+            beschreibung = erster_satz.group()
         if len(beschreibung) > 230:
             beschreibung = beschreibung[:229].rsplit(" ", 1)[0] + "…"
         quelle = "Vorhandene Songbeschreibung"
@@ -40,7 +40,8 @@ def kurzprofil(release, song):
         "tempo_bpm": next(iter(tempos)) if len(tempos) == 1 else None,
         "soundcloud_genres": genres,
         "soundcloud_tags": tags,
-        "soundcloud_zugeordnet": bool(soundcloud),
+        "soundcloud_status": "Öffentlich zugeordnet" if any(i.get("sharing") != "private" for i in soundcloud)
+        else "Privat" if soundcloud else "Keine Zuordnung",
         "fassungen": len(dateien),
         "formate": formate,
         "lyrics_lokal": bool(song.get("lyrics_vorhanden")),

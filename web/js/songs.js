@@ -55,7 +55,7 @@ function profilAnsicht(profil, details) {
     ["Tempo", profil.tempo_bpm ? profil.tempo_bpm + " BPM" : "Nicht belegt"],
     ["SoundCloud-Genre", profil.soundcloud_genres.join(", ") || "Nicht hinterlegt"],
     ["SoundCloud-Tags", profil.soundcloud_tags.join(", ") || "Nicht hinterlegt"],
-    ["SoundCloud", profil.soundcloud_zugeordnet ? "Öffentlich zugeordnet" : "Keine Zuordnung"],
+    ["SoundCloud", profil.soundcloud_status],
     ["Fassungen", profil.fassungen + " · " + profil.formate.join(", ")],
     ["Lyrics", profil.lyrics_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
     ["Songcover", profil.songcover_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
@@ -127,7 +127,7 @@ const filterFelder = [
   ["tags", "SoundCloud-Tag"],
   ["format", "Dateiformat"],
   ["wertung", "Bewertung", ["Positiv", "Bewertet", "Ohne Bewertung"]],
-  ["sc", "SoundCloud", ["Öffentlich zugeordnet", "Ohne Zuordnung"]],
+  ["sc", "SoundCloud", ["Öffentlich zugeordnet", "Privat", "Keine Zuordnung"]],
   ["cover", "Songcover", ["Mit Cover", "Ohne Cover"]],
 ];
 
@@ -141,7 +141,7 @@ function songMerkmale(release, song) {
     tags: [...new Set(soundcloud.flatMap(info => info.tags || []))],
     format: [...new Set(song.dateien.map(d => d.pfad.split(".").pop().toUpperCase()))],
     wertung: scores.length ? (scores.some(score => score > 0) ? ["Positiv", "Bewertet"] : ["Bewertet"]) : ["Ohne Bewertung"],
-    sc: [soundcloud.length ? "Öffentlich zugeordnet" : "Ohne Zuordnung"],
+    sc: [song.kurzprofil?.soundcloud_status || "Keine Zuordnung"],
     cover: [song.cover ? "Mit Cover" : "Ohne Cover"],
   };
 }

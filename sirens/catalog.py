@@ -154,6 +154,15 @@ def _soundcloud_infos(root):
         for platz in eintrag.get("placements", []):
             ordner = platz["folder"].replace(chr(92), "/").casefold()
             titel.setdefault((ordner, _titel_schluessel(track["title"])), []).append(info)
+    try:
+        private_downloads = json.loads((root / "_soundcloud" / "private-downloads.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        private_downloads = {}
+    for eintrag in private_downloads.values():
+        pfad = eintrag.get("path")
+        if pfad and eintrag.get("sharing") == "private":
+            pfade.setdefault(pfad.replace(chr(92), "/").casefold(), []).append({
+                "sharing": "private", "tags": [], "genre": "", "url": None, "beschreibung": "", "cover": None})
     album_cover = {eintrag["folder"].replace(chr(92), "/").casefold(): eintrag["cover"].replace(chr(92), "/")
                    for eintrag in daten["local"].get("albums", [])
                    if eintrag.get("cover") and (root / eintrag["cover"]).is_file()}
