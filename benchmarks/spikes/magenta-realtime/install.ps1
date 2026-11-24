@@ -1,20 +1,12 @@
-# Isolierte lokale Umgebung; absichtlich kein Netzbezug ohne geprüfte Pins.
+# WSL2 statt nativer Windows-JAX-CUDA-Installation.
 param([switch]$ModelleLaden, [switch]$Entfernen)
 $ErrorActionPreference = 'Stop'
-$root = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
-$venv = Join-Path $root '.venv-spike-magenta-realtime'
-if ($Entfernen) {
-    if (Test-Path -LiteralPath $venv) { Remove-Item -LiteralPath $venv -Recurse -Force }
+if ($ModelleLaden -and $Entfernen) { throw 'Schalter schließen sich aus' }
+if (!$ModelleLaden -and !$Entfernen) {
+    Write-Host 'Kein Netzbezug. WSL2 mit Python 3.12 vorbereiten; siehe BERICHT.md.'
     exit 0
 }
-if ($ModelleLaden) {
-    Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BERICHT.md')
-    $answer = Read-Host 'Quellen, Größen und Lizenzen geprüft? (ja/nein)'
-    if ($answer -ne 'ja') { throw 'Abgebrochen' }
-    throw 'Automatischer Bezug noch nicht freigegeben: unveränderliche Pins und Hashes fehlen. Siehe Bericht.'
-}
-if (!(Test-Path -LiteralPath $venv)) {
-    & py -3.12 -m venv $venv
-    if ($LASTEXITCODE -ne 0) { throw 'Erstellen der eigenen Umgebung fehlgeschlagen' }
-}
-Write-Host "Isolierte Umgebung: $venv. Abhängigkeiten/Gewichte noch nicht installiert."
+$root = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
+$flag = if ($ModelleLaden) { '--modelle-laden' } else { '--entfernen' }
+& wsl.exe --cd $root python3.12 -m benchmarks.spikes.magenta-realtime.install $flag
+if ($LASTEXITCODE -ne 0) { throw "WSL-Installation fehlgeschlagen: $LASTEXITCODE" }
