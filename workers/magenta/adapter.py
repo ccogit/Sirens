@@ -70,6 +70,16 @@ class Companion:
             with self.lock:
                 self.busy = False
 
+    def warmup(self):
+        # JIT vorbereiten, aber die stille Referenz und den Warmup-Zustand
+        # nicht in die eigentliche Begleitspur übernehmen.
+        with self.lock:
+            epoch = self.epoch
+        self.process()
+        with self.lock:
+            if self.epoch == epoch:
+                self.state = self.conditioning = None
+
     def cancel(self):
         with self.lock:
             self.epoch += 1
