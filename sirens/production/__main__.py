@@ -58,8 +58,8 @@ def main(argv=None, *, cfg=None, backend=None):
         elif args.action == "references":
             result = integration.references(cfg, read_manifest(args.brief), options=integration.settings())
         elif args.action == "benchmark":
-            from .quality import benchmark
-            result = benchmark(args.manifest)
+            from .quality import benchmark, configured_analyzer
+            result = benchmark(args.manifest, analyzer=configured_analyzer(integration.settings()))
         elif args.action == "validate":
             validate_plan(read_manifest(args.plan))
             result = {"schema_version": 1, "valid": True}
