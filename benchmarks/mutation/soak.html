@@ -72,7 +72,7 @@ $("start").onclick=async()=>{
       if(active!==a||a.busy)return;
       const now=context.currentTime, elapsed=now-origin;
       if(elapsed>=secs){finish("30 Minuten beendet");return;}
-      $("status").textContent=Math.max(0,Math.floor(elapsed))+" / 1800 Sekunden; "+scheduler.mode+"; Blöcke "+a.applied;
+      $("status").textContent=Math.max(0,Math.floor(elapsed))+" / 1800 Sekunden; "+(bars===16?"Nachgebautes Backend – keine KI":scheduler.mode)+"; Blöcke "+a.applied;
       if(scheduler.next/rate-elapsed>2)return;
       a.busy=true;
       try{
@@ -82,7 +82,7 @@ $("start").onclick=async()=>{
         for(let i=0;i<dry.length;i++)dry[i]=wave(p.frame+i,rate);
         const t=performance.now(),r=await scheduler.prepare(p,{rate,dry,
           drum:{stems:{drums:dry},onsets:[{kind:"kick",frame:0,velocity:.4}]},
-          crossover:{songs:[]},acid:{bass:dry,onsets:[0]}});
+          crossover:{grid:{confidence:1,bpm:120,beat0:0,bar0:0},targetKey:"C major",songs:[{id:"synthetisch",track:dry,grid:{confidence:1,bpm:120,beat0:0,bar0:0},key:"C major"}]},acid:{bass:dry,onsets:[0]}});
         times.push(performance.now()-t);
         if(active!==a)return;
         // Logische Vorab-Entscheidung; AudioBufferSourceNode startet exakt zum
