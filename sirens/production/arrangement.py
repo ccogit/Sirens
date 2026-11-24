@@ -152,9 +152,57 @@ def _scale(key):
     return lambda degree, octave: 12 * octave + root + 12 * (degree // 7) + intervals[degree % 7]
 
 
-def clear_head_plan(brief, variant="ratchet"):
+# Preview-only sound choices; the full-song recipe keeps its original patches.
+# Alternate semantic IDs require locally verified bindings in the K03 manifest.
+_PREVIEW_SOUND = {
+    "ratchet": (12, "gear_bass", "bell_buoy"),
+    "counterweight": (24, "gear_bass_counterweight", "bell_buoy_counterweight"),
+    "undertow": (0, "gear_bass_undertow", "bell_buoy_undertow"),
+}
+
+
+def _preview_specs(specs, speech_bars, bar_seconds, target_seconds):
+    """Keep whole cues in order, preferring chorus and verse.
+    Target the nearest whole-bar duration including the two-second tail.
+    """
+    if target_seconds is None:
+        target_seconds = 45
+    if not 30 <= target_seconds <= 60:
+        raise ValueError("Preview target must be 30–60 seconds")
+    low = math.ceil(28 / bar_seconds)
+    high = math.floor(58 / bar_seconds)
+    if low > high:
+        raise ValueError("No whole-bar preview duration at this tempo")
+    wanted = max(low, min(high, round((target_seconds - 2) / bar_seconds)))
+    # One intro, one outro and one break between retained cues.
+    count = next((n for n in range(4, 0, -1)
+                  if sum(speech_bars[:n]) + n + 1 <= wanted), 0)
+    if not count:
+        raise ValueError("Preview target cannot hold a complete spoken cue")
+    chosen = [specs[0], *specs[1:2 * count], specs[-1]]
+    spoken_ids = ("chorus", "verse", "bridge", "chorus_final")
+    result = [(sid, speech_bars[spoken_ids.index(sid)] if sid in spoken_ids else 1,
+               intent) for sid, _, intent in chosen]
+    # Give spare bars to the musical breaks, or intro for a single cue.
+    spare = wanted - sum(bars for _, bars, _ in result)
+    instrumental = [i for i, (sid, _, _) in enumerate(result)
+                    if sid.startswith("interlude")] or [0]
+    for i in range(spare):
+        index = instrumental[i % len(instrumental)]
+        sid, bars, intent = result[index]
+        result[index] = (sid, bars + 1, intent)
+    return result
+
+
+def clear_head_plan(brief, variant="ratchet", *, preview=False,
+                    cue_durations_seconds=None):
     """Authored lighthouse arrangement. Lyrics: three blank-line separated
-    passages (chorus repeated at end) or four explicitly supplied passages."""
+    passages (chorus repeated at end) or four explicitly supplied passages.
+    Preview takes four measured durations in chorus/verse/bridge/final order;
+    with three text passages the final chorus still has its own duration.
+    If omitted, the existing text-based estimates are used. Full-song
+    planning is unchanged. A 30–60 s brief also selects preview mode.
+    """
     _contracts().validate_brief(brief)
     if variant not in _VARIANTS or brief["vocal_mode"] != "spoken":
         raise ValueError("Unknown variant or non-spoken Clear Head brief")
@@ -175,7 +223,24 @@ def clear_head_plan(brief, variant="ratchet"):
     speech_bars = [max(4, math.ceil((s + 0.5) / bar_seconds)) for s in speech_seconds]
     intro, outro = max(1, round(15 / bar_seconds)), max(1, round(5 / bar_seconds))
     interludes = [max(1, round(s / bar_seconds)) for s in (35, 45, 45)]
-    if brief["target_seconds"] is not None:
+    target = brief["target_seconds"]
+    preview = preview or (target is not None and 30 <= target <= 60)
+    if cue_durations_seconds is not None:
+        if not preview:
+            raise ValueError("Measured cue durations are for preview mode")
+        if (not isinstance(cue_durations_seconds, (list, tuple))
+                or len(cue_durations_seconds) != 4
+                or any(type(s) not in (int, float) or not math.isfinite(s)
+                       or s < 0.001 for s in cue_durations_seconds)):
+            raise ValueError("Supply four finite positive cue durations in seconds")
+        speech_seconds = list(cue_durations_seconds)
+    if preview:
+        # Speech starts one sixteenth after the bar; leave 0.5 s afterwards.
+        # Use rounded-up event ticks in the bar budget, not the raw duration.
+        speech_bars = [math.ceil((240 + math.ceil(s * bpm / 60 * PPQ)
+                                 + math.ceil(0.5 * bpm / 60 * PPQ)) / BAR)
+                       for s in speech_seconds]
+    if not preview and target is not None:
         wanted = round((brief["target_seconds"] - 2) / bar_seconds)
         budget = wanted - intro - outro - sum(speech_bars)
         if budget < 3:
@@ -196,6 +261,8 @@ def clear_head_plan(brief, variant="ratchet"):
         ("chorus_final", speech_bars[3], "return of spoken chorus"),
         ("outro", outro, "dawn, lamp clicks off"),
     ]
+    if preview:
+        specs = _preview_specs(specs, speech_bars, bar_seconds, target)
     sections = []
     total = 0
     for sid, bars, intent in specs:
@@ -212,6 +279,9 @@ def clear_head_plan(brief, variant="ratchet"):
     tracks = {tid: dict(id=tid, role=role, patch=patch,
                         backend="asset" if tid in ("voice", "atmosphere") else "instrument",
                         events=[], automation=[]) for tid, role, patch in roles}
+    swing = 12
+    if preview:
+        swing, tracks["gears"]["patch"], tracks["buoy"]["patch"] = _PREVIEW_SOUND[variant]
     requests = []
 
     def note(tid, tick, length, p, velocity):
@@ -256,12 +326,12 @@ def clear_head_plan(brief, variant="ratchet"):
                     note("kick", k, 180, 36, 115 if beat == 0 else 108)
                     note("sub", k, 300, pitch(0, 3), 98)
                 for step, degree, length in _VARIANTS[variant]:
-                    shift = 0 if step % 2 == 0 else 12
+                    shift = 0 if step % 2 == 0 else swing
                     note("gears", t + step * 240 + shift,
                          length * 240 - 40, pitch(degree, 4 if variant != "counterweight" else 5),
                          (75 if spoken else 96) + rng.randrange(-4, 5))
                 for step in (2, 6, 10, 14):
-                    note("hats", t + step * 240 + (12 if step % 4 == 2 else 0),
+                    note("hats", t + step * 240 + (swing if step % 4 == 2 else 0),
                          100, 42, (48 if spoken else 70) + rng.randrange(-5, 6))
             if not spoken and sid != "outro":
                 for step, degree in _HOOKS[variant]:
@@ -284,7 +354,9 @@ def clear_head_plan(brief, variant="ratchet"):
                 ppq=PPQ, total_bars=total, tail_seconds=2, sections=sections,
                 tracks=list(tracks.values()), asset_requests=requests,
                 mix=dict(target_lufs=None, ceiling_dbtp=-1))
-    return validate_arrangement(brief, plan, lyrics="\n".join(cues))
+    expected_cues = [cues[spoken_ids.index(section["id"])] for section in sections
+                     if section["id"] in spoken_ids]
+    return validate_arrangement(brief, plan, lyrics="\n".join(expected_cues))
 
 
 def revise_window(plan, track_id, events, *, section_id=None, automation=None):
@@ -364,9 +436,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument("brief", type=Path)
     parser.add_argument("--variant", choices=tuple(_VARIANTS), default="ratchet")
+    parser.add_argument("--preview", action="store_true")
+    parser.add_argument("--cue-durations", nargs=4, type=float, metavar="SECONDS",
+                        help="measured chorus, verse, bridge, final chorus durations")
     args = parser.parse_args(argv)
     brief = json.loads(args.brief.read_text(encoding="utf-8"))
-    print(json.dumps(clear_head_plan(brief, args.variant), ensure_ascii=True,
+    print(json.dumps(clear_head_plan(brief, args.variant, preview=args.preview,
+                                    cue_durations_seconds=args.cue_durations), ensure_ascii=True,
                      indent=2, allow_nan=False))
 
 
