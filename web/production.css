@@ -1,0 +1,7 @@
+.production-session { display: grid; gap: .75rem; max-width: 44rem; margin-inline: auto; }
+.production-session textarea { min-height: 4rem; resize: vertical; font: inherit; color: inherit; background: transparent; }
+.production-session audio { width: 100%; }
+.production-session [hidden] { display: none !important; }
+.production-session pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.production-session [role="alert"]:empty { display: none; }
+.production-session button:disabled { opacity: .55; }
