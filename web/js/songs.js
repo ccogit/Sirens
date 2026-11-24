@@ -80,8 +80,8 @@ function soundcloudSymbol(song) {
 }
 
 const scZaehler = [
-  ["playback_count", "Plays"], ["likes_count", "Likes"], ["reposts_count", "Reposts"],
-  ["comment_count", "Kommentare"], ["download_count", "Downloads"],
+  ["playback_count", "Plays", "▶"], ["likes_count", "Likes", "♥"], ["reposts_count", "Reposts", "↻"],
+  ["comment_count", "Kommentare", "▤"], ["download_count", "Downloads", "↓"],
 ];
 const zahlenformat = new Intl.NumberFormat("de-DE");
 const datumsformat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
@@ -95,8 +95,13 @@ function soundcloudZahlen(song) {
     const stand = Number.isFinite(datum.getTime()) ? "Stand " + datumsformat.format(datum) : "";
     return h("div", { class: "library-sc-numbers", title: stand },
       tracks.length > 1 ? h("span", {}, track.title) : null,
-      ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label]) =>
-        h("span", {}, h("strong", {}, zahlenformat.format(track.zahlen[key])), " " + label)));
+      ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label, symbol]) => {
+        const zahl = zahlenformat.format(track.zahlen[key]);
+        return h("span", { class: "library-sc-metric" + (track.zahlen[key] === 0 ? " leer" : ""),
+          title: [zahl + " " + label, stand].filter(Boolean).join(" · ") },
+        h("span", { class: "library-sc-glyph " + key, "aria-hidden": "true" }, symbol),
+        h("strong", { "aria-label": zahl + " " + label }, zahl));
+      }));
   };
   if (tracks.length === 1) return zeile(tracks[0]);
   return h("details", { class: "library-sc-versions" }, h("summary", {}, "SoundCloud-Zahlen · " + tracks.length + " Tracks"),

@@ -194,3 +194,8 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .library-profile dd { color: var(--tinte); overflow-wrap: anywhere; }
 [data-theme="dark"] .songs-library select { color-scheme: dark; }
 .songs-library select option { background-color: var(--flaeche); color: var(--tinte); }
+
+.library-sc-metric { display: inline-flex; align-items: center; gap: .24rem; }
+.library-sc-glyph { display: inline-flex; justify-content: center; width: .95rem; font-size: .88rem; line-height: 1; color: var(--akzent); }
+.library-sc-glyph.likes_count { color: #e787a1; }
+.library-sc-metric.leer .library-sc-glyph { color: inherit; }
