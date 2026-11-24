@@ -4,7 +4,7 @@
 
 CPU-Referenz in ES-Modulen ohne Fremdabhängigkeiten: FFT/STFT mit Overlap-Add, spektrale Maske, Freeze und Pitch, granularer Cloud-Pfad und WSOLA-Stretch für endliche Clips, uniform partitionierte FFT-Faltung mit zwei generierten IRs und Morphing. Gemeinsame Stereo-Frame-Schnittstelle, begrenzte Parameter, lineare Rampen, Wet/Dry, Bypass, Presets und Profile. Rack-Latenz fast/standard/detail: 896/1664/3200 Frames (deklarierte Summen, keine Geräte-Messwerte). RackPath kompensiert zusätzliche Pfadlatenz. Audio-Core-Einbau als Hook WP09, keine eigenen Änderungen an WP04-Dateien. Limiter bleibt die letzte Stufe im Core; Rack begrenzt Wet-Spitzen defensiv. Kein GPU-Code.
 
-Depends-on: KETTE-11 (integriert) und KETTE-22 (zuletzt nachgezogen: 8b58186a9366372bcbd5c1a7195571b388aa4ef2), integration/sirens-rt (329db196ca860c1467b951ae6fb92f57dc59d6f3). Keine fremden Projekte, Code- oder Gewichts-Pins, keine zusätzlichen Lizenzen; keine Modelle oder Gewichte. Python 3.11 / Node 22 gemäß CI, Browser mit AudioWorklet; CPU-only, keine RTX erforderlich.
+Depends-on: KETTE-11 (integriert) und KETTE-22 (zuletzt nachgezogen: 51fdeb3040d86d411650087e93e5ed82dc63bee8), integration/sirens-rt (4af7c1dae487436e28cd170175b0078f3a29da34). Keine fremden Projekte, Code- oder Gewichts-Pins, keine zusätzlichen Lizenzen; keine Modelle oder Gewichte. Python 3.11 / Node 22 gemäß CI, Browser mit AudioWorklet; CPU-only, keine RTX erforderlich.
 
 ## Abnahmebelege
 
@@ -14,7 +14,7 @@ Depends-on: KETTE-11 (integriert) und KETTE-22 (zuletzt nachgezogen: 8b58186a936
 | 2 | Oktave: 375 Hz → 750 Hz, Toleranz 30 Hz; Stretch: Faktor 2, 400 Hz ±30 Hz über den stationären Abschnitt, exakt doppelte Framezahl; IR: Impulsantwort sampleweise ±1e-6, Stereo. |
 | 3 | Begrenzung endlicher Parameter, Ablehnung von NaN/Inf, falschem Bypass-Typ, unbekanntem Preset/Parameter und fehlerhaftem Stereo-PCM; IR-Größe und Werte geprüft. |
 | 4 | **Nicht gemessen**: G3-Zusatzlatenz und Control-to-audio am Zielrechner, Dropouts, Hörtest. Node- und Browser-Messskripte, synthetische Inputs, mehrere Stems und Profile, Ergebnis-Konverter und Test in benchmarks/dsp/ bzw. tests/realtime/test_dsp_report.py. Browser-Ausgabezeitstempel sind eine Schätzung, physischer Loopback bleibt separat. |
-| 5 | Maßgeblicher Befehl: python -m unittest discover -s tests -v. PR #15; CI-Läufe 45452844913 (Kerne), 45452978488 (Rack), 45453076484 (nach WP04-Merge), 45453226983 (Messskripte) jeweils success. Neuere Pushes separat über PR-Checks prüfen. Lokaler Checkout nicht möglich: DNS für github.com nicht auflösbar; keine lokale Gesamtprüfung. board.md nicht selbst geändert (KETTEN.md-Regel). |
+| 5 | Maßgeblicher Befehl: python -m unittest discover -s tests -v. PR #15; CI-Läufe 45452844913 (Kerne), 45452978488 (Rack), 45453076484 (nach WP04-Merge), 45453226983 (Messskripte), 45453433320 (Bypass-Rampe, Steuerantwort und Ergebnis) jeweils success. Neuere Pushes separat über PR-Checks prüfen. Lokaler Checkout nicht möglich: DNS für github.com nicht auflösbar; keine lokale Gesamtprüfung. board.md nicht selbst geändert (KETTEN.md-Regel). |
 
 Nachstellen: `node --test tests/realtime/dsp_*.test.mjs` (Shell mit Glob-Unterstützung) bzw. `python -m unittest discover -s tests -v`; Messaufrufe siehe benchmarks/dsp/README.md. `python -m benchmarks.dsp.report <input.json> <result.json>` validiert das gemeinsame Format. Messwerte werden erst am Zielrechner erzeugt.
 
