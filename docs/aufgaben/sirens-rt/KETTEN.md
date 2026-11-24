@@ -25,7 +25,7 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 gemergt | gemergt |
 | KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | vergeben (24.11.2026) |
 | KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
-| KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | vergeben (24.11.2026) |
+| KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | gemergt |
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
 | KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, KETTE-14 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, KETTE-15 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
