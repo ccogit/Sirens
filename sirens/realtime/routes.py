@@ -141,6 +141,21 @@ def dispatch(handler, path, body):
             return handler._json(202, s.render(body))
     if method == "POST" and parts == ["separation", "jobs"]:
         return handler._json(202, service(handler).separation.start(body))
+    if method == "PUT" and len(parts) == 3 and parts[0] == "jobs" and parts[2] == "export":
+        try:
+            length = int(handler.headers.get("Content-Length", "0"))
+        except ValueError:
+            raise invalid("audio") from None
+        if (handler.headers.get("Transfer-Encoding") is not None
+                or handler.headers.get("Content-Type", "").lower() != "application/octet-stream"):
+            raise invalid("audio")
+        old_timeout = handler.connection.gettimeout()
+        handler.connection.settimeout(15)
+        try:
+            result = service(handler).separation.export(parts[1], handler.rfile, length)
+        finally:
+            handler.connection.settimeout(old_timeout)
+        return handler._json(201, result)
     if len(parts) >= 2 and parts[0] == "jobs":
         if method == "GET" and len(parts) == 2:
             manager = service(handler)
