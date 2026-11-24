@@ -71,6 +71,26 @@ def amm_notes_to_events(notes):
     return sorted(events, key=lambda e: (e["tick"], e["note"]))
 
 
+def amm_proposals(*, harmony=None, chords=None, groove=None, groove_args=None,
+                  phrase=None, phrase_args=None, motif=None, motif_args=None):
+    """Invoke opt-in, read-only AMM proposal APIs with their native contracts.
+
+    Inputs come from the trusted local AMM context (confirmed state, hashes,
+    requests); never fabricate confirmations or invoke apply/Live operations.
+    The returned proposals are advisory until selected by an agent.
+    """
+    result = {}
+    if harmony is not None:
+        result["harmony"] = harmony.voice_chords(chords)
+    if groove is not None:
+        result["groove"] = groove.propose_relational_groove(*groove_args)
+    if phrase is not None:
+        result["phrase"] = phrase.propose_phrase_variations(*phrase_args)
+    if motif is not None:
+        result["motif"] = motif.propose_motif_developments(*motif_args)
+    return result
+
+
 def validate_arrangement(brief, plan, *, lyrics=None):
     """Check explicit brief constraints on an agent-authored plan."""
     _contracts().validate_brief(brief)
@@ -78,9 +98,12 @@ def validate_arrangement(brief, plan, *, lyrics=None):
     for key in ("bpm", "key", "seed"):
         if brief[key] is not None and brief[key] != plan[key]:
             raise ValueError("Plan contradicts brief: " + key)
+    negative = {tag.casefold().strip() for tag in brief["negative_tags"]}
+    if brief["vocal_mode"] == "spoken" or negative & {"sung melody", "pop vocals"}:
+        if any(t["role"].casefold() in ("vocal", "vocals", "singing", "sung")
+               for t in plan["tracks"]):
+            raise ValueError("Brief excludes sung tracks")
     if brief["vocal_mode"] == "spoken":
-        if any(t["role"] in ("vocal", "vocals", "singing") for t in plan["tracks"]):
-            raise ValueError("Spoken brief cannot contain sung track")
         requests = {r["id"]: r for r in plan["asset_requests"]}
         cues = []
         for track in plan["tracks"]:
@@ -292,11 +315,60 @@ def revise_window(plan, track_id, events, *, section_id=None, automation=None):
         raise ValueError("Replacement crosses revision boundary")
     track["events"] = sorted(retained + deepcopy(events), key=lambda e: (e["tick"], e.get("note", 0)))
     if automation is not None:
-        # Section edits cannot change inherited automation state outside the
-        # window implicitly: require whole-track automation replacement instead.
         if section_id is not None:
-            raise ValueError("Automation revision requires explicit whole-track scope")
-        track["automation"] = deepcopy(automation)
+            if any(not lo <= e["tick"] < hi for e in automation):
+                raise ValueError("Automation replacement outside section")
+            outside = [e for e in track["automation"] if not lo <= e["tick"] < hi]
+            # Preserve boundary values and parameter support; interpolation
+            # must not acquire a different external anchor.
+            old_inside = [e for e in track["automation"] if lo <= e["tick"] < hi]
+            def edges(points):
+                grouped = {}
+                for point in sorted(points, key=lambda e: e["tick"]):
+                    grouped.setdefault(point["parameter"], []).append(point)
+                return {key: (value[0], value[-1]) for key, value in grouped.items()}
+            if edges(old_inside) != edges(automation):
+                raise ValueError("Section automation must preserve first/last anchors")
+            track["automation"] = sorted(outside + deepcopy(automation),
+                                         key=lambda e: (e["tick"], e["parameter"]))
+        else:
+            track["automation"] = deepcopy(automation)
     _contracts().validate_plan(result)
+    if track["role"] == "spoken":
+        requests = {r["id"]: r for r in plan["asset_requests"]}
+        previous = next(t for t in plan["tracks"] if t["id"] == track_id)
+        if [e["asset_id"] for e in previous["events"]] != [e["asset_id"] for e in track["events"]]:
+            raise ValueError("Revision must preserve spoken cue order")
+        for event in track["events"]:
+            seconds = event["duration_ticks"] / PPQ * 60 / plan["bpm"]
+            if seconds + 1e-9 < requests[event["asset_id"]]["duration_seconds"]:
+                raise ValueError("Revision would truncate spoken cue")
+        if any(a["tick"] + a["duration_ticks"] > b["tick"]
+               for a, b in zip(track["events"], track["events"][1:])):
+            raise ValueError("Overlapping spoken cues after revision")
+    locked = {t["id"]: t for t in result["tracks"] if t["id"] in ("kick", "sub")}
+    original = {t["id"]: t for t in plan["tracks"] if t["id"] in ("kick", "sub")}
+    def ticks(t):
+        return [e["tick"] for e in t["events"]]
+    if set(locked) == {"kick", "sub"} and ticks(original["kick"]) == ticks(original["sub"]):
+        if ticks(locked["kick"]) != ticks(locked["sub"]):
+            raise ValueError("Revision would break locked kick/sub timing")
     return result, dict(track_id=track_id, section_id=section_id, seed=plan["seed"],
                         before_sha256=before, after_sha256=_digest(track))
+
+
+def main(argv=None):
+    """Local CLI for the authored test brief; prints JSON, never renders."""
+    import argparse
+    from pathlib import Path
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("brief", type=Path)
+    parser.add_argument("--variant", choices=tuple(_VARIANTS), default="ratchet")
+    args = parser.parse_args(argv)
+    brief = json.loads(args.brief.read_text(encoding="utf-8"))
+    print(json.dumps(clear_head_plan(brief, args.variant), ensure_ascii=True,
+                     indent=2, allow_nan=False))
+
+
+if __name__ == "__main__":
+    main()
