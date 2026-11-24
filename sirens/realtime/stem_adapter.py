@@ -1,7 +1,6 @@
 """Offline-Stem-Cache: keine Modellimporte im Hauptprozess."""
 import hashlib
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -246,7 +245,7 @@ class SeparationJobs:
                 if stop.is_set():
                     return
                 aid = new_id()
-                meta = {"id": aid, "kind": "source" if stem == "original" else "stem",
+                meta = {"id": aid, "kind": "source" if stem == "original" else "cache",
                         "sample_rate": rate, "channels": channels, "nframes": frames}
                 prepared[aid] = (path, meta, source_hash(path))
                 published[stem] = aid
@@ -284,6 +283,13 @@ class SeparationJobs:
         with self.lock:
             return self._snapshot(job)
 
+    @staticmethod
+    def contract_job(detail):
+        # Offline-Korrelation ohne Mock-Sitzung; Detailantwort separat.
+        return {"id": detail["id"], "session_id": detail["id"], "state": detail["state"],
+                "progress": detail["progress"], "asset_id": detail["assets"].get("original"),
+                "error": detail["error"]}
+
     def asset(self, aid, audio=False):
         asset_id(aid)
         with self.lock:
@@ -313,7 +319,8 @@ class SeparationJobs:
                 raise error("unavailable")
             self.export_count += 1
         directory = self.root / "exports" / "separation"
-        if directory.resolve() != directory or self.cfg.music_root.resolve() in directory.parents:
+        if (directory.resolve() != directory or directory == self.cfg.music_root.resolve()
+                or self.cfg.music_root.resolve() in directory.parents):
             raise invalid("path")
         directory.mkdir(parents=True, exist_ok=True)
         eid = new_id()
