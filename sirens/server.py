@@ -130,6 +130,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise Ablehnung("forbidden_host", "Diese Adresse ist nicht erlaubt.", status=403)
             teile = urlsplit(self.path)
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
+            if pfad == "/api/rt/v1/profile":
+                return self._rt_profile()
             if pfad.startswith("/api/rt/v1/"):
                 from .realtime.routes import dispatch
                 return dispatch(self, pfad, self._body() if schreibend and self.command != "PUT" else None)
@@ -144,6 +146,31 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:  # noqa: BLE001 – der Dienst soll weiterlaufen
             traceback.print_exc(file=sys.stderr)
             self._json(500, {"error": "internal", "meldung": "Unerwarteter Fehler im Dienst.", "feld": None})
+
+    def _rt_profile(self):
+        # Eigene Integrationsadresse: bestehende v1-Antworten und parallele
+        # Dateijob-Routen bleiben unverändert.
+        from .realtime.contracts import error, invalid
+        from .realtime.model_registry import PROFILES
+        from .realtime.routes import service
+        if self.command == "PUT":
+            self.close_connection = True
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in {f"http://{h}" for h in self._erlaubte_hosts()}:
+            raise Ablehnung("forbidden_origin", "Anfragen von fremden Seiten werden abgelehnt.", status=403)
+        if self.command == "POST":
+            body = self._body()
+        elif self.command != "GET":
+            raise invalid("method")
+        if not self.app.cfg.rt_enabled:
+            raise error("unavailable")
+        if self.command == "GET":
+            sessions = getattr(self.app, "rt_sessions", None)
+            return self._json(200, {"profile": sessions.gpu.profile if sessions else "Performance"})
+        if (not isinstance(body, dict) or set(body) != {"profile"}
+                or type(body["profile"]) is not str or body["profile"] not in PROFILES):
+            raise invalid("profile")
+        return self._json(200, {"profile": service(self).gpu.set_profile(body["profile"])})
 
     def do_GET(self):
         self._bearbeiten(False)
