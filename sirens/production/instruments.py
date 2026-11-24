@@ -11,6 +11,7 @@ import tempfile
 import wave
 from pathlib import Path
 
+from .cache import HashCache, cache_key as stage_cache_key
 from .contracts import (SAMPLE_RATE, PPQ, expected_frames, tick_to_sample,
                         safe_path, validate_plan, validate_assets, validate_stems)
 
@@ -18,11 +19,6 @@ from .contracts import (SAMPLE_RATE, PPQ, expected_frames, tick_to_sample,
 def digest(path):
     with open(path, "rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
-def cache_key(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
-                                     allow_nan=False).encode("utf-8")).hexdigest()
 
 
 def read_pcm(path):
@@ -159,7 +155,8 @@ def _patch(patches, track):
     return patch
 
 
-def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_dir=None):
+def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_dir=None,
+                 cancelled=lambda: None):
     """New run only. A backend is mandatory for instruments; no production mock fallback.
 
     Cache identity includes the complete track, absolute timeline, seed, patch
@@ -172,15 +169,18 @@ def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_
         raise FileExistsError("Render into a fresh run")
     frames = expected_frames(plan)
     assets = {a["id"]: a for a in asset_manifest["assets"]}
-    cache = Path(cache_dir).resolve() if cache_dir is not None else None
-    if cache is not None:
-        cache.mkdir(parents=True, exist_ok=True)
+    cache = None
+    if cache_dir is not None:
+        cache_root = Path(cache_dir).resolve()
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cache = HashCache(cache_root)
     stems = []
     with tempfile.TemporaryDirectory(dir=root) as stage_name:
         stage = Path(stage_name)
         audio = stage / "stems"
         audio.mkdir()
         for track in plan["tracks"]:
+            cancelled()
             path = audio / (track["id"] + ".wav")
             if track["backend"] == "asset":
                 if track["automation"]:
@@ -195,21 +195,17 @@ def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_
                 patch = _patch(patches, track)
                 request = {"track": track, "patch": patch, "bpm": plan["bpm"],
                            "frames": frames, "seed": plan["seed"], "sample_rate": SAMPLE_RATE}
-                key = cache_key({"request": request, "backend": backend.name, "revision": backend.revision})
-                cached = cache / (key + ".wav") if cache else None
-                meta = cache / (key + ".json") if cache else None
+                key = stage_cache_key("instrument", request, backend.name, backend.revision, plan["seed"])
                 hit = False
-                if cached and cached.is_file() and meta.is_file():
-                    try:
-                        entry = json.loads(meta.read_text(encoding="utf-8"))
-                        c, d = read_pcm(cached)
-                        hit = entry["sha256"] == digest(cached) and len(d) == frames * c * 3
-                    except (ValueError, OSError, KeyError, wave.Error):
-                        hit = False
-                if hit:
-                    shutil.copyfile(cached, path)
-                else:
+                if cache is not None:
+                    with tempfile.TemporaryDirectory(dir=stage) as restore_dir:
+                        restore = Path(restore_dir)
+                        hit = cache.restore(key, restore)
+                        if hit:
+                            shutil.copyfile(restore/"track.wav", path)
+                if not hit:
                     backend.render(request, path)
+                cancelled()
                 channels, data = read_pcm(path)
                 if len(data) != frames * channels * 3:
                     raise ValueError("Instrument stem length mismatch")
@@ -218,18 +214,15 @@ def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_
                     write_pcm(path, channels, data)
                 if track["events"] and peak_dbfs(data) is None:
                     raise ValueError("Instrument rendered silence: " + track["id"])
-                if cached and not hit:
-                    with tempfile.NamedTemporaryFile(dir=cache, delete=False) as f:
-                        temp = Path(f.name)
-                    try:
-                        shutil.copyfile(path, temp)
-                        os.replace(temp, cached)
-                    finally:
-                        temp.unlink(missing_ok=True)
-                    _atomic_json(meta, {"sha256": digest(cached)})
+                if cache is not None and not hit:
+                    with tempfile.TemporaryDirectory(dir=stage) as publish_dir:
+                        publish = Path(publish_dir)
+                        shutil.copyfile(path, publish/"track.wav")
+                        cache.publish(key, publish, ["track.wav"])
                 source = {"backend": backend.name, "revision": backend.revision,
                           "patch": track["patch"], "preset_revision": patch["revision"],
                           "seed": plan["seed"], "license": patch["license"], "use": patch["use"],
+                          "preset_id": patch["instrument"].get("preset"),
                           "cache_key": key, "cache_hit": hit}
             peak = peak_dbfs(data)
             if peak is not None and peak >= -0.01:
@@ -237,11 +230,10 @@ def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_
             stems.append({"track_id": track["id"], "role": track["role"],
                           "file": "stems/" + path.name, "channels": channels,
                           "sha256": digest(path), "source": source, "peak_dbfs": peak})
+        cancelled()
         sidechain(plan, stage / "sidechain.wav")
         manifest = {"schema_version": 1, "sample_rate": SAMPLE_RATE, "frames": frames,
-                    "stems": stems, "sidechain_file": "stems/sidechain-control.wav"}
-        # Use a reserved sidechain filename outside the track namespace.
-        manifest["sidechain_file"] = "sidechain-control.wav"
+                    "stems": stems, "sidechain_file": "sidechain-control.wav"}
         validate_stems(manifest, plan=plan, root=stage)
         if (root / "sidechain-control.wav").exists():
             raise FileExistsError("Sidechain output already exists")
