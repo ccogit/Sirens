@@ -141,8 +141,11 @@ class Worker:
     """
     def __init__(self, python, *, lease=None, model_dir=None, stable_cache=None,
                  timeout=180, cancelled=lambda: False, stable_python=None):
-        self.python = Path(python).resolve(strict=True)
-        self.stable_python = Path(stable_python).resolve(strict=True) if stable_python else self.python
+        # Keep the venv entrypoint path, not its symlink target (POSIX venvs).
+        self.python = Path(python).absolute()
+        self.stable_python = Path(stable_python).absolute() if stable_python else self.python
+        if not self.python.is_file() or not self.stable_python.is_file():
+            raise AssetError("worker interpreter unavailable")
         self.lease = lease
         self.model_dir = model_dir
         self.stable_cache = stable_cache
