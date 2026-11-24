@@ -41,8 +41,15 @@ def cache_key(digest, name, revision, params):
 def wav_shape(path):
     with wave.open(str(path), "rb") as stream:
         shape = (stream.getframerate(), stream.getnchannels(), stream.getnframes())
-        if not all(shape) or len(stream.readframes(shape[2])) != shape[1] * shape[2] * stream.getsampwidth():
+        if not all(shape):
             raise ValueError("Unvollständige WAV-Datei")
+        remaining = shape[2]
+        width = shape[1] * stream.getsampwidth()
+        while remaining:
+            count = min(remaining, 65536)
+            if len(stream.readframes(count)) != count * width:
+                raise ValueError("Unvollständige WAV-Datei")
+            remaining -= count
         return shape
 
 
@@ -91,7 +98,12 @@ class StemAdapter:
                             and not (directory / (stem + ".wav")).is_symlink()
                             and wav_shape(directory / (stem + ".wav")) == expected
                             for stem in stems))
-        hit = valid(target)
+        try:
+            hit = valid(target)
+        except (OSError, ValueError, EOFError, wave.Error):
+            hit = False
+        if target.exists() and not hit:
+            raise ValueError("Ungültiger Cache; manuelle Bereinigung erforderlich")
         if not hit:
             self.cache_root.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix=".stem-", dir=self.cache_root) as temp:
