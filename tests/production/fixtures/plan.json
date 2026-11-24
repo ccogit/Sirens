@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "seed": 101,
+  "bpm": 120,
+  "key": "D minor",
+  "meter": [
+    4,
+    4
+  ],
+  "ppq": 960,
+  "total_bars": 1,
+  "tail_seconds": 0,
+  "sections": [
+    {
+      "id": "intro",
+      "start_bar": 0,
+      "bars": 1,
+      "intent": "test"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "role": "drums",
+      "backend": "instrument",
+      "patch": "tight_kick",
+      "events": [
+        {
+          "tick": 0,
+          "duration_ticks": 240,
+          "note": 36,
+          "velocity": 100
+        }
+      ],
+      "automation": []
+    },
+    {
+      "id": "voice",
+      "role": "spoken",
+      "backend": "asset",
+      "patch": "spoken_calm",
+      "events": [
+        {
+          "tick": 960,
+          "duration_ticks": 960,
+          "asset_id": "cue1"
+        }
+      ],
+      "automation": []
+    }
+  ],
+  "asset_requests": [
+    {
+      "id": "cue1",
+      "kind": "speech",
+      "text": "Synthetic.",
+      "prompt": "test",
+      "seed": 101,
+      "duration_seconds": 0.5
+    }
+  ],
+  "mix": {
+    "target_lufs": null,
+    "ceiling_dbtp": -1
+  }
+}
