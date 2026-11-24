@@ -260,6 +260,25 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Im DJ-Pult startet kein CUDA-KI-Modell; nur eine ausdrücklich gewählte Stem-Trennung
   kann CUDA benutzen (nicht während Claude produziert).
 
+### Signal Room: Discovery und Sessions
+
+Das Live Lab öffnet den **Signal Room**: ein eigener dunkler, responsiver Arbeitsbereich
+mit Experiment-Index, Suche, Kategorien, Favoriten, zuletzt geöffneten Werkzeugen und
+individuellen interaktiven Signalstudien. Diese Vorschauen sind ausdrücklich rein visuell:
+Sie laden keine Audiodateien und starten weder AudioContext noch KI noch WebGL.
+„Experiment starten“ öffnet das echte bestehende Werkzeug. Fokusmodus blendet
+Navigation und Lab-Kopf aus, Vollbild nutzt die Browser-Vollbildfunktion.
+Der letzte gewählte Eintrag, Favoriten und die letzten sechs geöffneten Werkzeuge
+liegen lokal im Browser. Beim Verlassen einer Session wird deren Audio gestoppt;
+die Session wird geschlossen (Reglereinstellungen der meisten Werkzeuge werden
+nicht dauerhaft gespeichert). Bereits gestartete serverseitige KI-/Analyse-Jobs
+laufen gemäß bestehender Backend-Logik weiter; ihre Ergebnisse bleiben lokal.
+Der aktuelle Claude-Status wird im Lab angezeigt und weiterhin für die vorhandenen
+Eco-/GPU-Regeln genutzt. Die restliche Anwendung behält ihr Light-/Dark-Theme.
+
+Neue Experimente werden an einer Stelle registriert. Details, ein vollständiges
+Integrationsbeispiel und die Lifecycle-Regeln stehen in [docs/signal-room.md](docs/signal-room.md).
+
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
 geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben

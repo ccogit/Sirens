@@ -13,6 +13,10 @@ class Seite(unittest.TestCase):
     def test_keine_externen_quellen_und_importe_vorhanden(self):
         for datei in list(WEB.rglob("*.js")) + list(WEB.rglob("*.html")) + list(WEB.rglob("*.css")):
             text = datei.read_text(encoding="utf-8")
+            # Der SVG-Namespace ist ein DOM-Bezeichner, keine externe Ressource.
+            # Nur seine konkrete Deklaration ausnehmen; alle übrigen URLs bleiben verboten.
+            if datei == WEB / "js" / "signal_art.js":
+                text = re.sub(r'^const NS = "http://www\.w3\.org/2000/svg";$', "", text, count=1, flags=re.M)
             self.assertIsNone(re.search(r"https?://|@import|url\(", text), datei.name)
             for ziel in re.findall(r'from "(\./[^"]+)"', text):
                 self.assertTrue((datei.parent / ziel).is_file(), f"{datei.name}: {ziel}")
