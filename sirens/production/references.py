@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import re
 from collections import defaultdict
@@ -38,7 +37,7 @@ def _json(path):
 
 
 def _axes(values):
-    return {k: v for k, v in (values or {}).items() if k in ACHSEN
+    return {k: v for k, v in (values if isinstance(values, dict) else {}).items() if k in ACHSEN
             and type(v) in (int, float) and 0 <= v <= 10}
 
 
@@ -161,6 +160,7 @@ def collect(cfg, *, amm_export=None):
                     "bpm_text": short.get("tempo_bpm"), "bpm_measured": None,
                     "bpm_confidence": None, "key": None, "key_confidence": None,
                     "features": {}, "source": {"sha256": digest, "version": file.get("version"),
+                        "release": release["pfad"], "title": title,
                         "fassung": file.get("fassung"), "amm_resolved": bool(amm)},
                     "usage": "analysis_only",
                 })
@@ -180,6 +180,9 @@ def collect(cfg, *, amm_export=None):
                 "with_lyrics": sum(t["lyrics"] is not None for t in tracks)}
     coverage["favorite_status"] = ("found" if coverage["favorites"] else
                                     "none_found_in_available_sources")
+    coverage["missing_sources"] = (["amm_export"] if amm_export is None else []) + (
+        ["catalog"] if tree["zustand"] != "bereit" else []) + (
+        ["store"] if not cfg.orders_dir.is_dir() else [])
     return sorted(tracks, key=lambda t: t["id"]), coverage
 
 
@@ -277,16 +280,25 @@ def build_references(tracks, coverage, brief, *, measure=None):
         for master in members:
             if "emastered" not in (master["source"]["fassung"] or "").casefold():
                 continue
-            matching = [t for t in originals if t["source"]["version"] == master["source"]["version"]]
+            matching = [t for t in originals if all(t["source"][k] == master["source"][k]
+                            for k in ("release", "title", "version"))]
             if len(matching) == 1:
                 pairs.append({"original": matching[0]["id"], "master": master["id"]})
     coverage = dict(coverage, holdout_families=len(held), conflicting_families=conflicts,
                     selected=len(selected), contrasts=len(contrasts),
                     measured=sum(t["bpm_measured"] is not None for t in tracks))
+    def summary(t):
+        return {"id": t["id"], "title": t["source"]["title"], "rating": t["rating"],
+                "style": t["style_text"] or t["style_hint"],
+                "bpm_measured": t["bpm_measured"], "bpm_text": t["bpm_text"],
+                "axes": t["axes"], "description": t["description"]}
+
     return {"schema_version": 1, "tracks": tracks, "selected": [t["id"] for t in selected],
             "holdout": [t["id"] for t in tracks if t["song_family"] in held],
             "profile": {"music": {"positive_examples": [t["id"] for t in selected],
-                                  "negative_examples": [t["id"] for t in contrasts]},
+                                  "negative_examples": [t["id"] for t in contrasts],
+                                  "producer_examples": [summary(t) for t in selected],
+                                  "producer_contrasts": [summary(t) for t in contrasts]},
                         "production": {"original_master_pairs": pairs},
                         "coverage": coverage}}
 
