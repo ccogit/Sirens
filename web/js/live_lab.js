@@ -69,7 +69,8 @@ export function liveLabAnsicht(el) {
   root.append(header,discovery,sessionPanel,footer);el.append(root);
   const runtime=createSession(host,{isProducing:()=>produktion});
   const filterDefs=[["all","Alle"],["favorites","★ Favoriten"],["recent","Zuletzt"],
-    ...[...new Set(tools.map(t=>t.gruppe))].map(g=>["group:"+g,g])];
+    ...[...new Set(tools.map(t=>t.gruppe))].map(g=>["group:"+g,g]),
+    ...(tools.some(t=>t.experimental)?[["experimental","Experimental"]]:[])];
   for(const [id,label] of filterDefs) filters.append(button(label,{class:"sr-filter","data-filter":id,
     onclick:()=>{filter=id;renderList();}}));
 
@@ -85,7 +86,7 @@ export function liveLabAnsicht(el) {
           if(window.matchMedia?.("(max-width: 670px)").matches) stage.scrollIntoView({block:"start",behavior:"auto"});}},
         h("span",{class:"sr-num"},"/"+nummer(tools.indexOf(tool)+1)),
         h("span",{},h("strong",{},tool.kurz||tool.titel,favorites.includes(tool.id)?" ★":""),
-          h("small",{},tool.sub)),h("span",{class:"sr-arrow","aria-hidden":"true"},"↗"));
+          h("small",{},tool.sub),tool.experimental?h("small",{class:"sr-experimental"},"EXPERIMENTAL"):null),h("span",{class:"sr-arrow","aria-hidden":"true"},"↗"));
       b.style.setProperty("--sr-tool",tool.farbe);list.append(b);
     }
     if(restoreId) [...list.children].find(b=>b.dataset.id===restoreId)?.focus({preventScroll:true});
@@ -100,7 +101,7 @@ export function liveLabAnsicht(el) {
     stageNumber.textContent="EXPERIMENT "+nummer(tools.indexOf(selected)+1)+" / "+nummer(tools.length);
     category.textContent=selected.kategorie;headline.textContent=selected.slogan;hook.textContent=selected.sub;
     name.textContent=selected.titel;description.textContent=selected.text;prep.textContent=selected.voraussetzung;
-    tags.replaceChildren(...(selected.tags||[]).map(tag=>h("span",{},tag)));
+    tags.replaceChildren(...(selected.tags||[]).map(tag=>h("span",{},tag)),...(selected.experimental?[h("span",{class:"sr-experimental"},"EXPERIMENTAL")]:[]));
     const fav=favorites.includes(selected.id);
     star.textContent=fav?"★":"☆";star.setAttribute("aria-pressed",String(fav));
     star.setAttribute("aria-label",fav?"Aus Favoriten entfernen":"Zu Favoriten hinzufügen");
