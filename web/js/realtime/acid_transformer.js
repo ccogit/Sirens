@@ -28,7 +28,7 @@ export function acidTransformer({rate,length,bass,notes=[],onsets=[],grid,preset
     const freq=Math.min(rate*.4,440*2**((n.midi+12*p.octave-69)/12));
     // Nur tatsächlich gerenderte Stimmen dürfen einen Slide auslösen.
     const linked=prevFreq>0&&prevEnd===n.frame;
-    if(!linked){phase=0;prevFreq=freq;prevEnd=end;z1=z2=0;}
+    if(!linked){phase=0;prevFreq=freq;z1=z2=0;}
     for(let i=n.frame;i<end;i++){
       const t=(i-n.frame)/rate,slide=linked&&p.slide?Math.min(1,t/p.slide):1;
       const hz=prevFreq*(freq/prevFreq)**slide;
@@ -40,7 +40,7 @@ export function acidTransformer({rate,length,bass,notes=[],onsets=[],grid,preset
       const accent=n.velocity>=p.accent?1:.65;
       out[i]+=Math.tanh(filtered*p.drive)*env*n.velocity*accent*p.gain;
     }
-    prevFreq=freq;
+    prevFreq=freq;prevEnd=end;
   }
   return {track:applyRack(normalize(out),p.rack),events,warnings};
 }

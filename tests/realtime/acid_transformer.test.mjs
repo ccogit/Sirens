@@ -10,3 +10,10 @@ test("Acid: Noten, Raster, Bass stumm, Pegel, Onset-Warnung, Preset",()=>{
  assert.ok(acidTransformer({rate,length:rate,onsets:[{frame:1}]}).warnings.length);
  assert.deepEqual(loadPreset("acid",savePreset("acid",p),acidPreset),p);
 });
+
+test("Slide bleibt über mehrere tatsächlich gespielte Noten verbunden",()=>{
+ const notes=[[0,.1,36,1],[.1,.2,39,1],[.2,.3,43,1]];
+ const slid=acidTransformer({rate,length:rate,notes,preset:{slide:.06}}).track;
+ const plain=acidTransformer({rate,length:rate,notes,preset:{slide:0}}).track;
+ assert.ok(slid.slice(9600,12000).some((v,i)=>v!==plain[9600+i]));
+});
