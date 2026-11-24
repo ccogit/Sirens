@@ -11,8 +11,8 @@
   "capability": {
     "id": "demon",
     "mock": false,
-    "available": false,
-    "mode": "offline",
+    "available": true,
+    "mode": "streaming",
     "sample_rates": [
       48000
     ],
@@ -34,7 +34,7 @@
         "default": 0
       }
     ],
-    "vram_peak_bytes": "unknown",
+    "vram_peak_bytes": 4837081088,
     "device": "cuda",
     "license": "AGPL-3.0-or-later / MIT (Gewichte)",
     "model_revision": "19671f406d603126926c1b7e2adc169acbcade22"

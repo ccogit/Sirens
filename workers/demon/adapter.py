@@ -48,13 +48,24 @@ class Backend:
         from acestep.nodes.types import Audio
         self.torch, self.Audio = torch, Audio
         self.instruction = TASK_INSTRUCTIONS["cover"]
+        # Decoder auf TensorRT, wenn die Engine gebaut ist (G1: Änderung in 92–121 ms statt 333 ms bei Tiefe 1);
+        # sonst eager. Die VAE bleibt eager: die gebauten VAE-Engines nehmen die volle Songlänge nicht an.
+        engines, decoder_backend = None, "eager"
+        try:
+            from acestep.paths import available_trt_engines
+            gefunden, _profil = available_trt_engines(duration_s=60)
+            if gefunden.get("decoder"):
+                engines, decoder_backend = {"decoder": gefunden["decoder"]}, "tensorrt"
+        except Exception:  # keine Engine, kein TensorRT: eager weiter
+            engines, decoder_backend = None, "eager"
+        self.decoder_backend = decoder_backend
         with patch.object(ModelContext, "_ensure_downloaded",
                           staticmethod(lambda *a, **k: None)), torch.inference_mode():
             self.session = Session(project_root=str(model.parent),
                                    config_path="acestep-v15-turbo", device="cuda",
-                                   decoder_backend="eager", vae_backend="eager",
+                                   decoder_backend=decoder_backend, vae_backend="eager",
                                    vae_window=0.36, use_flash_attention=False,
-                                   offload_text_encoder=True)
+                                   offload_text_encoder=True, trt_engines=engines)
 
     def prepare(self, samples, prompt):
         with self.torch.inference_mode():

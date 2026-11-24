@@ -1,9 +1,32 @@
 # G1 DEMON (ACE-Step v1.5 Turbo 2B) – Messung am Zielrechner (24.11.2026)
 
-**Gate: gelb für den Modus `streaming`.** Die Engine streamt stabil (Fensterdecode weit unter Echtzeit,
-VRAM reicht). Eine Änderung pro Anfrage (Seed, Denoise, Prompt) braucht im Eager-Betrieb aber 333 ms (Tiefe 1)
-bzw. 650–1300 ms (Tiefe 4) bis zum neuen Latent, also mehr als 250 ms. TensorRT/compile nicht gemessen;
-1-Tick-Pfad über Shared Curves nicht gemessen.
+**Gate: grün für den Modus `streaming` mit TensorRT-Decoder bei Tiefe 1** (Nachmessung 24.11.2026, unten).
+Eine Änderung (Seed, Denoise, Prompt) ist nach 92 ms (10-s-Song) bzw. 121 ms (30-s-Song) im neuen Latent.
+Ohne TensorRT (eager, erste Messung) gelb: 333 ms. Tiefe 4 bleibt über bzw. an der Grenze von 250 ms.
+
+## Nachmessung mit TensorRT-Decoder
+
+Engines mit dem DEMON-eigenen Bau gebaut (`python -m acestep.engine.trt.build --preset minimal`, TensorRT
+10.16.1.11, `sm_120`, ca. 5 Minuten): Decoder `spectral_decoder_mixed_refit_b8_60s` (Profil 60 s, mixed precision,
+Refit) und VAE-Engines. **VAE auf TensorRT scheitert** am Vollsong-Decode (`TRT VAE decode rejected input shape
+(1, 64, 250)`); die VAE läuft deshalb eager, der Decoder auf TensorRT. Gleiches Messskript und gleiche Fälle wie
+bei eager (Klick 120 BPM, Denoise 1,0, 8 Schritte, Seed-Wechsel nach der Hälfte der Ticks).
+
+| Fall | Tick p50 / p95 / p99 | Seed-Wechsel bis neues Latent | VRAM allokiert (max) | Fensterdecode p95 |
+|---|---:|---:|---:|---:|
+| Tiefe 1, Song 10 s | 11,1 / 12,5 / 12,7 ms | **92 ms** (eager 333 ms) | 3,2 GiB | 8,3 ms |
+| Tiefe 1, Song 30 s | 15,2 / 16,4 / 16,8 ms | **121 ms** | 4,0 GiB | 8,6 ms |
+| Tiefe 4, Song 10 s | 18,9 / 23,6 / 24,0 ms | 249 ms (eager 650 ms) | 3,2 GiB | 9,1 ms |
+| Tiefe 4, Song 30 s | 40,4 / 43,3 / 43,7 ms | 481 ms (eager 1295 ms) | 4,0 GiB | 9,2 ms |
+
+Folgen: Der Worker (`workers/demon/adapter.py`) nutzt den TensorRT-Decoder, sobald die Engine gebaut ist, sonst
+eager; Tiefe 1. Laden der Session mit Engine 11,7 s: vorab laden. Engines sind GPU- und versionsspezifisch und
+müssen nach Treiber-, CUDA- oder TensorRT-Wechsel neu gebaut werden.
+
+## Erste Messung (eager)
+
+Gate damals gelb: Die Engine streamt stabil (Fensterdecode weit unter Echtzeit, VRAM reicht), eine Änderung pro
+Anfrage braucht aber 333 ms (Tiefe 1) bzw. 650–1300 ms (Tiefe 4).
 
 - Zielrechner: Windows 11, RTX 5080 16 GB, Treiber 621.24; Torch **2.9.1+cu128** (Upstream-Pin, `sm_120` läuft),
   bf16, 8 Schritte, `decoder_backend=eager`, `vae_backend=eager`, SDPA statt flash-attn, Textencoder auf CPU ausgelagert.

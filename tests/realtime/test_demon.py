@@ -28,8 +28,11 @@ class FakeBackend:
 
 class DemonTest(unittest.TestCase):
     def test_descriptor(self):
+        # G1 mit TensorRT-Decoder bei Tiefe 1 grün (benchmarks/results/g1/demon.md): freigegeben, Streaming.
         a = Adapter(FakeBackend)
-        self.assertFalse(validate("capability", a.probe())["available"])
+        cap = validate("capability", a.probe())
+        self.assertTrue(cap["available"])
+        self.assertEqual(cap["mode"], "streaming")
 
     def test_lifecycle_epoch_bypass(self):
         a = Adapter(FakeBackend)
