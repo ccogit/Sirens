@@ -13,7 +13,7 @@ from sirens.config import load
 from sirens.contracts import Ablehnung
 from sirens.realtime import contracts as c, pcm
 from sirens.realtime.mock import MockAdapter
-from sirens.realtime.schema import SCHEMAS, validate
+from sirens.realtime.schemas import SCHEMAS, validate
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "docs/realtime/examples"
@@ -94,6 +94,8 @@ class Contracts(unittest.TestCase):
         self.assertEqual(cfg.realtime_dir, Path("rt"))
 
     def test_stdlib_imports_recursively(self):
+        legacy_workers = {"kick_dsp": {"numpy", "scipy", "soundfile"},
+                          "stem_transcribe": {"basic_pitch"}}
         for path in (ROOT / "sirens").rglob("*.py"):
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path))):
                 if isinstance(node, ast.Import):
@@ -104,15 +106,15 @@ class Contracts(unittest.TestCase):
                     continue
                 for name in names:
                     module = name.split(".")[0]
-                    # Unveränderter Kick-DSP ist ein eigenständiges CLI im Bestand,
-                    # kein Import im Hauptprozess. Nur seine drei Altimporte erlauben.
-                    if path == ROOT / "sirens/kick_dsp.py" and module in {"numpy", "scipy", "soundfile"}:
+                    # Zwei unveränderte Bestands-CLIs laufen nur als Unterprozess.
+                    if path.parent == ROOT / "sirens" and module in legacy_workers.get(path.stem, ()):
                         continue
                     self.assertIn(module, sys.stdlib_module_names | {"sirens"}, str(path))
-                    self.assertNotIn(name, {"sirens.kick_dsp", "kick_dsp"}, str(path))
-                if isinstance(node, ast.ImportFrom) and node.level:
-                    self.assertNotEqual(node.module, "kick_dsp", str(path))
-                    self.assertNotIn("kick_dsp", [alias.name for alias in node.names], str(path))
+                    self.assertFalse(any(name == f"sirens.{worker}" or name.startswith(f"sirens.{worker}.")
+                                         or name == worker for worker in legacy_workers), str(path))
+                if isinstance(node, ast.ImportFrom) and (node.level or node.module == "sirens"):
+                    self.assertNotIn(node.module, legacy_workers, str(path))
+                    self.assertTrue(set(alias.name for alias in node.names).isdisjoint(legacy_workers), str(path))
 
 class PCM(unittest.TestCase):
     def test_fixtures_and_roundtrip(self):
