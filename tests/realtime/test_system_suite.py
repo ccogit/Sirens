@@ -1,3 +1,6 @@
+import subprocess
+import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -57,3 +60,24 @@ class SystemSuite(unittest.TestCase):
             with patch("benchmarks.system_suite.inventory", return_value=[]), \
                  patch("benchmarks.system_suite.worker_processes", side_effect=[set(), workers]):
                 self.assertEqual(run(root / "out", None, {}, False, snapshot=lambda: []), 1)
+
+    def test_cli_dry_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "report"
+            if shutil.which("pwsh"):
+                cmd = ["pwsh", "-NoProfile", "-File", "benchmarks/suite.ps1",
+                       "-DryRun", "-OutputDir", str(out), "-Python", sys.executable]
+            else:
+                cmd = [sys.executable, "-m", "benchmarks.system_suite",
+                       "--dry-run", "--out", str(out)]
+            subprocess.run(cmd, check=True, timeout=60)
+            result = read(out / "suite.json")
+            self.assertEqual(result["gate"], "nicht_gemessen")
+            self.assertTrue(result["funktionen"])
+            self.assertTrue(all(r["status"] == "nicht_gemessen" for r in result["funktionen"]))
+
+    def test_known_child_survives_parent(self):
+        rows = [{"ProcessId": 2, "ParentProcessId": 1, "CreationDate": "b",
+                 "CommandLine": "python"}]
+        self.assertEqual(worker_processes(rows, Path("/repo"), known={(2, "b")}), {(2, "b")})
+        self.assertFalse(worker_processes(rows, Path("/repo"), known={(2, "old")}))

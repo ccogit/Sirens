@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from benchmarks.result import METRICS, read, write
@@ -20,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ALIASES = {"separation": ("roformer", "roformer-drumsep"),
            "stable_audio": ("stable-audio-3",),
            "magenta": ("magenta-realtime",)}
-CORE = {"core": "streaming", "dsp": "streaming", "beatgrid": "offline",
+CORE = {"core": "unbekannt", "mock-e2e": "offline", "dsp": "unbekannt", "beatgrid": "offline",
         "performance-tools": "offline", "recorder": "offline",
         "integration": "unbekannt", "performance-soak": "streaming"}
 
@@ -47,8 +48,9 @@ def gate_evidence(root, capability):
         if path.suffix == ".md":
             # Koordinatorentscheidung in den vorhandenen G1-Berichten.
             for line in path.read_text(encoding="utf-8").splitlines():
-                if re.search(r"(?:gate|g1).*?\b(?:grün|amber|green)\b", line, re.I) and re.search(
-                        r"(?:modus[: ]+|mode[: ]+)[` ]*" + re.escape(mode) + r"\b", line, re.I):
+                if (not re.search(r"\b(?:nicht|kein|keine|rot|red)\b", line, re.I)
+                        and re.search(r"(?:gate|g1).*?\b(?:grün|amber|green)\b", line, re.I) and re.search(
+                        r"(?:modus[: ]+|mode[: ]+)[` ]*" + re.escape(mode) + r"\b", line, re.I)):
                     return path.name
     return None
 
@@ -92,9 +94,10 @@ def process_snapshot():
     return data if isinstance(data, list) else [data]
 
 
-def worker_processes(rows, root=ROOT):
+def worker_processes(rows, root=ROOT, known=()):
     prefix = str(root).lower().replace("\\", "/").rstrip("/") + "/"
-    seeds = set()
+    seeds = {r["ProcessId"] for r in rows
+             if (r["ProcessId"], str(r.get("CreationDate"))) in known}
     for row in rows:
         cmd = (row.get("CommandLine") or "").lower().replace("\\", "/")
         if prefix + "workers/" in cmd or prefix + "sirens/realtime/sidecar.py" in cmd:
@@ -123,6 +126,12 @@ def verify(before_hash, after_hash, before_workers, after_workers):
 def report(path, rows, errors, dry):
     machine = dict(os=platform.platform(), python=sys.version, node=None, ffmpeg=None,
                    gpus=None, wsl=None, disk=None, git=None, notes=[])
+    if not dry and os.name == "nt":
+        from benchmarks.baseline import collect
+        try:
+            machine = collect()
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            errors.append("Rechnerdaten: " + str(exc))
     write(path, dict(wp="WP19", kandidat="Systemabnahme G4",
                      zeitpunkt=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                      befehl="benchmarks/suite.ps1" + (" -DryRun" if dry else ""),
@@ -145,6 +154,7 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
     errors = []
     before_hash = hashes(music) if music else {}
     before_workers = worker_processes(snapshot()) if not dry else set()
+    known_workers = set(before_workers)
     try:
         for row in rows:
             cid = row["id"]
@@ -159,31 +169,52 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 errors.append("Messpfad fehlt: " + cid)
                 continue
             try:
-                argv = job["argv"]
-                if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
-                    raise ValueError("argv muss eine nichtleere Textliste sein")
+                steps = job.get("steps", [job.get("argv")])
+                if not isinstance(steps, list) or not steps:
+                    raise ValueError("steps muss eine nichtleere Liste sein")
                 result_path = out / (cid + ".json")
                 if result_path.exists():
                     raise ValueError("Messdatei existiert bereits")
-                argv = [a.replace("{out}", str(result_path)) for a in argv]
                 with (out / (cid + ".log")).open("wb") as log:
-                    subprocess.run(argv, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
-                                   check=True, timeout=job.get("timeout", 14400))
+                    for argv in steps:
+                        if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
+                            raise ValueError("argv muss eine nichtleere Textliste sein")
+                        argv = [a.replace("{out}", str(result_path)).replace("{dir}", str(out))
+                                .replace("{python}", sys.executable) for a in argv]
+                        with subprocess.Popen(argv, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT) as proc:
+                            deadline = time.monotonic() + job.get("timeout", 14400)
+                            try:
+                                while proc.poll() is None:
+                                    if time.monotonic() >= deadline:
+                                        raise subprocess.TimeoutExpired(argv, job.get("timeout", 14400))
+                                    known_workers.update(worker_processes(snapshot(), known=known_workers))
+                                    try:
+                                        proc.wait(timeout=2)
+                                    except subprocess.TimeoutExpired:
+                                        pass
+                            finally:
+                                if proc.poll() is None:
+                                    proc.kill()
+                                    proc.wait(timeout=10)
+                            if proc.returncode:
+                                raise subprocess.CalledProcessError(proc.returncode, argv)
                 evidence = read(result_path)
                 if evidence["modus"] != row["modus"] and row["modus"] != "unbekannt":
                     raise ValueError("Messmodus stimmt nicht überein")
                 row["ergebnis"] = result_path.name
+                if evidence["gate"] == "red":
+                    raise ValueError("Messbericht meldet rot")
                 if row["minimum_seconds"] is not None:
                     elapsed = evidence.get("elapsed_seconds")
                     if type(elapsed) not in (int, float) or elapsed < row["minimum_seconds"]:
                         raise ValueError("Soak-Dauer nicht belegt")
                 row["status"] = "messdatei_vorhanden"
-            except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
                 errors.append(cid + ": " + str(exc))
     finally:
         try:
             errors.extend(verify(before_hash, hashes(music) if music else {},
-                                 before_workers, worker_processes(snapshot()) if not dry else set()))
+                                 before_workers, worker_processes(snapshot(), known=known_workers) if not dry else set()))
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             errors.append("Nachkontrolle: " + str(exc))
         report(out / "suite.json", rows, errors, dry)
@@ -200,6 +231,8 @@ def main():
     if not args.dry_run and (not args.music_root or not args.plan):
         parser.error("Hardwarelauf benötigt --music-root und --plan")
     plan = json.loads(args.plan.read_text(encoding="utf-8")) if args.plan else {}
+    if not isinstance(plan, dict):
+        parser.error("Plan muss ein JSON-Objekt sein")
     if args.dry_run and args.music_root is None:
         with tempfile.TemporaryDirectory() as tmp:
             music = Path(tmp)
