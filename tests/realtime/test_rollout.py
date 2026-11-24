@@ -1,4 +1,6 @@
 """Rollout-Vertrag, ohne GPU, Netz oder Modellgewichte."""
+import os
+import tempfile
 import shutil
 import subprocess
 import unittest
@@ -42,3 +44,37 @@ class RolloutTest(unittest.TestCase):
         for worker in WORKERS:
             self.assertIn("workers/" + worker + "/install.ps1", result.stdout)
         self.assertIn("SIRENS_RT_ENABLED=0", result.stdout)
+
+    def test_removal_owned_only_if_powershell_available(self):
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if not shell:
+            self.skipTest("PowerShell nicht verfügbar")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            script = scripts / SCRIPT.name
+            shutil.copyfile(SCRIPT, script)
+            local = root / "local"
+            local.mkdir()
+            env = dict(os.environ, OS="Windows_NT", LOCALAPPDATA=str(local))
+            owned = root / ".venv-spike-rave"
+            owned.mkdir()
+            foreign = root / ".venv-spike-after"
+            foreign.mkdir()
+            (foreign / "keep.txt").write_text("Bestand", encoding="utf-8")
+            marker = owned / ".sirens-rt-rollout"
+            marker.write_text("rave", encoding="utf-8")
+            def run(*args):
+                return subprocess.run([shell, "-NoProfile", "-File", str(script), *args],
+                                      capture_output=True, text=True, timeout=30, env=env)
+            dry = run("-Worker", "rave", "-Entfernen", "-DryRun")
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            self.assertTrue(marker.is_file())
+            denied = run("-Worker", "after", "-Entfernen")
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertTrue((foreign / "keep.txt").is_file())
+            removed = run("-Worker", "rave", "-Entfernen")
+            self.assertEqual(removed.returncode, 0, removed.stderr)
+            self.assertFalse(owned.exists())
+            self.assertTrue((foreign / "keep.txt").is_file())
