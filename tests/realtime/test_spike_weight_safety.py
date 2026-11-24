@@ -26,3 +26,35 @@ class SpikeWeightSafetyTests(unittest.TestCase):
                                 self.assertNotEqual(
                                     getattr(keyword.value, "value", None), False
                                 )
+
+    def test_roformer_manifest_and_download(self):
+        import hashlib
+        import importlib
+        import io
+        import json
+        import tempfile
+        from unittest.mock import patch
+
+        installer = importlib.import_module("benchmarks.spikes.roformer-drumsep.install")
+        manifest = json.loads((SPIKES / "roformer-drumsep" / "weights.json").read_text(encoding="utf-8"))
+        for item in manifest["models"]:
+            self.assertTrue({"url", "filename", "size_bytes", "sha256", "license"} <= item.keys())
+        sample = dict(approved=True, filename="test.ckpt", size_bytes=3,
+                      sha256=hashlib.sha256(b"abc").hexdigest(), url="https://example.invalid")
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            with patch.object(installer.urllib.request, "urlopen", return_value=io.BytesIO(b"bad")):
+                with self.assertRaises(ValueError):
+                    installer.obtain_weight(sample, directory)
+            self.assertFalse(list(directory.iterdir()))
+            with patch.object(installer.urllib.request, "urlopen", return_value=io.BytesIO(b"abc")) as request:
+                path = installer.obtain_weight(sample, directory)
+                self.assertEqual(path.read_bytes(), b"abc")
+                self.assertEqual(installer.obtain_weight(sample, directory), path)
+                self.assertEqual(request.call_count, 1)
+            with patch.object(installer.urllib.request, "urlopen") as request:
+                with self.assertRaises(ValueError):
+                    installer.obtain_weight(manifest["models"][1], directory)
+                request.assert_not_called()
+                self.assertEqual(installer.main([]), 0)
+                request.assert_not_called()
