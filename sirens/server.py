@@ -132,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
             if pfad.startswith("/api/rt/v1/"):
                 from .realtime.routes import dispatch
-                return dispatch(self, pfad, self._body() if schreibend else None)
+                return dispatch(self, pfad, self._body() if schreibend and self.command != "PUT" else None)
             if schreibend:
                 self._schreiben(pfad, self._body())
             else:
