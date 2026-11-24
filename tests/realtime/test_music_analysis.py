@@ -79,3 +79,42 @@ class MusicAnalysis(unittest.TestCase):
                          [{"start_frame":4800,"end_frame":12000,"pitch":60,"amplitude":.8}])
         with self.assertRaises(Ablehnung):
             notes_to_frames([[0,1,128,.5]],48000)
+
+    def test_disabled_model(self):
+        import json
+        from sirens.realtime.music_analysis import BeatThisLiveStub
+        manifest_path = Path(__file__).resolve().parents[2]/"benchmarks"/"beatgrid"/"beat_this_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertFalse(manifest["available"])
+        self.assertIsNone(manifest["worker_entrypoint"])
+        adapter = BeatThisLiveStub()
+        self.assertIsNone(adapter.probe())
+        for call in (adapter.load, adapter.warmup, adapter.process, adapter.generate):
+            with self.assertRaises(Ablehnung):
+                call()
+        adapter.cancel()
+        adapter.unload()
+        self.assertFalse(adapter.health()["available"])
+
+    def test_reference_report(self):
+        import json
+        from unittest.mock import patch
+        from benchmarks.beatgrid.measure import measure
+        from benchmarks.result import read
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            audio = root/"source"
+            audio.write_bytes(b"synthetische Quelle")
+            local = root/"tracks.json"
+            local.write_text(json.dumps({"tracks":[{
+                "pfad":audio.name,"sha256":source_hash(audio),"genre":"Techno",
+                "lizenz":"synthetisch","bpm":120,
+                "beat_seconds":[.5,1,1.5,2],"downbeat_seconds":[0,2]}]}))
+            target = root/"result.json"
+            fake = {"confidence":.9,"grid":{"bpm":120,"beat0":0,"bar0":0,"confidence":.9}}
+            with patch("benchmarks.beatgrid.measure.analyse_file",return_value=fake):
+                data = measure(local,target)
+            self.assertEqual(data,read(target))
+            self.assertEqual(data["tracks"][0]["beat_seconds"]["max_ms"],0)
+            self.assertEqual(data["tracks"][0]["downbeat_seconds"]["max_ms"],0)
+            self.assertNotIn(str(root),target.read_text())
