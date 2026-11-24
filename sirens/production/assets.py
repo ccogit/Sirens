@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import hashlib
+import http.client
 import json
 import os
 import shutil
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 import re
 import wave
 from pathlib import Path
+from urllib.parse import urlencode
 
 
 class AssetError(ValueError):
@@ -124,8 +126,9 @@ class Worker:
     No network or GPU is used for PCM conversion.
     """
     def __init__(self, python, *, lease=None, model_dir=None, stable_cache=None,
-                 timeout=180, cancelled=lambda: False):
+                 timeout=180, cancelled=lambda: False, stable_python=None):
         self.python = Path(python).resolve(strict=True)
+        self.stable_python = Path(stable_python).resolve(strict=True) if stable_python else self.python
         self.lease = lease
         self.model_dir = model_dir
         self.stable_cache = stable_cache
@@ -143,7 +146,8 @@ class Worker:
         with tempfile.TemporaryDirectory() as tmp:
             job = Path(tmp) / "job.json"
             job.write_bytes(_json_bytes(payload))
-            with subprocess.Popen([str(self.python), str(self.script), str(job)],
+            interpreter = self.stable_python if payload["kind"] not in ("speech", "convert") else self.python
+            with subprocess.Popen([str(interpreter), str(self.script), str(job)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                   env=env, shell=False) as child:
                 try:
@@ -320,3 +324,156 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                      source=e.get("source"), error=e.get("error")) for e in entries]))
     _write_json(manifest_path, manifest)
     return manifest
+
+
+class LocalHTTP:
+    """Only direct loopback HTTP; no proxy, redirects, external hosts or retries."""
+    def __init__(self, port, timeout=15):
+        if type(port) is not int or not 1 <= port <= 65535:
+            raise ValueError("invalid local service port")
+        self.port, self.timeout = port, timeout
+
+    def request(self, method, path, body=None, *, binary=False):
+        if not path.startswith("/api/") or "\\r" in path or "\\n" in path:
+            raise AssetError("invalid local service route")
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.timeout)
+        try:
+            connection.request(method, path, None if body is None else _json_bytes(body),
+                               {"Content-Type": "application/json"})
+            response = connection.getresponse()
+            if response.status not in (200, 202):
+                raise AssetError("local service returned HTTP " + str(response.status))
+            limit = 64 * 1024 * 1024 if binary else 8 * 1024 * 1024
+            raw = response.read(limit + 1)
+            if len(raw) > limit:
+                raise AssetError("local service response exceeds limit")
+            return raw if binary else json.loads(raw)
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            if isinstance(exc, AssetError):
+                raise
+            raise AssetError("local service unavailable or response invalid; do not retry uncertain submission") from exc
+        finally:
+            connection.close()
+
+
+class SecondRoom:
+    """Thin transport over the existing WB-owned delivery ledger."""
+    revision = "8cd35755376b11ef753cb323576a824a366a2f1e"
+
+    def __init__(self, transport=None):
+        self.http = transport or LocalHTTP(8099)
+
+    def list(self, project_id):
+        return self.http.request("GET", "/api/projects/" + asset_id(project_id) + "/deliveries")
+
+    def job(self, job_id):
+        return self.http.request("GET", "/api/jobs/" + asset_id(job_id))
+
+    def status(self):
+        return self.http.request("GET", "/api/status")
+
+    def generate(self, project_id, *, kind, prompt, op_id, seconds, seed):
+        """Explicit submit only; the WB guard and GPU broker remain authoritative."""
+        if kind not in ("texture", "loop"):
+            raise AssetError("SecondRoom supports texture/loop, not Foley or speech")
+        if self.status().get("safe_to_generate") is not True:
+            raise AssetError("SecondRoom live/GPU guard not clear")
+        return self.http.request("POST", "/api/generate",
+                                 dict(project_id=asset_id(project_id), kind=kind,
+                                      prompt=prompt, op_id=asset_id(op_id), seconds=seconds,
+                                      seeds=[seed], model="turbo"))
+
+    def await_job(self, job_id, *, timeout=180, cancelled=lambda: False):
+        deadline = time.monotonic() + timeout
+        while True:
+            if cancelled():
+                raise Cancelled("poll cancelled; upstream job may still be active")
+            result = self.job(job_id)
+            if result["status"] == "succeeded":
+                return result
+            if result["status"] not in ("queued", "running"):
+                raise AssetError("SecondRoom job did not succeed; inspect existing job, no resubmit")
+            if time.monotonic() >= deadline:
+                raise AssetError("SecondRoom polling timed out; upstream job may still be active")
+            time.sleep(.25)
+
+    def used(self, project_id, *, delivery_ids=(), sample_ids=()):
+        """Call only after actual placement, not on discovery or failed runs."""
+        return self.http.request("POST", "/api/used",
+                                 dict(project_id=asset_id(project_id),
+                                      delivery_ids=[asset_id(i) for i in delivery_ids],
+                                      sample_ids=[asset_id(i) for i in sample_ids]))
+
+
+class AMMSamples:
+    """Use the existing Sample-DB query and immutable CAS audio route."""
+    revision = "26c5ce2fe9641ed958414f78d58643527bc3032f"
+
+    def __init__(self, transport=None):
+        self.http = transport or LocalHTTP(8000)
+
+    def search(self, text, *, commercial=False, pack=None):
+        params = {"q": text, "limit": 30, "commercial_safe": str(commercial).lower()}
+        if pack:
+            params["pack"] = pack
+        return self.http.request("GET", "/api/samples?" + urlencode(params))
+
+    def signature_kits(self):
+        return self.http.request("GET", "/api/factory/signature-kits")
+
+    def selected(self, sample_id, scratch, *, commercial=False):
+        """Import one coordinator-selected sample only; no auto harvest."""
+        identifier = asset_id(sample_id)
+        row = self.http.request("GET", "/api/samples/" + identifier)
+        licence = row.get("license") or {}
+        licence_id = licence.get("id")
+        if (row.get("id") != identifier or row.get("status") != "active" or
+                row.get("quality_tier") not in ("A", "B") or
+                (row.get("rating") or {}).get("rejected") or
+                not licence_id or licence_id.lower() == "unknown"):
+            raise AssetError("AMM sample is not active/approved")
+        if licence.get("attribution_required") and not row.get("attribution"):
+            raise AssetError("AMM sample requires missing attribution")
+        source = dict(backend="amm-sampledb", revision=self.revision,
+                      sample_id=identifier, license=licence_id,
+                      license_confirmed=True, commercial_ok=licence.get("commercial_ok") is True,
+                      use="commercial" if commercial else "production",
+                      attribution=row.get("attribution"), pack=row.get("pack"),
+                      origin=row.get("origin"))
+        approved_source(source, commercial=commercial)
+        # This is existing local CAS content, not a web download or a reference extraction.
+        from .contracts import safe_path
+        output = safe_path(scratch, identifier + ".wav")
+        data = self.http.request("GET", "/api/samples/" + identifier + "/audio", binary=True)
+        if output.exists():
+            if output.read_bytes() != data:
+                raise AssetError("AMM immutable CAS response changed")
+        else:
+            with output.open("xb") as f:
+                f.write(data)
+        return Candidate(output, source, {"bpm": row.get("bpm"), "key": row.get("musical_key")})
+
+
+def selected_delivery(secondroom, project_id, delivery_id, host_root, *, commercial=False):
+    """Resolve an existing verified SecondRoom delivery under a configured local root."""
+    delivery_id = asset_id(delivery_id)
+    row = next((r for r in secondroom.list(project_id) if r.get("id") == delivery_id), None)
+    if not row or row.get("fits") is not True or row.get("path_exists") is not True:
+        raise AssetError("SecondRoom delivery is not verified")
+    if row.get("job_id") and secondroom.job(row["job_id"]).get("status") != "succeeded":
+        raise AssetError("SecondRoom job not succeeded")
+    if not row.get("host_path") or not row.get("license"):
+        raise AssetError("SecondRoom delivery missing host or licence evidence")
+    root = Path(host_root).resolve(strict=True)
+    path = Path(row["host_path"])
+    if not path.is_absolute() or not path.is_relative_to(root):
+        raise AssetError("SecondRoom host path not mapped to approved root")
+    source = dict(backend="secondroom", revision=secondroom.revision,
+                  delivery_id=delivery_id, job_id=row.get("job_id"),
+                  license=row["license"], license_confirmed=True,
+                  commercial_ok=row.get("commercial_ok") is True,
+                  use="commercial" if commercial else "production",
+                  attribution=row.get("attribution"))
+    approved_source(source, commercial=commercial)
+    return local_candidate(root, path.relative_to(root).as_posix(), source,
+                           {"bpm": row.get("bpm"), "key": row.get("musical_key")})
