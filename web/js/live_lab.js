@@ -7,7 +7,7 @@ import { spielAnhalten, spielwiese } from "./spielwiese.js";
 import { autoDjAnsicht } from "./auto_dj.js";
 import { kickTausch } from "./kicktausch.js";
 import { stemSpiel } from "./stems.js";
-import { labWerkzeugNavigation, labWerkzeugWahl } from "./lab_library.js";
+import { labWerkzeugNavigation, labWerkzeugWahl, labWerkzeugAktivieren } from "./lab_library.js";
 
 function minuten(t) {
   if (!Number.isFinite(t)) return "0:00";
@@ -204,21 +204,15 @@ export function liveLabAnsicht(el) {
       panel: stems.el, anhalten: () => stems.pausieren(), beenden: () => stems.beenden() },
   ];
   for (const tool of werkzeuge) {
-    if (tool.id !== "pult") tool.panel = h("div", { class: "lab-toy" }, tool.panel);
+    if (!tool.panel.classList.contains("lab-toy")) tool.panel = h("div", { class: "lab-toy" }, tool.panel);
     tool.panel.id = "lab-panel-" + tool.id;
     tool.panel.hidden = true;
   }
   let spielzeug;
   const navigation = labWerkzeugNavigation(werkzeuge, waehlen);
   function waehlen(key) {
-    if (spielzeug !== key) {
-      for (const tool of werkzeuge) {
-        tool.panel.hidden = tool.id !== key;
-        if (tool.id !== key) tool.anhalten?.();
-      }
-      werkzeuge.find((tool) => tool.id === key)?.aktivieren?.();
-      spielzeug = key;
-    }
+    labWerkzeugAktivieren(werkzeuge, key, spielzeug);
+    spielzeug = key;
     try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
     navigation.anzeigen(key);
   }
