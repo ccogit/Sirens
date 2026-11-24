@@ -70,28 +70,52 @@ def stable(request, output):
         adapter.unload()
 
 
-def speech(request, output, model_dir):
+def load_speech_model(model_dir):
     import torch
     from qwen_tts import Qwen3TTSModel
+
     model_dir = Path(model_dir).resolve(strict=True)
-    if not (model_dir / "config.json").is_file():
+    config = model_dir / "config.json"
+    if not config.is_file():
         raise ValueError("Qwen3-TTS local model missing")
-    text = request["text"]
-    if not isinstance(text, str) or not text.strip():
-        raise ValueError("empty text")
-    torch.manual_seed(request["seed"])
-    torch.cuda.manual_seed_all(request["seed"])
-    model = Qwen3TTSModel.from_pretrained(
+    if json.loads(config.read_text(encoding="utf-8")).get("tts_model_type") != "voice_design":
+        raise ValueError("Qwen3-TTS requires a VoiceDesign model")
+    return Qwen3TTSModel.from_pretrained(
         str(model_dir), device_map="cuda:0", dtype=torch.bfloat16,
         attn_implementation="sdpa", local_files_only=True)
-    # Preset speaker only: no arbitrary reference audio or voice cloning.
-    wavs, rate = model.generate_custom_voice(
-        text=text, language="English", speaker="Ryan",
-        instruct="Calm, intimate, close-miked male spoken word. Speak naturally, "
-                 "with gentle pauses at punctuation. No singing. Do not add words.")
+
+
+def speech(request, output, model):
+    import torch
+
+    text, prompt = request["text"], request["prompt"]
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("empty text")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("empty VoiceDesign prompt")
+    language = request.get("language", "English")
+    if not isinstance(language, str) or not language.strip():
+        raise ValueError("invalid speech language")
+    torch.manual_seed(request["seed"])
+    torch.cuda.manual_seed_all(request["seed"])
+    # Voice description only; no reference audio or voice cloning.
+    wavs, rate = model.generate_voice_design(
+        text=text, instruct=prompt, language=language)
     if len(wavs) != 1:
         raise ValueError("one spoken cue expected")
     write_wav(output, wavs[0], int(rate))
+
+
+def speech_batch(jobs, model_dir):
+    """Load one local model for all uncached cues in this run."""
+    if not jobs:
+        return
+    model = load_speech_model(model_dir)
+    for job in jobs:
+        output = Path(job["output"])
+        if not output.is_absolute() or not output.parent.is_dir():
+            raise ValueError("output path")
+        speech(job["request"], output, model)
 
 
 def main():
@@ -106,7 +130,9 @@ def main():
         samples, rate = sf.read(job["input"], dtype="float32", always_2d=True)
         write_wav(output, samples, rate)
     elif job["kind"] == "speech":
-        speech(job["request"], output, job["model_dir"])
+        speech_batch([job], job["model_dir"])
+    elif job["kind"] == "speech_batch":
+        speech_batch(job["jobs"], job["model_dir"])
     elif job["kind"] in ("texture", "foley", "loop", "fill"):
         stable(job["request"], output)
     else:

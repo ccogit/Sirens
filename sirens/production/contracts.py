@@ -9,7 +9,6 @@ import hashlib
 import json
 import math
 import re
-import wave
 from fractions import Fraction
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
@@ -236,23 +235,108 @@ def validate_plan(value, *, automation_ranges=None):
     return value
 
 
+class _PCMReader:
+    """Bounded little-endian RIFF PCM reader, including extensible PCM."""
+    def __init__(self, file):
+        import struct
+
+        self.file = file
+        file.seek(0, 2)
+        size = file.tell()
+        file.seek(0)
+        header = file.read(12)
+        _require(len(header) == 12 and header[:4] == b"RIFF" and
+                 header[8:] == b"WAVE", "invalid RIFF/WAVE header")
+        end = 8 + struct.unpack_from("<I", header, 4)[0]
+        _require(12 <= end <= size, "truncated RIFF/WAVE")
+        fmt = data = None
+        while file.tell() < end:
+            _require(end - file.tell() >= 8, "truncated WAV chunk header")
+            chunk, length = struct.unpack("<4sI", file.read(8))
+            offset = file.tell()
+            stop = offset + length
+            _require(stop <= end, "truncated WAV chunk")
+            if chunk == b"fmt ":
+                _require(fmt is None and length >= 16, "invalid WAV fmt chunk")
+                raw = file.read(min(length, 40))
+                tag, channels, rate, byte_rate, align, bits = struct.unpack_from("<HHIIHH", raw)
+                if tag == 0xfffe:
+                    _require(length >= 40, "truncated extensible WAV format")
+                    extension, valid_bits = struct.unpack_from("<HH", raw, 16)
+                    _require(extension >= 22 and 18 + extension <= length,
+                             "invalid extensible WAV format")
+                    _require(raw[24:40] == bytes.fromhex("0100000000001000800000aa00389b71"),
+                             "WAV subformat must be integer PCM (not float)")
+                    _require(valid_bits == bits, "WAV valid bits differ from container bits")
+                else:
+                    _require(tag == 1, "WAV format must be integer PCM (not float)")
+                _require(channels > 0 and rate > 0 and bits > 0 and bits % 8 == 0 and
+                         align == channels * (bits // 8) and byte_rate == rate * align,
+                         "invalid WAV PCM geometry")
+                fmt = channels, rate, bits // 8, align
+            elif chunk == b"data":
+                _require(data is None, "duplicate WAV data chunk")
+                data = offset, length
+            # Legacy wave writers may omit padding for the final odd data chunk.
+            if length & 1 and stop == end:
+                _require(chunk == b"data", "missing WAV chunk padding")
+            else:
+                stop += length & 1
+                _require(stop <= end, "missing WAV chunk padding")
+            file.seek(stop)
+        _require(fmt is not None and data is not None, "missing WAV fmt/data chunk")
+        self.channels, self.rate, self.width, self.align = fmt
+        offset, self.remaining = data
+        _require(self.remaining % self.align == 0, "partial WAV frame")
+        self.frames = self.remaining // self.align
+        file.seek(offset)
+
+    def getnchannels(self):
+        return self.channels
+
+    def getframerate(self):
+        return self.rate
+
+    def getsampwidth(self):
+        return self.width
+
+    def getnframes(self):
+        return self.frames
+
+    def readframes(self, count):
+        length = min(count * self.align, self.remaining)
+        raw = self.file.read(length)
+        _require(len(raw) == length, "truncated WAV data")
+        self.remaining -= length
+        return raw
+
+
+def open_pcm_wav(path):
+    """Return a context manager exposing the PCM metadata and frame reader."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def opened():
+        try:
+            with open(path, "rb") as file:
+                yield _PCMReader(file)
+        except (OSError, EOFError) as exc:
+            raise ContractError(str(exc)) from exc
+
+    return opened()
+
+
 def validate_wav(path, *, channels=None, frames=None):
-    try:
-        with wave.open(str(path), "rb") as wav:
-            _require(wav.getframerate() == SAMPLE_RATE and wav.getsampwidth() == 3, "WAV must be 48 kHz PCM24")
-            _require(wav.getnchannels() in (1, 2), "WAV channels")
-            _require(wav.getnframes() > 0, "empty WAV")
-            if channels is not None:
-                _require(wav.getnchannels() == channels, "WAV channel mismatch")
-            if frames is not None:
-                _require(wav.getnframes() == frames, "WAV frame mismatch")
-            remaining = wav.getnframes()
-            while remaining:
-                count = min(remaining, 65536)
-                _require(len(wav.readframes(count)) == count * wav.getnchannels() * 3, "truncated WAV")
-                remaining -= count
-    except (OSError, EOFError, wave.Error) as exc:
-        raise ContractError(str(exc)) from exc
+    with open_pcm_wav(path) as wav:
+        _require(wav.getframerate() == SAMPLE_RATE and wav.getsampwidth() == 3, "WAV must be 48 kHz PCM24")
+        _require(wav.getnchannels() in (1, 2), "WAV channels")
+        _require(wav.getnframes() > 0, "empty WAV")
+        if channels is not None:
+            _require(wav.getnchannels() == channels, "WAV channel mismatch")
+        if frames is not None:
+            _require(wav.getnframes() == frames, "WAV frame mismatch")
+        while wav.readframes(65536):
+            pass
 
 
 def _audio(item, root, frames):

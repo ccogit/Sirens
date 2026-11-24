@@ -125,20 +125,62 @@ class WBWorker:
     """
     name = "amm_wb_vst3"
 
-    def __init__(self, python, amm_backend, revision):
-        self.python = str(Path(python).resolve(strict=True))
-        self.amm_backend = str(Path(amm_backend).resolve(strict=True))
+    def __init__(self, python, amm_backend, revision, *, wb_data_dir=None):
+        if not Path(python).is_file():
+            raise ValueError("Instrument host missing; set instrument_python to the installed worker interpreter.")
+        if not Path(amm_backend).is_dir():
+            raise ValueError("AMM backend missing; set amm_backend to the local WB backend directory.")
+        self.python = str(Path(python).resolve())
+        self.amm_backend = str(Path(amm_backend).resolve())
+        if wb_data_dir is None:
+            # Keep the existing integration call signature and reuse its trusted
+            # SIRENS_PRODUCTION_CONFIG reader (including .env support).
+            from .integration import settings
+            wb_data_dir = settings().get("wb_data_dir")
+        self.wb_data_dir = None
+        if wb_data_dir is not None:
+            if not isinstance(wb_data_dir, (str, os.PathLike)) or not Path(wb_data_dir).is_dir():
+                raise ValueError("WB data directory missing; set wb_data_dir to an existing local directory.")
+            self.wb_data_dir = str(Path(wb_data_dir).resolve())
         if not revision:
             raise ValueError("Explicit AMM/host revision required")
         self.revision = revision
 
+    def prepare(self, request):
+        # Check explicit file bindings before a cache hit as well as a render.
+        # Paths are operator configuration, not song-plan inputs.
+        instrument = request["patch"]["instrument"]
+        plugin = instrument.get("plugin")
+        if not isinstance(plugin, str) or not plugin:
+            raise ValueError("Plugin missing; set instrument.plugin in the local patch.")
+        explicit = Path(plugin.partition("#")[0])
+        if explicit.is_absolute() and not explicit.exists():
+            raise ValueError("Plugin missing; set instrument.plugin to an existing VST3.")
+        preset = instrument.get("preset_file")
+        if preset is not None:
+            if (not isinstance(preset, dict) or not isinstance(preset.get("path"), str)
+                    or not Path(preset["path"]).is_absolute()
+                    or not Path(preset["path"]).is_file()
+                    or digest(preset["path"]) != preset.get("sha256")):
+                raise ValueError("Preset missing or hash mismatch; update instrument.preset_file with its verified path and sha256.")
+        request["wb_data_dir"] = self.wb_data_dir or os.environ.get("WORKBENCH_DATA_DIR", "/data")
+        request["host_adapter"] = "amm-pedalboard-v2"
+
     def render(self, request, output):
         script = Path(__file__).resolve().parents[2] / "workers/production_instruments/render.py"
         payload = dict(request, amm_backend=self.amm_backend, output=str(output.resolve()))
-        result = subprocess.run([self.python, str(script)], input=json.dumps(payload),
-                                text=True, capture_output=True, timeout=600, check=False)
+        env = os.environ.copy()
+        if self.wb_data_dir is not None:
+            env["WORKBENCH_DATA_DIR"] = self.wb_data_dir
+        env["PYTHONIOENCODING"] = "utf-8"
+        try:
+            result = subprocess.run([self.python, str(script)], input=json.dumps(payload),
+                                    encoding="utf-8", capture_output=True, env=env,
+                                    timeout=600, check=False)
+        except OSError as exc:
+            raise RuntimeError("Instrument host unavailable; set instrument_python to the installed worker interpreter.") from exc
         if result.returncode:
-            raise RuntimeError("WB worker failed: " + result.stderr[-2000:])
+            raise RuntimeError("WB worker failed: " + result.stderr[-2000:].strip())
 
 
 def _patch(patches, track):
@@ -150,8 +192,8 @@ def _patch(patches, track):
             raise ValueError("Missing patch metadata: " + field)
     if patch["instrument"].get("type") != "vst3":
         raise ValueError("Only verified WB VST3 instrument bindings are supported")
-    if not patch["instrument"].get("preset") and not patch["instrument"].get("state"):
-        raise ValueError("Explicit preset or state required")
+    if not any(patch["instrument"].get(k) for k in ("preset", "preset_file", "state")):
+        raise ValueError("Preset missing; configure a verified preset_file or state in the local patch.")
     return patch
 
 
@@ -195,6 +237,8 @@ def render_stems(plan, asset_manifest, run_dir, *, patches, backend=None, cache_
                 patch = _patch(patches, track)
                 request = {"track": track, "patch": patch, "bpm": plan["bpm"],
                            "frames": frames, "seed": plan["seed"], "sample_rate": SAMPLE_RATE}
+                if isinstance(backend, WBWorker):
+                    backend.prepare(request)
                 key = stage_cache_key("instrument", request, backend.name, backend.revision, plan["seed"])
                 hit = False
                 if cache is not None:
