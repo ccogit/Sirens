@@ -113,8 +113,11 @@ class Runner:
                 validate_wav(safe_path(root, name), frames=expected_frames(plan))
             manifest("mix_report", mix, validate_mix_report)
             checkpoint("report", 0.8)
-            manifest("report", self.backend.report(brief, plan, assets, stems, mix, root, cancelled),
-                     validate_report)
+            report = manifest("report", self.backend.report(brief, plan, assets, stems, mix, root, cancelled),
+                              validate_report)
+            if (getattr(self.backend, "require_technical_pass", False) is True
+                    and report["technical"].get("errors")):
+                raise ContractError("Inspect technical errors in report.json")
             cancelled()
             self.store.status(run_id, "succeeded", "complete", 1)
         except Cancelled:
