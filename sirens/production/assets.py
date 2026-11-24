@@ -11,7 +11,6 @@ import tempfile
 import time
 from dataclasses import dataclass
 import re
-import wave
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -22,9 +21,9 @@ class AssetError(ValueError):
 
 def inspect_wav(path, *, duration_seconds=None, loop=False, speech=False):
     """Inspect PCM24, report technical measurements, never infer musical quality."""
-    from .contracts import validate_wav, sha256_file
+    from .contracts import validate_wav, sha256_file, open_pcm_wav
     validate_wav(path)
-    with wave.open(str(path), "rb") as wav:
+    with open_pcm_wav(path) as wav:
         channels, frames = wav.getnchannels(), wav.getnframes()
         rate = wav.getframerate()
         peak = energy = clips = 0
@@ -315,7 +314,7 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                         try:
                             inspect_wav(candidate.path)
                             shutil.copyfile(candidate.path, pending)
-                        except (ValueError, OSError, wave.Error):
+                        except (ValueError, OSError):
                             if worker is None:
                                 raise AssetError("source needs local WAV conversion")
                             worker.convert(candidate.path, pending)
@@ -348,7 +347,7 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
             entries.append(dict(id=identifier, kind=request["kind"],
                                 file="assets/" + target.name, source=source,
                                 cache_hit=cache_hit, **info))
-        except (AssetError, ValueError, OSError, KeyError, TypeError, wave.Error) as exc:
+        except (AssetError, ValueError, OSError, KeyError, TypeError) as exc:
             # Do not leak absolute paths, local user text or service responses in errors.
             target.unlink(missing_ok=True)
             entries.append(dict(id=identifier, kind=request["kind"],
