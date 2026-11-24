@@ -16,7 +16,7 @@ def db(value):
 def run(exe, args):
     result = subprocess.run([exe, "-hide_banner", "-nostdin", "-nostats",
                              "-threads", "1", *map(str, args)],
-                            capture_output=True, text=True, timeout=600)
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
     if result.returncode:
         raise RuntimeError("ffmpeg failed: " + result.stderr[-2000:])
     return result.stderr
