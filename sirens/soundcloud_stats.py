@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
+import urllib.request
 
 from .config import load
 from .migrate_music_db import MusicmakerPfade
@@ -21,14 +22,17 @@ def zugang(upload_skript):
         return modul.get_access_token(modul.load_env())
 
 
-def abrufen(upload_skript, profil):
-    import requests
+def _json_holen(url, kopf, timeout):
+    """GET mit der Standardbibliothek; HTTP-Fehler werfen wie raise_for_status."""
+    anfrage = urllib.request.Request(url, headers={**kopf, "Accept": "application/json"})
+    with urllib.request.urlopen(anfrage, timeout=timeout) as antwort:
+        return json.loads(antwort.read().decode("utf-8"))
 
+
+def abrufen(upload_skript, profil):
     kopf = {"Authorization": "OAuth " + zugang(upload_skript)}
     basis = "https://api.soundcloud.com"
-    konto = requests.get(basis + "/me", headers=kopf, timeout=25)
-    konto.raise_for_status()
-    if konto.json().get("permalink") != profil:
+    if _json_holen(basis + "/me", kopf, 25).get("permalink") != profil:
         raise RuntimeError("Angemeldetes SoundCloud-Konto stimmt nicht mit dem gewünschten Profil überein.")
     url = basis + "/me/tracks?linked_partitioning=true&limit=200"
     gesehen = set()
@@ -38,9 +42,7 @@ def abrufen(upload_skript, profil):
         if quelle.scheme != "https" or quelle.netloc != "api.soundcloud.com" or url in gesehen:
             raise RuntimeError("Ungültige SoundCloud-Paginierung.")
         gesehen.add(url)
-        antwort = requests.get(url, headers=kopf, timeout=35)
-        antwort.raise_for_status()
-        seite = antwort.json()
+        seite = _json_holen(url, kopf, 35)
         verfuegbare.extend(seite["collection"])
         url = seite.get("next_href")
     auswahl = {}
