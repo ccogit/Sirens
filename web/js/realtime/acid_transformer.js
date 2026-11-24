@@ -1,4 +1,4 @@
-import {makeTrack,finite,frame,normalize,gridFor,applyRack,clamp} from "./drum_architect.js";
+import {makeTrack,finite,frame,normalize,gridFor,applyRack} from "./drum_architect.js";
 export const acidDefaults=Object.freeze({gain:.5,cutoff:900,resonance:3,drive:1,octave:0,accent:.75,slide:.06,hideBass:false,quantize:0,rack:"neutral",onsetMidi:36});
 export function acidPreset(p={}){
   const x={...acidDefaults,...p};
@@ -12,8 +12,8 @@ export function acidTransformer({rate,length,bass,notes=[],onsets=[],grid,preset
   if(bass&&!p.hideBass)out.set(bass);
   if(!notes.length&&onsets.length)warnings.push("Nur Onsets – Tonhöhe ist vorgegeben, nicht erkannt");
   // Noten aus Stem Studio: [Startsekunden, Endsekunden, MIDI, Velocity].
-  const raw=notes.length?notes.map(n=>({frame:Math.round(n[0]*rate),end:Math.round(n[1]*rate),midi:n[2],velocity:n[3]})):
-    onsets.map(n=>({frame:n.frame,end:n.frame+Math.round(rate*.15),midi:n.midi??p.onsetMidi,velocity:n.velocity??.7}));
+  const raw=notes.length?notes.map(n=>Array.isArray(n)?({frame:Math.round(n[0]*rate),end:Math.round(n[1]*rate),midi:n[2],velocity:n[3]}):({frame:n.start_frame,end:n.end_frame,midi:n.pitch,velocity:n.amplitude})):
+    onsets.map(n=>typeof n==="number"?({frame:n,end:n+Math.round(rate*.15),midi:p.onsetMidi,velocity:.7}):({frame:n.frame,end:n.frame+Math.round(rate*.15),midi:n.midi??p.onsetMidi,velocity:n.velocity??.7}));
   const events=raw.map(n=>{
     const f=frame(n.frame),end=frame(n.end);if(end<=f)throw new RangeError("Notenlänge");
     const start=g?g.quantize(f,p.quantize):f;

@@ -11,7 +11,7 @@ export function frame(x) {
   if(!Number.isSafeInteger(x)||x<0) throw new RangeError("Frame");
   return x;
 }
-export function rateCheck(rate) { return finite(rate,8000,192000,"Samplerate"); }
+export function rateCheck(rate) { if(!Number.isSafeInteger(rate))throw new RangeError("Samplerate");return finite(rate,8000,192000,"Samplerate"); }
 export function makeTrack(length,rate) {
   frame(length); rateCheck(rate);
   if(length>rate*600) throw new RangeError("Maximal 10 Minuten je Render");
@@ -73,7 +73,7 @@ export function drumArchitect({rate,length,stems={},onsets=[],grid,preset={}}){
   if(available.length!==3)warnings.push("Einzelschlagzeugspuren fehlen – nur vorhandene Spuren; Demucs drums wird nicht ersetzt");
   for(const [kind,track] of Object.entries(stems)){
     if(!(track instanceof Float32Array)||track.length!==length)throw new RangeError("Stem-Länge");
-    if(p.mode==="replace"&&available.includes(kind)&&onsets.some(e=>e.kind===kind))continue;
+    if(p.mode==="replace"&&available.includes(kind)&&onsets.some(e=>e.kind===kind&&e.frame<length))continue;
     for(let i=0;i<length;i++)out[i]+=track[i];
   }
   const events=[];
@@ -82,6 +82,7 @@ export function drumArchitect({rate,length,stems={},onsets=[],grid,preset={}}){
     const c=p.corrections.find(c=>c.index===index);
     const original=frame(c?.frame??e.frame),velocity=finite(c?.velocity??e.velocity,0,1,"Velocity");
     const start=c||!g?original:g.quantize(original,p.quantize);
+    if(start>=length)continue;
     const event={kind:e.kind,frame:start,velocity};events.push(event);
     const duration=Math.round(rate*(e.kind==="cymbal"?.12:.09));
     let seed=(start+1)>>>0;
