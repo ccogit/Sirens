@@ -130,6 +130,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise Ablehnung("forbidden_host", "Diese Adresse ist nicht erlaubt.", status=403)
             teile = urlsplit(self.path)
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
+            if pfad.startswith("/api/rt/v1/"):
+                from .realtime.routes import dispatch
+                return dispatch(self, pfad, self._body() if schreibend else None)
             if schreibend:
                 self._schreiben(pfad, self._body())
             else:
