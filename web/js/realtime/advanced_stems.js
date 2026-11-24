@@ -170,7 +170,7 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
     const status = doc.createElement("p"); status.setAttribute("role", "status");
     const preview = doc.createElement("audio"); preview.controls = true;
     const mixer = doc.createElement("div");
-    let active = true, running = false, current = null, timer = null, unmount = null, url = null;
+    let active = true, running = false, current = null, timer = null, unmount = null, url = null, starting = null;
     const clearMix = () => {
         if (unmount) unmount();
         unmount = null; preview.pause(); preview.removeAttribute("src");
@@ -241,25 +241,29 @@ export function mountSeparationJobs(host, {selectedPath, onMix, onExport,
         } catch (e) { error(e); }
         finally { if (job.id === current) { current = null; idle(); } }
     };
-    const start = button("Offline trennen", async () => {
+    const start = button("Offline trennen", () => {
         if (!active || running || !canStart(model.value)) return;
         const path = selectedPath?.();
         if (!path || path === "fixture") { status.textContent = "Zuerst einen Song auswählen"; return; }
         clearMix(); running = true; start.disabled = true; status.textContent = "Job wird angelegt";
+        starting = (async () => {
         try {
             const job = await api.start(path, model.value);
             if (!validId(job.id)) throw new Error("Ungültige Job-ID");
             if (!active) { await api.cancel(job.id); return; }
             current = job.id; cancel.disabled = false; await show(job);
         } catch (e) { error(e); if (active) idle(); }
+        })();
+        return starting;
     });
     const cancel = button("Abbrechen", cancelJob); cancel.disabled = true;
     model.addEventListener("change", paint);
     panel.append(heading, note, model, start, cancel, status, ...(onMix ? [] : [preview]), mixer); host.append(panel);
     paint();
-    const destroy = () => {
+    const destroy = async () => {
         active = false; clearTimeout(timer); clearMix(); panel.remove();
-        if (current) return cancelJob();
+        try { if (current) await cancelJob(); }
+        finally { await starting; }
     };
     destroy.paint = paint;
     return destroy;
