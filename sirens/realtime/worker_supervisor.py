@@ -401,6 +401,7 @@ class WorkerSupervisor:
                 for root in (self.music_root, self.realtime_dir / "cache"))
                 or self.realtime_dir == self.music_root or self.music_root in self.realtime_dir.parents
                 or out_dir != expected or out_dir.resolve() != expected
+                or jobs == self.music_root or self.music_root in jobs.parents
                 or jobs.resolve() != jobs or out_dir.exists() or out_dir.is_symlink()
                 or published.exists() or published.is_symlink()):
             raise invalid("path")
