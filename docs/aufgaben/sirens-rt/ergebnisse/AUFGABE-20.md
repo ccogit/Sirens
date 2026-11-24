@@ -4,7 +4,7 @@
 
 | Punkt | Beleg / Status |
 |---|---|
-| 1 | scripts/rt-install.ps1: DryRun vor Programmausführung, ausdrücklicher Schalter und Zustimmung, feste Zielordner mit Markierung, ReparsePoint-Schutz. tests/realtime/test_rollout.py prüft Textvertrag und bei vorhandenem PowerShell DryRun. Windows-Löschtest noch offen. |
+| 1 | scripts/rt-install.ps1: DryRun vor Programmausführung, ausdrücklicher Schalter und Zustimmung, feste Zielordner mit Markierung, ReparsePoint-Schutz. tests/realtime/test_rollout.py prüft Textvertrag und bei vorhandenem PowerShell DryRun. Zusätzlich temporärer Besitztest (DryRun erhält Markierung, unmarkierter Ordner bleibt erhalten, markierter Ordner wird entfernt). Native Windows-Prüfung noch offen. |
 | 2 | Produktcode unverändert; vorhandene Legacy-Tests und test_integration_26.py (Flag, CUDA-Sperre) laufen in PR-CI. Manueller Bestandsstart ohne Worker nicht gemessen. |
 | 3 | benchmarks/rollout.py und docs/realtime/runbook.md: reproduzierbarer Aufruf, Exitcode/Baseline und validiertes Benchmark-Format, Messwerte null. Frische Zielinstallation nicht gemessen. G4 nicht gemessen (Koordinator). |
 | 4 | Zwischenstand 33d419b8: PR-CI Run 45486937159 erfolgreich. Endstand bei Niederschrift nicht bestätigt. Board unverändert gemäß KETTEN.md. |
@@ -41,7 +41,7 @@ Nur WP20-Commits revertieren.
 
 ## Übergabe
 
-**Fertig:** Rollout-Einstieg, CPU-Textvertrag und bedingter DryRun-Test,
+**Fertig:** Rollout-Einstieg, CPU-Textvertrag und bedingter DryRun-/Besitztest,
 Installationsbericht, Handbuch mit G1-Belegen, Lizenzmatrix, Runbook,
 Changelog; ein Draft-PR #53, Zwischenstand-CI grün.
 
