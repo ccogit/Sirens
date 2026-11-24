@@ -1,13 +1,13 @@
 // Nur synthetische Fixtures. Ausgabe ausschließlich in einem neuen Verzeichnis außerhalb des Repos.
 import {mkdir,writeFile,realpath} from "node:fs/promises";
-import {resolve,dirname,relative,isAbsolute} from "node:path";
+import {resolve,dirname,relative,isAbsolute,sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {demos,rate} from "../../tests/realtime/performance_fixtures.mjs";
 const root=await realpath(fileURLToPath(new URL("../../",import.meta.url)));
 if(process.argv.length!==3)throw new Error("Aufruf: node benchmarks/performance/render.mjs <neues externes Verzeichnis>");
 const requested=resolve(process.argv[2]),parent=await realpath(dirname(requested)),dest=resolve(parent,requested.split(/[\\/]/).at(-1));
 const rel=relative(root,dest);
-if(rel===""||(!rel.startsWith("..")&&!isAbsolute(rel)))throw new Error("Ausgabe muss außerhalb des Repositories liegen");
+if(rel===""||(!(rel===".."||rel.startsWith(".."+sep))&&!isAbsolute(rel)))throw new Error("Ausgabe muss außerhalb des Repositories liegen");
 await mkdir(dest);
 const results=[];
 for(const [name,render] of Object.entries(demos)){
