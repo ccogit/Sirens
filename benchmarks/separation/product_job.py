@@ -7,7 +7,6 @@ import shutil
 import time
 from pathlib import Path
 from urllib.request import Request, build_opener, ProxyHandler
-from urllib.error import HTTPError
 
 from benchmarks.baseline import collect
 from benchmarks.result import METRICS, write
@@ -51,6 +50,8 @@ def main():
             job = get_json("jobs/" + jid)
             print(f"{job['state']}: {job['progress']:.0%}", flush=True)
         elapsed = time.monotonic() - start
+        if job["state"] == "ready":
+            job = get_json("separation/jobs/" + jid)
         if job["state"] != "ready" or job["model"] != "roformer":
             raise RuntimeError("Kein RoFormer-Ergebnis: " + json.dumps(job))
         out.mkdir()
