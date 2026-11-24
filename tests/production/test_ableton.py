@@ -131,6 +131,8 @@ class AbletonExchangeTests(unittest.TestCase):
         self.assertTrue(result["duration_changed"])
         self.assertFalse(result["mastering_required"])
         self.assertFalse(result["published"])
+        self.assertEqual(json.loads((inbox / "return.json").read_text())["master_sha256"], master)
+        self.assertEqual(json.loads((self.runs / "revision1/status.json").read_text())["status"], "queued")
         self.assertEqual((self.runs / "revision1/master.wav").read_bytes(),
                          (inbox / "master.wav").read_bytes())
         self.assertEqual(original, {p: p.read_bytes() for p in self.run.iterdir()})
@@ -157,6 +159,26 @@ class AbletonExchangeTests(unittest.TestCase):
         write_json(inbox / "return.json", {**manifest, "export_id": "exp1"})
         with self.assertRaises(ContractError):
             import_return(self.exports, "exp1", self.runs, confirm=True, stability_seconds=0)
+
+    def test_optional_stems_midi_and_tempo_change(self):
+        self.export()
+        inbox = self.exports / "return/exp1"
+        master = wav(inbox / "master.wav", self.frames)
+        stem = wav(inbox / "edited.wav", self.frames, 1)
+        midi = self.exports / "exp1/MIDI/kick.mid"
+        (inbox / "edited.mid").write_bytes(midi.read_bytes())
+        data = dict(schema_version=1, export_id="exp1", parent_run_id="run1",
+                    master_file="master.wav", master_sha256=master, notes="edited",
+                    stems=[dict(file="edited.wav", sha256=stem, track_id="kick")],
+                    midi=["edited.mid"], bpm=128)
+        write_json(inbox / "return.json", data)
+        result = import_return(self.exports, "exp1", self.runs, confirm=True,
+                               revision_id="revision2", stability_seconds=0)
+        self.assertFalse(result["stereo_only"])
+        self.assertEqual(result["bpm"], 128)
+        self.assertEqual(result["original_bpm"], 126)
+        self.assertEqual(len(result["files"]), 3)
+        self.assertEqual(json.loads((inbox / "return.json").read_text()), data)
 
     def test_unstable_and_atomic_failure(self):
         self.export()
