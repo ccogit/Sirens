@@ -87,7 +87,7 @@ def parse_pfad(pfad, music_root=None):
         metadaten = release_metadaten(Path(music_root), pfad)
         stil = metadaten.get("stilreferenz") or stil
         release = metadaten.get("slug") or release
-    stem = PurePosixPath(pfad).stem
+    stem = re.sub(r' \[SC \d+\]$', '', PurePosixPath(pfad).stem)
     match = NAME_RE.match(stem)
     return {
         "artist_slug": stil,

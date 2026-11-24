@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .contracts import AUDIO_EXT, BILD_EXT, parse_pfad
 from .musikablage import ablage, ist_single, release_metadaten
+from .songprofile import kurzprofil
 from .store import jetzt
 
 EMASTERED = re.compile(r"^eMastered_(.+?)\s+Version\s+(\d+)(.*)$", re.IGNORECASE)
@@ -79,6 +80,45 @@ def _e_mastered_zuordnen(dateien):
                          song_cover=original["song_cover"], track_nummer=original["track_nummer"])
 
 
+def _beschreibung(text):
+    return re.split(r"^\s*lyrics\s*[:\-]?\s*$", text or "", maxsplit=1, flags=re.I | re.M)[0].strip()
+
+
+def _text(datei):
+    try:
+        return datei.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _release_texte(ordner):
+    album = []
+    songs = {}
+    for datei in sorted(ordner.glob("*.txt")):
+        match = re.fullmatch(r"(.+) - beschreibung", datei.stem, re.I)
+        if match:
+            beschreibung = _beschreibung(_text(datei))
+            if beschreibung:
+                songs[_titel_schluessel(match[1])] = beschreibung
+    for nr, zeile in enumerate(_text(ordner / "Album-info.txt").splitlines()):
+        zeile = zeile.strip()
+        if nr == 0 or zeile.startswith(("https://", "http://")):
+            continue
+        if zeile.startswith(("Titelliste", "Musicmaker-Ergänzungen", "Weitere Titel", "Albumkonzept")):
+            continue
+        match = re.match(r"^\d+[.)]\s+(.+?)\s+[—–-]\s+(.+)$", zeile)
+        if match:
+            songs.setdefault(_titel_schluessel(match[1]), match[2])
+        elif len(zeile) > 60 and not re.match(r"^(?:\d+[.)]|- )\s", zeile):
+            album.append(zeile)
+    lyrics = {
+        _titel_schluessel(match[1])
+        for datei in [*ordner.glob("*.txt"), *(ordner / "Lyrics-Fassungen").glob("*.txt")]
+        if (match := re.fullmatch(r"(.+) - lyrics(?: \[song \d+\])?", datei.stem, re.I))
+    }
+    return "\n\n".join(album), songs, lyrics
+
+
 def _soundcloud_infos(root):
     """Nur belegte Pfade oder exakte Titel im zugeordneten Ordner erhalten Metadaten."""
     try:
@@ -86,14 +126,22 @@ def _soundcloud_infos(root):
         lokal = daten["local"]["tracks"]
     except (OSError, ValueError, KeyError, TypeError):
         return {}, {}
+    try:
+        updates = json.loads((root / "_soundcloud" / "metadata-sync.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        updates = {}
     pfade, titel = {}, {}
     for track in daten.get("tracks", []):
+        aktualisiert = updates.get(f"track:{track['id']}", {})
+        for feld in ("description", "tag_list"):
+            if isinstance(aktualisiert.get(feld), str):
+                track[feld] = aktualisiert[feld]
         eintrag = lokal.get(str(track["id"]), {})
         try:
             tags = shlex.split(track.get("tag_list") or "")
         except ValueError:
             tags = []
-        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url")}
+        info = {"tags": tags, "genre": track.get("genre") or "", "url": track.get("permalink_url"), "beschreibung": _beschreibung(track.get("description"))}
         kandidaten = [*eintrag.get("audio_candidates", []), *eintrag.get("musicmaker_audio_candidates", [])]
         if eintrag.get("confirmed_audio"):
             kandidaten.append(eintrag["confirmed_audio"])
@@ -166,8 +214,8 @@ class Katalog:
                 daten = release_metadaten(root, pfad)
                 if basis not in assets:
                     ordner_pfad = root / basis
-                    assets[basis] = (_release_bilder(ordner_pfad), _titelfolge(ordner_pfad))
-                bilder, folge = assets[basis]
+                    assets[basis] = (_release_bilder(ordner_pfad), _titelfolge(ordner_pfad), *_release_texte(ordner_pfad))
+                bilder, folge, album_text, song_texte, lyrics = assets[basis]
                 song = parse_pfad(pfad, root)
                 titel_key = _titel_schluessel(song["titel"])
                 bild = bilder.get(titel_key)
@@ -175,7 +223,8 @@ class Katalog:
                 dateien.append({"pfad": pfad, **song, "release_pfad": basis,
                                 "song_cover": f"{basis}/{bild}" if bild else None,
                                 "album_cover": f"{basis}/{album_bild}" if album_bild else None,
-                                "track_nummer": folge.get(titel_key),
+                                "track_nummer": folge.get(titel_key), "album_beschreibung": album_text,
+                                "song_beschreibung": song_texte.get(titel_key, ""), "lyrics_vorhanden": titel_key in lyrics,
                                 "release_titel": daten.get("titel"),
                                 "single": ist_single(pfad), "unterordner": "/".join(unterpfad)})
         _e_mastered_zuordnen(dateien)
@@ -196,7 +245,8 @@ class Katalog:
                 alben.append({"pfad": basis, "slug": daten.get("slug") or ordner.name,
                               "titel": daten.get("titel") or ordner.name.replace("-", " "),
                               "stilreferenz": daten.get("stilreferenz", ""), "single": False,
-                              "cover": f"{basis}/{bilder['']}" if "" in bilder else None})
+                              "cover": f"{basis}/{bilder['']}" if "" in bilder else None,
+                              "beschreibung": assets[basis][2] if basis in assets else _release_texte(ordner)[0]})
         with self._lock:
             self._dateien, self._alben, self.zustand, self.gelesen_am = dateien, alben, "bereit", jetzt()
 
@@ -243,10 +293,11 @@ class Katalog:
                 "pfad": d["release_pfad"], "slug": d["release_slug"],
                 "titel": d["release_titel"] or d["release_slug"].replace("-", " "),
                 "stilreferenz": d["artist_slug"], "single": d["single"], "songs": {},
-                "cover": d["album_cover"],
+                "cover": d["album_cover"], "beschreibung": d["album_beschreibung"],
             })
             song = release["songs"].setdefault(d["titel"], {"titel": d["titel"], "dateien": [],
-                "cover": d["song_cover"], "track_nummer": d["track_nummer"], "soundcloud": []})
+                "cover": d["song_cover"], "track_nummer": d["track_nummer"], "soundcloud": [],
+                "beschreibung": d["song_beschreibung"], "lyrics_vorhanden": d["lyrics_vorhanden"]})
             for info in d["soundcloud"]:
                 if info not in song["soundcloud"]:
                     song["soundcloud"].append(info)
@@ -273,7 +324,10 @@ class Katalog:
             songs = release["songs"].values()
             release["songs"] = sorted(songs, key=lambda song: (song["track_nummer"] or 999, song["titel"].casefold()))
             for song in release["songs"]:
+                if not song["beschreibung"] and len(song["soundcloud"]) == 1:
+                    song["beschreibung"] = song["soundcloud"][0]["beschreibung"]
                 song["dateien"].sort(key=lambda d: (d["version"] or 0, d["unterordner"], d["fassung"], d["pfad"]))
+                song["kurzprofil"] = kurzprofil(release, song)
             katalog_releases.append(release)
         result = {"zustand": zustand, "gelesen_am": gelesen_am, "anzahl_dateien": anzahl,
                   "kuenstler": sorted(kuenstler), "artists": artists, "releases": katalog_releases}

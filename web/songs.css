@@ -129,3 +129,19 @@
 .library-tags button { border: 0; border-radius: 4px; background: var(--mulde); color: var(--leise);
   font-size: .75rem; padding: .14rem .35rem; cursor: pointer; }
 .library-tags button:hover { color: var(--akzent); }
+
+.library-description, .library-no-description { margin: .22rem 0 0; color: var(--leise); font-size: .8rem; }
+.library-description summary { cursor: pointer; }
+.library-description summary span { display: inline-block; max-width: calc(100% - 1.2rem);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.library-description[open] summary span { display: none; }
+.library-description[open] summary::after { content: "Beschreibung einklappen"; }
+.library-description p { white-space: pre-line; margin: .45rem 0; max-width: 82ch; }
+.library-album-description, .library-detail > .library-no-description { margin: .25rem 1rem .8rem; }
+.library-album-description summary span { display: -webkit-inline-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; white-space: normal; }
+.library-track-description { max-width: 72ch; }
+
+.library-profile { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem 1rem; }
+.library-profile dt { font-weight: 650; }
+.library-profile dd { margin: 0; }

@@ -40,6 +40,34 @@ function masterKnopf(datei) {
   } }, "Mastern");
 }
 
+function beschreibung(text, klasse, leer) {
+  if (!text) return h("p", { class: "klein library-no-description" }, leer);
+  return h("details", { class: "library-description " + klasse },
+    h("summary", {}, h("span", {}, text.split("\n\n")[0])),
+    h("p", {}, text));
+}
+
+function profilAnsicht(profil, details) {
+  if (!profil) return beschreibung(details, "library-track-description", "Keine Songbeschreibung hinterlegt");
+  const felder = [
+    ["Typ", profil.typ],
+    ["Stilreferenz", profil.stilreferenz || "Nicht hinterlegt"],
+    ["Tempo", profil.tempo_bpm ? profil.tempo_bpm + " BPM" : "Nicht belegt"],
+    ["SoundCloud-Genre", profil.soundcloud_genres.join(", ") || "Nicht hinterlegt"],
+    ["SoundCloud-Tags", profil.soundcloud_tags.join(", ") || "Nicht hinterlegt"],
+    ["SoundCloud", profil.soundcloud_zugeordnet ? "Öffentlich zugeordnet" : "Keine Zuordnung"],
+    ["Fassungen", profil.fassungen + " · " + profil.formate.join(", ")],
+    ["Lyrics", profil.lyrics_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
+    ["Songcover", profil.songcover_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
+    ["Beste Bewertung", profil.beste_bewertung ?? "Nicht bewertet"],
+  ];
+  return h("details", { class: "library-description library-track-description" },
+    h("summary", {}, h("span", {}, profil.beschreibung)),
+    h("p", {}, details || profil.beschreibung),
+    h("dl", { class: "library-profile" },
+      felder.map(([name, wert]) => [h("dt", {}, name), h("dd", {}, wert)])));
+}
+
 function songZeile(song, stil, auftraege, gewaehlt, tagWaehlen) {
   const cover = song.cover || song.dateien.map(d => auftraege.get(d.pfad)?.song.cover).find(Boolean);
   const titel = h("strong", {}, song.titel);
@@ -83,7 +111,9 @@ function songZeile(song, stil, auftraege, gewaehlt, tagWaehlen) {
       cover ? h("img", { src: api.bildUrl(cover), alt: "", loading: "lazy" }) : "♫"),
     player, h("div", { class: "library-song-identity" }, titel,
       h("div", { class: "library-song-meta" },
-        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status),
+        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status,
+        song.lyrics_vorhanden ? h("span", { class: "klein" }, "Lyrics lokal vorhanden") : null),
+      profilAnsicht(song.kurzprofil, song.beschreibung),
       tags.length ? h("div", { class: "library-tags" },
         tags.slice(0, 3).map(tag => h("button", { type: "button", title: "Nach " + tag + " filtern",
           onclick: () => tagWaehlen(tag) }, tag))) : null),
@@ -158,7 +188,7 @@ export function songsAnsicht(el) {
       const basis = [release.titel, release.stilreferenz].join(" ").toLowerCase();
       const songs = release.songs.filter(song => {
         const merkmale = songMerkmale(release, song);
-        const text = [basis, song.titel, ...merkmale.tags, ...merkmale.genre].join(" ").toLowerCase();
+        const text = [basis, song.titel, song.beschreibung, ...merkmale.tags, ...merkmale.genre].join(" ").toLowerCase();
         return worte.every(wort => text.includes(wort)) &&
           aktivFilter.every(([name, feld]) => merkmale[name].includes(feld.value));
       });
@@ -199,7 +229,9 @@ export function songsAnsicht(el) {
       if (gruppe.value) sichtbar = songs.filter(song => schluessel(song) === gruppe.value);
       kopf.append(h("div", { class: "library-single-controls" }, gruppierung, gruppe));
     }
-    inhalt.append(kopf, sichtbar.length ? h("ul", { class: "library-song-list" },
+    inhalt.append(kopf,
+      album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
+      sichtbar.length ? h("ul", { class: "library-song-list" },
       sichtbar.map(({ song, stil }) => songZeile(song, stil, auftraege, fassungen, tagWaehlen)))
       : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
     knoepfeAktualisieren();
