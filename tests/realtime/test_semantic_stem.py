@@ -9,6 +9,7 @@ import unittest
 import wave
 from pathlib import Path
 
+from workers.sam_audio.backend import SamBackend, verify_snapshot, PIN
 from workers.sam_audio.adapter import Cancelled, encode, separate, split_sample
 from workers.sam_audio.cache import SemanticCache, validate_assets
 from sirens.realtime.model_registry import ModelRegistry
@@ -113,3 +114,59 @@ class SemanticTests(unittest.TestCase):
             finally:
                 p.kill()
                 p.wait(timeout=5)
+
+    def test_model_interface(self):
+        # Dieselbe Schnittstelle wie SAMAudioProcessor / SAMAudio.separate.
+        from contextlib import nullcontext
+        from types import SimpleNamespace
+        class Tensor:
+            def __init__(self, values):
+                self.values = list(values)
+            def unsqueeze(self, axis): return self
+            def detach(self): return self
+            def cpu(self): return self
+            def reshape(self, *args): return self
+            def numel(self): return len(self.values)
+            def __getitem__(self, sl): return Tensor(self.values[sl])
+            def tolist(self): return self.values
+            def to(self, device): return self
+        calls = []
+        class Processor:
+            audio_sampling_rate = 44100
+            def __call__(self, *, audios, descriptions):
+                calls.append(descriptions)
+                return audios[0]
+        class Model:
+            def separate(self, batch, *, predict_spans, reranking_candidates):
+                calls.append((predict_spans, reranking_candidates))
+                return SimpleNamespace(target=[batch])
+        backend = SamBackend.__new__(SamBackend)
+        backend.processor, backend.model = Processor(), Model()
+        backend.device = "cpu"
+        backend.torch = SimpleNamespace(float32=None, tensor=lambda values, **kw: Tensor(values),
+                                        inference_mode=nullcontext, manual_seed=lambda seed: None)
+        backend.audio = SimpleNamespace(functional=SimpleNamespace(resample=lambda t, a, b: t))
+        self.assertEqual(backend.separate([.25, -.25], 44100, "voice"), [.25, -.25])
+        self.assertEqual(calls, [["voice"], (False, 1)])
+
+    def test_snapshot_rejects_unverified_or_changed_files(self):
+        import hashlib
+        snapshot = self.root / "snapshot"
+        snapshot.mkdir()
+        files = {}
+        for name in ("checkpoint.pt", "config.json"):
+            # Beliebige Bytes, keine echten Gewichte.
+            data = name.encode()
+            (snapshot / name).write_bytes(data)
+            files[name] = hashlib.sha256(data).hexdigest()
+        receipt = self.root / "receipt.json"
+        info = dict(code_pin=PIN, offline_audited=False, snapshot=str(snapshot), files=files)
+        receipt.write_text(json.dumps(info), encoding="utf-8")
+        with self.assertRaises(ValueError):
+            verify_snapshot(receipt)
+        info["offline_audited"] = True
+        receipt.write_text(json.dumps(info), encoding="utf-8")
+        self.assertEqual(verify_snapshot(receipt), snapshot)
+        (snapshot / "checkpoint.pt").write_bytes(b"changed")
+        with self.assertRaises(ValueError):
+            verify_snapshot(receipt)
