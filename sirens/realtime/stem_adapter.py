@@ -148,6 +148,7 @@ class SeparationJobs:
         self.cache = self.root / "cache" / "separation"
         self.lock = threading.RLock()
         self.items, self.assets = {}, {}
+        self.export_count = 0
         self.closed = False
 
     def start(self, body):
@@ -166,7 +167,7 @@ class SeparationJobs:
         if source.suffix.lower() != ".wav" or source.stat().st_size > 512 * 1024**2:
             raise invalid("audio")
         with self.lock:
-            if self.closed or any(j["state"] in ("queued", "running") for j in self.items.values()):
+            if self.closed or any(j["_thread"].is_alive() for j in self.items.values()):
                 raise error("unavailable")
             if len(self.items) >= 64 or len(self.assets) >= 320:
                 raise error("unavailable")
@@ -238,18 +239,21 @@ class SeparationJobs:
                        for name in ("roformer", "htdemucs")}
             result = StemAdapter(self.cfg.music_root, self.cache, runners).separate(
                 relative, job["model"], cancelled=stop.is_set)
+            paths = {"original": source, **{stem: self.cache / result["key"] / (stem + ".wav")
+                                          for stem in result["stems"]}}
+            prepared, published = {}, {}
+            for stem, path in paths.items():
+                if stop.is_set():
+                    return
+                aid = new_id()
+                meta = {"id": aid, "kind": "source" if stem == "original" else "stem",
+                        "sample_rate": rate, "channels": channels, "nframes": frames}
+                prepared[aid] = (path, meta, source_hash(path))
+                published[stem] = aid
             with self.lock:
                 if stop.is_set():
                     return
-                paths = {"original": source, **{stem: self.cache / result["key"] / (stem + ".wav")
-                                              for stem in result["stems"]}}
-                published = {}
-                for stem, path in paths.items():
-                    aid = new_id()
-                    meta = {"id": aid, "kind": "source" if stem == "original" else "stem",
-                            "sample_rate": rate, "channels": channels, "nframes": frames}
-                    self.assets[aid] = (path, meta, source_hash(path))
-                    published[stem] = aid
+                self.assets.update(prepared)
                 job.update(model=result["model"], cache_hit=result["cache_hit"],
                            assets=published, state="ready", progress=1)
                 if "fallback_from" in result:
@@ -293,6 +297,47 @@ class SeparationJobs:
                 or source_hash(path) != digest):
             raise error("unavailable")
         return path
+
+    def export(self, jid, stream, length):
+        """Expliziter PCM16-Mixexport, niemals ein Pfad vom Client."""
+        asset_id(jid)
+        with self.lock:
+            job = self.items.get(jid)
+            if job is None or job["state"] != "ready":
+                raise error("not_found")
+            meta = self.assets[job["assets"]["original"]][1]
+            expected = 44 + meta["nframes"] * 4
+            if length != expected or not 44 < length <= 128 * 1024**2:
+                raise invalid("audio")
+            if self.closed or self.export_count >= 32:
+                raise error("unavailable")
+            self.export_count += 1
+        directory = self.root / "exports" / "separation"
+        if directory.resolve() != directory or self.cfg.music_root.resolve() in directory.parents:
+            raise invalid("path")
+        directory.mkdir(parents=True, exist_ok=True)
+        eid = new_id()
+        with tempfile.TemporaryDirectory(prefix=".mix-", dir=directory) as temp:
+            staging = Path(temp) / "mix.wav"
+            with staging.open("xb") as output:
+                remaining = length
+                while remaining:
+                    block = stream.read(min(remaining, 65536))
+                    if not block:
+                        raise invalid("audio")
+                    output.write(block)
+                    remaining -= len(block)
+            try:
+                if wav_shape(staging) != (44100, 2, meta["nframes"]):
+                    raise invalid("audio")
+                with wave.open(str(staging), "rb") as audio:
+                    if audio.getsampwidth() != 2:
+                        raise invalid("audio")
+            except (ValueError, EOFError, wave.Error):
+                raise invalid("audio") from None
+            target = directory / (eid + ".wav")
+            staging.rename(target)
+        return {"id": eid, "file": "exports/separation/" + target.name}
 
     def close(self):
         with self.lock:
