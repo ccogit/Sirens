@@ -30,7 +30,8 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
 | KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-14 gemergt | vergeben (24.11.2026) |
 | KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, KETTE-15 gemergt | vergeben (24.11.2026) |
-| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | vergeben (24.11.2026) |
+| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gemergt |
+| KETTE-38 | Welle 3: Performance Pads Teil 2 – Verdrahtung | 27 | KETTE-35 gemergt | offen |
 | KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, KETTE-16 gemergt | vergeben (24.11.2026) |
 | KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
@@ -80,6 +81,7 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-37 | `web/js/realtime/drum_architect.js`, `stem_crossover.js`, `acid_transformer.js` |
 | KETTE-28 | `workers/separation/`, `sirens/realtime/stem_adapter.py`, `web/js/realtime/advanced_stems.js`, Dateijob in `worker_supervisor.py` und `routes.py`, `benchmarks/separation/` |
 | KETTE-43 | gemeinsame Dateien (README Abschnitt 4 Punkt 7) außer den Dateien von KETTE-28 und KETTE-35 |
+| KETTE-38 | `workers/stable_audio/`, `web/js/realtime/pad_scheduler.js`, `benchmarks/pads/`, Pad-Leiste als eigenes Modul unter `web/js/realtime/` |
 | KETTE-35 | `workers/stable_audio/`, `web/js/realtime/pad_scheduler.js`, `benchmarks/pads/` |
 | KETTE-31 | `sirens/realtime/sessions.py`, alle Adressen in `routes.py`, Einbau aller Hooks, `benchmarks/g2/` |
 
