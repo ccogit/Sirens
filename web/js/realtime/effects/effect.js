@@ -25,16 +25,16 @@ export class Delay {
 export class Effect {
     constructor(latencyFrames){
         this.latencyFrames=latencyFrames;this.delay=new Delay(latencyFrames);
-        this.wet=new Smooth(1,0,1);this.bypass=false;this.dryFrame=new Float32Array(2);this.wetFrame=new Float32Array(2);
+        this.wet=new Smooth(1,0,1);this.bypass=false;this.bypassMix=new Smooth(1,0,1);this.started=false;this.dryFrame=new Float32Array(2);this.wetFrame=new Float32Array(2);
     }
     setWet(v){this.wet.set(v);}
-    setBypass(v){if(typeof v!=="boolean")throw new TypeError("Bypass");this.bypass=v;}
+    setBypass(v){if(typeof v!=="boolean")throw new TypeError("Bypass");this.bypass=v;if(!this.started){this.bypassMix.value=this.bypassMix.target=v?0:1;this.bypassMix.left=0;}else this.bypassMix.set(v?0:1);}
     process(l,r,out){
         this.delay.process(l,r,this.dryFrame);this.render(l,r,this.wetFrame);
-        const w=this.wet.tick();
+        this.started=true;const w=this.wet.tick()*this.bypassMix.tick();
         for(let c=0;c<2;c++){
             const d=this.dryFrame[c],v=this.wetFrame[c];
-            out[c]=this.bypass||w===0?d:Math.max(-4,Math.min(4,d*(1-w)+(Number.isFinite(v)?v:0)*w));
+            out[c]=w===0?d:Math.max(-4,Math.min(4,d*(1-w)+(Number.isFinite(v)?v:0)*w));
         }
     }
     reset(){this.delay.reset();}

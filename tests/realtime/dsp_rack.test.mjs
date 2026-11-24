@@ -32,3 +32,9 @@ test("Morph und Maskierung: Sinus, Stereo, begrenzte Ausgabe",()=>{
     e.setMorph(1);let prev=o[0];for(let i=0;i<600;i++){e.process(.2,-.1,o);assert.ok(Math.abs(o[0]-prev)<.001);prev=o[0];assert.ok(Math.abs(o[1]+o[0]/2)<1e-6);}assert.ok(Math.abs(o[0]+.2)<1e-6);
     const s=new SpectralEffect("fast");s.setMask(.2);for(let i=0;i<5000;i++){if(i===2000)s.setFreeze(true);s.process(.1*Math.sin(i*.1),.1*Math.cos(i*.1),o);assert.ok(o.every(v=>Number.isFinite(v)&&Math.abs(v)<=4));}
 });
+
+test("Bypass blendet ohne Sprung und erreicht bitgleichen Dry-Pfad",()=>{
+    const e=new ConvolutionEffect("fast",Float32Array.of(-1),Float32Array.of(-1)),o=new Float32Array(2);
+    for(let i=0;i<300;i++)e.process(.25,-.125,o);
+    e.setBypass(true);let prev=o[0];for(let i=0;i<256;i++){e.process(.25,-.125,o);assert.ok(Math.abs(o[0]-prev)<=.002);prev=o[0];}assert.equal(o[0],.25);assert.equal(o[1],-.125);
+});
