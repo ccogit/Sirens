@@ -1,0 +1,184 @@
+{
+  "core": {
+    "instruction": "WP04: lokalen Audio-Core-Messserver starten, 30 min im Browser messen, Rohdatei im Suite-Ordner als core-raw.json speichern und Server beenden.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.await_file",
+        "{dir}/core-raw.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.audio_core.format_result",
+        "{dir}/core-raw.json",
+        "--out",
+        "{out}"
+      ]
+    ]
+  },
+  "mock-e2e": {
+    "instruction": "WP06: G2-Snippet ausführen, Crash separat injizieren, Sirens-Sitzung schließen, Rohdatei als mock-raw.json im Suite-Ordner speichern.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.await_file",
+        "{dir}/mock-raw.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g2.report",
+        "{dir}/mock-raw.json",
+        "--out",
+        "{out}"
+      ]
+    ]
+  },
+  "dsp": {
+    "instruction": "WP09: Browser-Messung (fast/1), Rohmessung als dsp-raw.json im Suite-Ordner speichern, lokalen Messserver beenden.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.await_file",
+        "{dir}/dsp-raw.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.dsp.report",
+        "{dir}/dsp-raw.json",
+        "{out}"
+      ]
+    ]
+  },
+  "beatgrid": {
+    "argv": [
+      "{python}",
+      "-m",
+      "benchmarks.beatgrid.measure",
+      "<LOKALES-ANNOTIERTES-MANIFEST>",
+      "--out",
+      "{out}"
+    ]
+  },
+  "performance-tools": {
+    "instruction": "WP14: Render-Ausgaben außerhalb des Repos anhören; erst danach echte Beobachtungen im Bericht erfassen.",
+    "steps": [
+      [
+        "node",
+        "benchmarks/performance/render.mjs",
+        "{dir}/performance-render"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.baseline",
+        "--out",
+        "{dir}/baseline.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.performance.report",
+        "{dir}/baseline.json",
+        "{dir}/performance-render/render.json",
+        "{out}",
+        "--note",
+        "Hörprüfung offen (separat dokumentieren)"
+      ]
+    ]
+  },
+  "recorder": {
+    "instruction": "WP16: lokalen Browser-Aufnahmetest starten und angezeigte URL öffnen.",
+    "interactive": true,
+    "argv": [
+      "{python}",
+      "-m",
+      "benchmarks.recorder.browser",
+      "--scratch",
+      "{dir}",
+      "--out",
+      "{out}"
+    ]
+  },
+  "integration": {
+    "instruction": "WP17: Sicht-/Hörprüfung gemäß benchmarks/integration/README.md durchführen und Beobachtungs-JSON als integration-raw.json im Suite-Ordner speichern.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.await_file",
+        "{dir}/integration-raw.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.baseline",
+        "--out",
+        "{dir}/integration-baseline.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.integration.report",
+        "{dir}/integration-baseline.json",
+        "{dir}/integration-raw.json",
+        "{out}"
+      ]
+    ]
+  },
+  "performance-soak": {
+    "instruction": "WP19: Performance-Profil starten, 7200 s mit g4/soak.js messen, Sitzung vollständig schließen und Rohmessung als soak-raw.json im Suite-Ordner speichern.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.await_file",
+        "{dir}/soak-raw.json"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.report",
+        "{dir}/soak-raw.json",
+        "--candidate",
+        "Performance",
+        "--out",
+        "{out}"
+      ]
+    ]
+  },
+  "separation": {
+    "instruction": "Nur lokal installierter, freigegebener RoFormer; Sirens vor Job starten.",
+    "steps": [
+      [
+        "{python}",
+        "-m",
+        "benchmarks.separation.product_job",
+        "<RELATIVER-SYNTHETISCHER-SONG>",
+        "{dir}/separation-render"
+      ],
+      [
+        "{python}",
+        "-m",
+        "benchmarks.g4.copy_report",
+        "{dir}/separation-render/result.json",
+        "{out}"
+      ]
+    ]
+  },
+  "stable_audio": {
+    "argv": [
+      "<WORKER-PYTHON>",
+      "benchmarks/pads/measure.py",
+      "--p95-ms",
+      "<GEMESSENER-P95-MS>",
+      "--out",
+      "{out}"
+    ]
+  }
+}
