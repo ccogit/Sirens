@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "session",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "state": {
+      "enum": [
+        "created",
+        "loading",
+        "ready",
+        "playing",
+        "paused",
+        "stopping",
+        "closed",
+        "error"
+      ]
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "seq": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "capability_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sample_rate": {
+      "type": "integer",
+      "minimum": 8000,
+      "maximum": 192000
+    },
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "state",
+    "epoch",
+    "seq",
+    "capability_id",
+    "sample_rate",
+    "job_id"
+  ],
+  "additionalProperties": false
+}
