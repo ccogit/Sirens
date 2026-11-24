@@ -47,14 +47,16 @@ function beschreibung(text, klasse, leer) {
     h("p", {}, text));
 }
 
-function profilAnsicht(profil, details) {
+function profilAnsicht(profil, details, tagWaehlen) {
   if (!profil) return beschreibung(details, "library-track-description", "Keine Songbeschreibung hinterlegt");
   const felder = [
     ["Typ", profil.typ],
     ["Stilreferenz", profil.stilreferenz || "Nicht hinterlegt"],
     ["Tempo", profil.tempo_bpm ? profil.tempo_bpm + " BPM" : "Nicht belegt"],
     ["SoundCloud-Genre", profil.soundcloud_genres.join(", ") || "Nicht hinterlegt"],
-    ["SoundCloud-Tags", profil.soundcloud_tags.join(", ") || "Nicht hinterlegt"],
+    ["SoundCloud-Tags", profil.soundcloud_tags.length ? h("span", { class: "library-tags" },
+      profil.soundcloud_tags.map(tag => h("button", { type: "button", onclick: () => tagWaehlen(tag) }, tag)))
+      : "Nicht hinterlegt"],
     ["SoundCloud", profil.soundcloud_status],
     ["Fassungen", profil.fassungen + " · " + profil.formate.join(", ")],
     ["Lyrics", profil.lyrics_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
@@ -62,13 +64,13 @@ function profilAnsicht(profil, details) {
     ["Beste Bewertung", profil.beste_bewertung ?? "Nicht bewertet"],
   ];
   return h("details", { class: "library-description library-track-description" },
-    h("summary", {}, h("span", {}, profil.beschreibung)),
+    h("summary", {}, h("span", {}, details ? profil.beschreibung : "Songinfo")),
     h("p", {}, details || profil.beschreibung),
     h("dl", { class: "library-profile" },
       felder.map(([name, wert]) => [h("dt", {}, name), h("dd", {}, wert)])));
 }
 
-function songZeile(song, stil, auftraege, gewaehlt, tagWaehlen) {
+function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
   const cover = song.cover || song.dateien.map(d => auftraege.get(d.pfad)?.song.cover).find(Boolean);
   const titel = h("strong", {}, song.titel);
   const status = h("span", { class: "klein library-song-status", "aria-live": "polite" });
@@ -105,18 +107,11 @@ function songZeile(song, stil, auftraege, gewaehlt, tagWaehlen) {
     if (player.isConnected) knoepfeAktualisieren();
   }
   fassungZeigen();
-  const tags = [...new Set((song.soundcloud || []).flatMap(info => info.tags || []))];
   return h("li", { class: "library-song" },
-    h("span", { class: "library-song-art", "aria-hidden": "true" },
-      cover ? h("img", { src: api.bildUrl(cover), alt: "", loading: "lazy" }) : "♫"),
-    player, h("div", { class: "library-song-identity" }, titel,
-      h("div", { class: "library-song-meta" },
-        stil ? h("span", { class: "klein" }, "Stilreferenz " + stil) : null, status,
-        song.lyrics_vorhanden ? h("span", { class: "klein" }, "Lyrics lokal vorhanden") : null),
-      profilAnsicht(song.kurzprofil, song.beschreibung),
-      tags.length ? h("div", { class: "library-tags" },
-        tags.slice(0, 3).map(tag => h("button", { type: "button", title: "Nach " + tag + " filtern",
-          onclick: () => tagWaehlen(tag) }, tag))) : null),
+    cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
+    cover && cover !== albumCover ? player : null,
+    h("div", { class: "library-song-identity" }, titel, status,
+      profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
     fassung, aktionen);
 }
 
@@ -159,6 +154,7 @@ function songMerkmale(release, song) {
 }
 
 export function songsAnsicht(el) {
+  document.body.classList.add("songs-page");
   let beendet = false;
   let katalog;
   let aktiv;
@@ -241,7 +237,7 @@ export function songsAnsicht(el) {
       if (gruppe.value) sichtbar = songs.filter(song => schluessel(song) === gruppe.value);
       kopf.append(h("div", { class: "library-single-controls" }, gruppierung, gruppe));
     }
-    const zeile = ({ song, stil }) => songZeile(song, stil, auftraege, fassungen, tagWaehlen);
+    const zeile = ({ song }) => songZeile(song, album?.cover, auftraege, fassungen, tagWaehlen);
     const haupttitel = [], weitere = [];
     for (const eintrag of sichtbar) {
       const extra = album && eintrag.song.dateien.every(datei =>
@@ -345,5 +341,5 @@ export function songsAnsicht(el) {
     }
     detailZeichnen();
   }).catch(() => {});
-  return () => { beendet = true; clearTimeout(wartezeit); };
+  return () => { beendet = true; clearTimeout(wartezeit); document.body.classList.remove("songs-page"); };
 }

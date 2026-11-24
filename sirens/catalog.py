@@ -5,6 +5,7 @@ import re
 import shlex
 import threading
 from pathlib import Path
+from collections import Counter
 
 from .contracts import AUDIO_EXT, BILD_EXT, parse_pfad
 from .musikablage import ablage, ist_single, release_metadaten
@@ -91,9 +92,17 @@ def _text(datei):
         return ""
 
 
+def _notiz_schluessel(titel):
+    return _titel_schluessel(re.sub(r"^\d{1,2}\s*[-:.]\s*", "", titel))
+
+
+def _textanfang(text):
+    return " ".join(text.casefold().split())[:80]
+
+
 def _release_texte(ordner):
     album = []
-    songs = {}
+    songs, notizen = {}, {}
     for datei in sorted(ordner.glob("*.txt")):
         match = re.fullmatch(r"(.+) - beschreibung", datei.stem, re.I)
         if match:
@@ -108,7 +117,7 @@ def _release_texte(ordner):
             continue
         match = re.match(r"^\d+[.)]\s+(.+?)\s+[—–-]\s+(.+)$", zeile)
         if match:
-            songs.setdefault(_titel_schluessel(match[1]), match[2])
+            notizen.setdefault(_notiz_schluessel(match[1]), match[2])
         elif len(zeile) > 60 and not re.match(r"^(?:\d+[.)]|- )\s", zeile):
             album.append(zeile)
     lyrics = {
@@ -116,7 +125,7 @@ def _release_texte(ordner):
         for datei in [*ordner.glob("*.txt"), *(ordner / "Lyrics-Fassungen").glob("*.txt")]
         if (match := re.fullmatch(r"(.+) - lyrics(?: \[song \d+\])?", datei.stem, re.I))
     }
-    return "\n\n".join(album), songs, lyrics
+    return "\n\n".join(album), songs, lyrics, notizen
 
 
 def _soundcloud_infos(root):
@@ -231,7 +240,7 @@ class Katalog:
                 if basis not in assets:
                     ordner_pfad = root / basis
                     assets[basis] = (_release_bilder(ordner_pfad), _titelfolge(ordner_pfad), *_release_texte(ordner_pfad))
-                bilder, folge, album_text, song_texte, lyrics = assets[basis]
+                bilder, folge, album_text, song_texte, lyrics, notizen = assets[basis]
                 song = parse_pfad(pfad, root)
                 titel_key = _titel_schluessel(song["titel"])
                 bild = bilder.get(titel_key)
@@ -241,6 +250,7 @@ class Katalog:
                                 "album_cover": f"{basis}/{album_bild}" if album_bild else None,
                                 "track_nummer": folge.get(titel_key), "album_beschreibung": album_text,
                                 "song_beschreibung": song_texte.get(titel_key, ""), "lyrics_vorhanden": titel_key in lyrics,
+                                "song_notiz": notizen.get(_notiz_schluessel(song["titel"]), ""),
                                 "release_titel": daten.get("titel"),
                                 "single": ist_single(pfad), "unterordner": "/".join(unterpfad)})
         _e_mastered_zuordnen(dateien)
@@ -314,7 +324,8 @@ class Katalog:
             })
             song = release["songs"].setdefault(d["titel"], {"titel": d["titel"], "dateien": [],
                 "cover": d["song_cover"], "track_nummer": d["track_nummer"], "soundcloud": [],
-                "beschreibung": d["song_beschreibung"], "lyrics_vorhanden": d["lyrics_vorhanden"]})
+                "beschreibung": d["song_beschreibung"], "lyrics_vorhanden": d["lyrics_vorhanden"],
+                "notiz": d["song_notiz"]})
             for info in d["soundcloud"]:
                 if info not in song["soundcloud"]:
                     song["soundcloud"].append(info)
@@ -346,6 +357,15 @@ class Katalog:
                     song["beschreibung"] = song["beschreibung"] or info["beschreibung"]
                     song["cover"] = song["cover"] or info["cover"]
                 song["dateien"].sort(key=lambda d: (d["version"] or 0, d["unterordner"], d["fassung"], d["pfad"]))
+            albumanfang = _textanfang(release["beschreibung"])
+            wiederholungen = Counter(_textanfang(song["beschreibung"]) for song in release["songs"])
+            for song in release["songs"]:
+                anfang = _textanfang(song["beschreibung"])
+                notiz = song.pop("notiz")
+                if len(anfang) >= 50 and (anfang == albumanfang or wiederholungen[anfang] > 1):
+                    song["beschreibung"] = notiz if _textanfang(notiz) != anfang else ""
+                elif not song["beschreibung"]:
+                    song["beschreibung"] = notiz
                 song["kurzprofil"] = kurzprofil(release, song)
             katalog_releases.append(release)
         result = {"zustand": zustand, "gelesen_am": gelesen_am, "anzahl_dateien": anzahl,

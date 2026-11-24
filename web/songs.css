@@ -147,3 +147,29 @@
 .library-profile dd { margin: 0; }
 .library-song:has(.library-description[open]) { align-items: start; }
 .library-extra > details > summary { cursor: pointer; padding: .8rem 1rem; border-top: 1px solid var(--linie); color: var(--leise); }
+
+/* Nur die Bibliothek verwendet einen an den Desktop gebundenen Arbeitsbereich. */
+body.songs-page, body.songs-page:has(#player:not([hidden])) {
+  display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden;
+}
+body.songs-page > .kopf { flex: none; }
+body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex; padding-bottom: .8rem; }
+.songs-page .songs-library { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.songs-page .library-header { margin-bottom: .65rem; }
+.songs-page .library-header h1 { font-size: clamp(1.7rem, 3vw, 2.5rem); }
+.songs-page .library-desktop { flex: 1; min-height: 0; align-items: stretch; gap: clamp(1rem, 2.7vw, 3rem); }
+.songs-page .library-sidebar, .songs-page .library-detail { position: static; max-height: none; min-height: 0; }
+.songs-page .library-sidebar { overflow: auto; }
+.songs-page .library-navigation, .songs-page .library-song-list { overscroll-behavior: contain; scrollbar-width: thin; }
+.songs-page .library-release-header { padding: .65rem .8rem .85rem; gap: 1rem; align-items: center; }
+.songs-page .library-release-header img { width: 4.5rem; box-shadow: none; }
+.songs-page .library-release-header h2 { font-size: clamp(1.45rem, 2.4vw, 2.1rem); }
+.songs-page .library-album-description { max-height: 30%; overflow: auto; flex: none; }
+.songs-page .library-song { border-top-color: color-mix(in srgb, var(--linie), transparent 35%); }
+.songs-page .library-song-art { grid-column: 1; width: 1.9rem; }
+.songs-page .library-song-play { grid-column: 2; }
+.songs-page .library-song-identity { grid-column: 3; }
+.songs-page .library-song-status:not([hidden]) { margin-inline-start: .6rem; }
+.songs-page .library-track-description summary { color: var(--leise); font-weight: 400; }
+.songs-page .library-track-description { margin-top: .12rem; }
+.songs-page .library-tags { margin: 0; }
