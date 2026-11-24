@@ -497,3 +497,47 @@ class WorkerSupervisor:
 
     def __exit__(self, *exc):
         self.close()
+
+
+class SessionWorkers:
+    """Sitzungseigene Worker; explizite Aktivierung und gemeinsamer GPU-Manager."""
+    def __init__(self, registry, gpu, **worker_options):
+        self.registry = registry
+        self.gpu = gpu
+        self.options = worker_options
+        self.lock = threading.RLock()
+        self.workers = {}
+        self.closed = False
+
+    def preload(self, name, params=None, *, user_action=False,
+                priority=Priority.INTERACTION, timeout=30):
+        if user_action is not True:
+            raise error("unavailable")
+        with self.lock:
+            if self.closed:
+                raise error("unavailable")
+            current = self.workers.get(name)
+            if current is not None:
+                if not current.stopped and current.worker and current.worker.alive():
+                    return current
+                current.close()
+                del self.workers[name]
+            worker = WorkerSupervisor(self.registry, name, gpu=self.gpu, **self.options)
+            worker.preload(params, user_action=True, priority=priority, timeout=timeout)
+            self.workers[name] = worker
+            return worker
+
+    def unload(self, name):
+        with self.lock:
+            worker = self.workers.pop(name, None)
+            if worker is not None:
+                worker.close()
+
+    def close(self):
+        with self.lock:
+            self.closed = True
+            try:
+                for name in tuple(self.workers):
+                    self.unload(name)
+            finally:
+                self.closed = True
