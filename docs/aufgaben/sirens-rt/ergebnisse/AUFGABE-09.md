@@ -4,7 +4,7 @@
 
 CPU-Referenz in ES-Modulen ohne Fremdabhängigkeiten: FFT/STFT mit Overlap-Add, spektrale Maske, Freeze und Pitch, granularer Cloud-Pfad und WSOLA-Stretch für endliche Clips, uniform partitionierte FFT-Faltung mit zwei generierten IRs und Morphing. Gemeinsame Stereo-Frame-Schnittstelle, begrenzte Parameter, lineare Rampen, Wet/Dry, Bypass, Presets und Profile. Rack-Latenz fast/standard/detail: 896/1664/3200 Frames (deklarierte Summen, keine Geräte-Messwerte). RackPath kompensiert zusätzliche Pfadlatenz. Audio-Core-Einbau als Hook WP09, keine eigenen Änderungen an WP04-Dateien. Limiter bleibt die letzte Stufe im Core; Rack begrenzt Wet-Spitzen defensiv. Kein GPU-Code.
 
-Depends-on: KETTE-11 (integriert) und KETTE-22 (zuletzt nachgezogen: 949c36f5d2cbb09a78fba3b0bfb42c37b12d13e2), integration/sirens-rt (ae58b386b622a3b9fe8f6ca87f87975003063850). Keine fremden Projekte, Code- oder Gewichts-Pins, keine zusätzlichen Lizenzen; keine Modelle oder Gewichte. Python 3.11 / Node 22 gemäß CI, Browser mit AudioWorklet; CPU-only, keine RTX erforderlich.
+Depends-on: KETTE-11 (integriert) und KETTE-22 (zuletzt nachgezogen: 8b58186a9366372bcbd5c1a7195571b388aa4ef2), integration/sirens-rt (329db196ca860c1467b951ae6fb92f57dc59d6f3). Keine fremden Projekte, Code- oder Gewichts-Pins, keine zusätzlichen Lizenzen; keine Modelle oder Gewichte. Python 3.11 / Node 22 gemäß CI, Browser mit AudioWorklet; CPU-only, keine RTX erforderlich.
 
 ## Abnahmebelege
 
@@ -23,7 +23,7 @@ Nachstellen: `node --test tests/realtime/dsp_*.test.mjs` (Shell mit Glob-Unterst
 - WP31 muss Hook in den Core einbauen und DSP-Capability erst nach G3 freigeben. Kein separater AudioContext im Produkt; Benchmark verwendet einen eigenen, isolierten Context. Vor Freigabe tatsächliche Browser-Deadlines und Geräteausgabe prüfen.
 - Stretch ist eine Clip-Funktion außerhalb des Rendercallbacks (ein kontinuierlicher Faktor ungleich 1 kann nicht dauerhaft in einen gleich langen Echtzeitpfad geschrieben werden). Cloud ist streaming-fähiger Referenzalgorithmus, jedoch nicht als Echtzeit freigegeben. Stationärer Sinus ist keine Qualitätsaussage für Transienten oder komplexe Musik.
 - Spektrale Bin-Zuordnung und Freeze können Artefakte verursachen; Schaltwechsel werden über OLA verteilt, nicht als samplegenauer Klickfreiheitsnachweis für alle Musiksignale belegt. IR/FFT-/Kornprofile nur bei gestopptem Neuaufbau. Gemessene Zusatzlatenz des neutralen Impulses ist nicht gleich der variablen Cloud-Leseposition.
-- G3: fast bei 48 kHz deklarierte 18,67 ms, standard/detail höherlatent; keine Freigabe oder Dropout-Zahl erfunden. CPU-vs-GPU-Vergleich vorbereitet, kein belastbarer SDK-Vorteil belegt; daher kein GPU-Backend oder GPU-ADR.
+- G3: fast bei 48 kHz deklarierte 18,67 ms, standard/detail höherlatent; keine Freigabe oder Dropout-Zahl erfunden. CPU-vs-GPU-Vergleich vorbereitet, WP02-Bericht GPU Audio SDK (README-Pin 4cde62009594e0f4f1db712d27be4fea8b0d06c8, CC BY-NC-SA 4.0 laut Bericht) benennt nur einen ungeprüften Kandidaten, Gate nicht_gemessen, sm_120 nicht belegt. Kein belastbarer Vorteil oder Eignungsnachweis, daher kein GPU-Backend oder GPU-ADR. Keine Fremdkomponenten übernommen.
 - Bypass ist nach Einregelung bitgleich zum verzögerten Dry-Pfad; kein harter Wechsel bei laufender Wiedergabe. Core-Limiter kann bei Pegeln oberhalb seiner Grenze bewusst abweichen.
 
 ## Rückbau
