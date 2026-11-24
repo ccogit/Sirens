@@ -1,6 +1,5 @@
 import io
 import tempfile
-import time
 import unittest
 import wave
 from pathlib import Path
@@ -10,6 +9,7 @@ from sirens.config import Config
 from sirens.contracts import Ablehnung
 from sirens.realtime.stem_adapter import SeparationJobs, MODELS
 from sirens.realtime.contracts import error
+from sirens.realtime.schemas import validate
 
 
 def wav(path):
@@ -77,7 +77,8 @@ class SeparationTests(unittest.TestCase):
         self.assertTrue(second["cache_hit"])
         self.assertEqual(self.calls, ["separation"])
         stem = second["assets"]["vocals"]
-        self.assertEqual(self.jobs.asset(stem)["nframes"], 256)
+        self.assertEqual(validate("asset", self.jobs.asset(stem))["nframes"], 256)
+        self.assertEqual(validate("job", self.jobs.contract_job(second))["state"], "ready")
         self.assertEqual(self.jobs.asset(stem, audio=True).name, "vocals.wav")
         original = self.source.read_bytes()
         exported = self.jobs.export(job["id"], io.BytesIO(original), len(original))
