@@ -1,4 +1,5 @@
 import {RingBuffer} from "./ringbuffer.js";
+import {RackPath} from "./effects/rack.js";
 
 export const CEILING = Math.pow(10,-1/20);
 // Float32-Grenze abrunden, damit auch der gespeicherte Wert nicht über -1 dBFS liegt.
@@ -49,6 +50,8 @@ if(typeof AudioWorkletProcessor !== "undefined") {
             super();
             const cfg=options.processorOptions;
             this.paths=cfg.latencies.map(l=>new RenderPath(l,Math.max(1,Math.round(sampleRate*.005))));
+            this.racks=cfg.dspEnabled===true?this.paths.map(()=>new RackPath("fast")):null;
+            this.dspOut=new Float32Array(2);
             this.epoch=0; this.start=currentFrame; this.active=false; this.cursor=currentFrame;
             this.source=0; this.loopSource=0;
             this.loopLength=0; this.nextLoop=Infinity;
@@ -57,7 +60,7 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                     this.epoch=m.epoch; this.start=m.frame; this.active=m.active;
                     this.source=m.source; this.loopSource=m.source;
                     this.loopLength=m.loopLength||0; this.nextLoop=this.loopLength?this.start+this.loopLength:Infinity;
-                    for(const p of this.paths) p.reset(m.epoch,m.frame);
+                    for(let j=0;j<this.paths.length;j++){this.paths[j].reset(m.epoch,m.frame);this.racks?.[j].reset();}
                 } else if(m.type==="pcm") {
                     const p=this.paths[m.stream-1];
                     if(p && !p.wet.write(m.epoch,m.start,m.samples))
@@ -69,6 +72,13 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                         if(Number.isFinite(m.gain)) p.targetGain=clamp(m.gain,0,1);
                         if(typeof m.bypass==="boolean") p.bypass=m.bypass;
                     }
+                } else if(m.type==="dspParam" || m.type==="dspPreset") {
+                    const rack=this.racks?.[m.stream-1]?.rack;
+                    try{
+                        if(!rack)throw new RangeError("DSP gesperrt");
+                        if(m.type==="dspParam")rack.setParameter(m.family,m.key,m.value);
+                        else rack.applyPreset(m.name);
+                    }catch{this.port.postMessage({type:"dspReject",stream:m.stream});}
                 } else if(m.type==="status") {
                     this.port.postMessage({type:"status",epoch:this.epoch,cursor:this.cursor,source:this.source,
                         streams:this.paths.map(p=>({cursor:p.wet.cursor,underruns:p.expectedUnderruns,rawUnderruns:p.wet.underruns}))});
@@ -86,17 +96,18 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                         if(this.epoch===0xffffffff) this.active=false;
                         else {
                             this.epoch++; this.nextLoop+=this.loopLength; this.source=this.loopSource;
-                            for(let j=0;j<this.paths.length;j++) this.paths[j].reset(this.epoch,frame);
+                            for(let j=0;j<this.paths.length;j++){this.paths[j].reset(this.epoch,frame);this.racks?.[j].reset();}
                         }
                     }
                     if(this.active) this.source++;
                     if(this.active) for(let j=0;j<this.paths.length;j++) {
                         const p=this.paths[j], input=inputs[j];
                         // Ein verspäteter Reset darf keine vergangenen Blöcke wiedergeben.
-                        if(p.wet.cursor!==frame) p.reset(this.epoch,frame);
+                        if(p.wet.cursor!==frame){p.reset(this.epoch,frame);this.racks?.[j].reset();}
                         const a=input[0],b=input[1];
                         p.sample(a?a[i]:0,b?b[i]:a?a[i]:0);
-                        l+=p.out[0]; r+=p.out[1];
+                        if(this.racks){this.racks[j].sample(p.out[0],p.out[1],this.dspOut);l+=this.dspOut[0];r+=this.dspOut[1];}
+                        else {l+=p.out[0];r+=p.out[1];}
                     }
                 }
                 out[0][i]=limit(l); if(out.length>1) out[1][i]=limit(r);

@@ -132,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
             if pfad.startswith("/api/rt/v1/"):
                 from .realtime.routes import dispatch
-                return dispatch(self, pfad, self._body() if schreibend else None)
+                return dispatch(self, pfad, self._body() if schreibend and self.command != "PUT" else None)
             if schreibend:
                 self._schreiben(pfad, self._body())
             else:
@@ -330,11 +330,21 @@ class Handler(BaseHTTPRequestHandler):
                 laenge -= len(block)
 
 
+class SirensHTTPServer(ThreadingHTTPServer):
+    def server_close(self):
+        try:
+            sessions = getattr(getattr(self, "app", None), "rt_sessions", None)
+            if sessions is not None:
+                sessions.close()
+        finally:
+            super().server_close()
+
+
 def make_server(cfg, port=None):
     """Server anlegen (noch nicht gestartet). Jede Bind-Adresse außer 127.0.0.1 wird abgelehnt."""
     if cfg.host != LOOPBACK:
         raise Ablehnung("invalid_bind", f"Der Dienst bindet nur an {LOOPBACK}, nicht an „{cfg.host}“.", "host")
-    server = ThreadingHTTPServer((LOOPBACK, cfg.port if port is None else port), Handler)
+    server = SirensHTTPServer((LOOPBACK, cfg.port if port is None else port), Handler)
     server.daemon_threads = True
     server.app = App(cfg)
     server.app.katalog.scan_im_hintergrund()
