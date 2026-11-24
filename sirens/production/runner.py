@@ -12,8 +12,8 @@ from ..store import write_json_atomic
 
 
 class Runner:
-    def __init__(self, cfg, backend):
-        self.store = RunStore(cfg)
+    def __init__(self, cfg, backend, *, clock=None):
+        self.store = RunStore(cfg, clock=clock)
         self.backend = backend
         self.cache = HashCache(self.store.root)
 
@@ -31,12 +31,13 @@ class Runner:
             if state["status"] not in ("queued", "running") or state["parent_run_id"] != parent:
                 raise ContractError("invalid prepared run")
         stage = "prepare"
+        report = None
 
         def checkpoint(name, progress):
             nonlocal stage
-            stage = name
             cancelled()
             self.store.status(run_id, "running", name, progress)
+            stage = name
 
         def manifest(name, result, validator, **kwargs):
             validator(result, **kwargs)
@@ -91,7 +92,27 @@ class Runner:
             return {"schema_version": 1, "sample_rate": SAMPLE_RATE,
                     "frames": expected_frames(plan), "stems": items}
 
+        def report_timings(status):
+            if report is not None:
+                report.update(stages=status["stages"], total_seconds=status["total_seconds"])
+                validate_report(report)
+                write_json_atomic(safe_path(root, "report.json"), report)
+
+        def finish(state, name, progress=None, error=None):
+            # Write the final report before publishing terminal status. Both
+            # files use the same timing snapshot; each write is atomic.
+            try:
+                self.store.status(run_id, state, name, progress, error,
+                                  before_write=report_timings)
+            except OSError:
+                if state == "succeeded":
+                    raise
+                # A report I/O failure must not prevent a failed/cancelled
+                # status from closing the active stage.
+                self.store.status(run_id, state, name, progress, error)
+
         try:
+            self.store.status(run_id, "running", stage, 0)
             # Persist inputs before checking cancellation so a cancelled run can resume.
             manifest("brief", brief, validate_brief)
             manifest("plan", plan, validate_plan)
@@ -99,7 +120,6 @@ class Runner:
                                                    "seed": plan["seed"], "parent_run_id": parent,
                                                    "backend": getattr(self.backend, "name", None),
                                                    "revision": getattr(self.backend, "revision", None)})
-            checkpoint("prepare", 0)
             checkpoint("assets", 0.2)
             assets = cached_stage("assets", {"brief": brief, "plan": plan, "mode": mode},
                                   lambda: self.backend.assets(brief, plan, root, cancelled),
@@ -127,13 +147,13 @@ class Runner:
                     and report["technical"].get("errors")):
                 raise ContractError("Inspect technical errors in report.json")
             cancelled()
-            self.store.status(run_id, "succeeded", "complete", 1)
+            finish("succeeded", "complete", 1)
         except Cancelled:
-            self.store.status(run_id, "cancelled", stage, error=None)
+            finish("cancelled", stage, error=None)
         except Exception as exc:
             # Never persist arbitrary exception text (could contain private paths or secrets).
             action = getattr(self.backend, "next_action", None)
-            self.store.status(run_id, "failed", stage,
+            finish("failed", stage,
                               error={"type": type(exc).__name__, "next_action": action(stage)}
                               if callable(action) else type(exc).__name__)
         return self.store.inspect(run_id)
