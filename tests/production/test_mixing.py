@@ -120,6 +120,18 @@ class MixingTests(unittest.TestCase):
                     root = Path(tmp) / variant
                     root.mkdir()
                     plan, stems = fixture(root)
+                    # A sustained key reliably crosses the sidechain threshold;
+                    # the original single-sample alignment fixture need not.
+                    kick_path = root / "kick.wav"
+                    samples = bytearray()
+                    for i in range(48000):
+                        val = (round(7000000 * math.sin(2 * math.pi * 100 * i / 48000))
+                               if 12000 <= i < 16800 else 0)
+                        samples.extend(val.to_bytes(3, "little", signed=True))
+                    with wave.open(str(kick_path), "wb") as wav:
+                        wav.setparams((1, 3, 48000, 48000, "NONE", ""))
+                        wav.writeframes(samples)
+                    stems["stems"][0]["sha256"] = hashlib.sha256(kick_path.read_bytes()).hexdigest()
                     track = plan["tracks"][-1]
                     stem = stems["stems"][-1]
                     track.update(role="bass", patch=patch_name)
