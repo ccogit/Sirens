@@ -209,22 +209,26 @@ class _Process:
 
 class WorkerSupervisor:
     """Ein persistenter Worker je Instanz; niemals automatisch Modellarbeit wiederholen."""
-    def __init__(self, registry, name, *, gpu=None, profile="Performance", max_pending=None,
+    def __init__(self, registry, name, *, gpu=None, profile=None, max_pending=None,
                  max_restarts=1, music_root=None, realtime_dir=None):
         self.music_root = Path(music_root).resolve() if music_root is not None else None
         self.realtime_dir = Path(realtime_dir).resolve() if realtime_dir is not None else None
         self.entry = registry.resolve(name)
         self.root = registry.root
-        if profile not in PROFILES or type(max_restarts) is not int or max_restarts < 0:
+        if profile is not None and profile not in PROFILES:
             raise invalid("profile")
-        self.profile = PROFILES[profile]
+        if type(max_restarts) is not int or max_restarts < 0:
+            raise invalid("profile")
+        self.gpu = gpu
+        self._profile_name = profile
         limit = self.profile["max_pending"] if max_pending is None else max_pending
         if type(limit) is not int or not 1 <= limit <= 128:
             raise invalid("max_pending")
-        self.slots = threading.BoundedSemaphore(limit)
+        self._pending_limit = max_pending
+        self._pending_lock = threading.Lock()
+        self._pending = 0
         self.serial = threading.Lock()
         self.lifecycle = threading.RLock()
-        self.gpu = gpu
         self.lease = None
         self.worker = None
         self.max_restarts = max_restarts
@@ -232,6 +236,22 @@ class WorkerSupervisor:
         self.started = False
         self.stopped = False
         self.deadline_misses = 0
+
+    @property
+    def profile(self):
+        return PROFILES[self._profile_name or (self.gpu.profile if self.gpu else "Performance")]
+
+    @property
+    def queue_limit(self):
+        limit = self.profile["max_pending"]
+        if self.gpu is not None:
+            limit = min(limit, PROFILES[self.gpu.profile]["max_pending"])
+        return limit if self._pending_limit is None else min(limit, self._pending_limit)
+
+    @property
+    def queue_depth(self):
+        with self._pending_lock:
+            return self._pending
 
     def _spawn(self):
         try:
@@ -279,6 +299,18 @@ class WorkerSupervisor:
             return True
         finally:
             self.lifecycle.release()
+
+    def preload(self, params=None, *, user_action=False, priority=Priority.INTERACTION,
+                timeout=30):
+        """Explizites Vorladen; bei Fehler immer Prozess und Lease freigeben."""
+        self.start(user_action=user_action, priority=priority)
+        try:
+            self.request("load", params, timeout=timeout)
+            self.request("warmup", timeout=timeout)
+        except BaseException:
+            self.close()
+            raise
+        return self
 
     def _current(self):
         with self.lifecycle:
@@ -330,8 +362,11 @@ class WorkerSupervisor:
     def _exchange(self, kind, payload, audio, timeout):
         rid = uuid4().hex
         data = _frame(kind, rid, payload, audio)
-        if not self.slots.acquire(blocking=False):
-            raise error("unavailable")
+        limit = self.queue_limit
+        with self._pending_lock:
+            if self._pending >= limit:
+                raise error("unavailable")
+            self._pending += 1
         deadline = time.monotonic() + timeout
         try:
             if not self.serial.acquire(timeout=max(0, deadline-time.monotonic())):
@@ -371,7 +406,8 @@ class WorkerSupervisor:
             finally:
                 self.serial.release()
         finally:
-            self.slots.release()
+            with self._pending_lock:
+                self._pending -= 1
 
     @property
     def file_progress(self):
