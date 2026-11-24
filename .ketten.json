@@ -1,0 +1,10 @@
+{
+  "name": "Sirens",
+  "repo": "ccogit/Sirens",
+  "branch": "integration/sirens-rt",
+  "register": "docs/aufgaben/sirens-rt/KETTEN.md",
+  "task_dir": "docs/aufgaben/sirens-rt",
+  "stack": "Python 3.11 (nur Standardbibliothek im Hauptprozess), ES-Module ohne Build, Node 22 für Tests",
+  "quality": "python -m unittest discover -s tests -v",
+  "rules": "Zielzweig ist integration/sirens-rt (nicht main); kein Torch-/Modell-Import im Paket sirens/; keine Modellgewichte, Musikdateien oder Downloads im Repo; gemeinsame Dateien nur ändern, wenn die Aufgabe es ausdrücklich erlaubt"
+}
