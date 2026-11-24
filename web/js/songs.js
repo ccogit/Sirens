@@ -61,10 +61,11 @@ function profilAnsicht(profil, details, tagWaehlen) {
     h("summary", {}, h("span", {}, details ? profil.beschreibung : "Songinfo")),
     h("div", { class: "library-profile-content" },
       h("p", {}, details || profil.beschreibung),
-      h("dl", { class: "library-profile" }, felder.map(([name, wert]) =>
-        h("div", {}, h("dt", {}, name), h("dd", {}, wert)))),
-      profil.soundcloud_tags.length ? h("div", { class: "library-tags" },
-        profil.soundcloud_tags.map(tag => h("button", { type: "button", onclick: () => tagWaehlen(tag) }, tag))) : null));
+      h("div", { class: "library-profile-facts" },
+        h("dl", { class: "library-profile" }, felder.map(([name, wert]) =>
+          h("div", {}, h("dt", {}, name), h("dd", {}, wert)))),
+        profil.soundcloud_tags.length ? h("div", { class: "library-tags" },
+          profil.soundcloud_tags.map(tag => h("button", { type: "button", onclick: () => tagWaehlen(tag) }, tag))) : null)));
 }
 
 function soundcloudSymbol(song) {
@@ -155,8 +156,8 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
     h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
-      titel, soundcloudSymbol(song), status),
-      profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
+      titel, soundcloudSymbol(song), status)),
+    profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen),
     h("div", { class: "library-song-stats" }, soundcloudZahlen(song) ||
       h("span", { class: "library-sc-unavailable", "aria-label": "Keine SoundCloud-Zahlen verfügbar" }, "–")), fassung, aktionen);
 }
