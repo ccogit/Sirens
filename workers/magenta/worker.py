@@ -16,6 +16,7 @@ def serve(adapter, descriptor, inp, out):
     lock = threading.Lock()
     done = threading.Event()
     active = None
+    processing = threading.Event()
 
     def send(kind, rid, payload, audio=b""):
         raw = json.dumps(dict(version=1, type=kind, request_id=rid, payload=payload),
@@ -36,11 +37,14 @@ def serve(adapter, descriptor, inp, out):
             raw = adapter.process(audio)
             # Cancel und Ausgabe sind bezüglich des Adapterzustands geordnet.
             with adapter.lock:
+                processing.clear()
                 if adapter.active:
                     send("result", rid, {"audio_bytes": len(raw)}, raw)
         except (ValueError, TypeError):
+            processing.clear()
             send("error", rid, {"code": "invalid"})
         except Exception:
+            processing.clear()
             send("error", rid, {"code": "unavailable"})
 
     threading.Thread(target=heartbeat, daemon=True).start()
@@ -68,9 +72,10 @@ def serve(adapter, descriptor, inp, out):
                 audio = inp.read(count)
                 if len(audio) != count:
                     break
-                if active is not None and active.is_alive():
+                if processing.is_set():
                     send("error", rid, {"code": "unavailable"})
                 else:
+                    processing.set()
                     active = threading.Thread(target=process, args=(rid, audio), daemon=True)
                     active.start()
                 continue
@@ -81,7 +86,7 @@ def serve(adapter, descriptor, inp, out):
                     adapter.load(**payload)
                     response = {}
                 elif kind == "warmup":
-                    adapter.process()
+                    adapter.warmup()
                     response = {}
                 elif kind == "health":
                     response = adapter.health()
