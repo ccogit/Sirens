@@ -1,12 +1,13 @@
 """Dateijob-Worker; Modellarbeit ausschließlich in der eigenen Umgebung."""
 import json
 import os
+import shutil
 import struct
 import sys
 import threading
 from pathlib import Path
 
-from roformer import run, PIN, SHA
+from roformer import run
 
 MAX = 1024 * 1024
 # Modellbibliotheken dürfen das IPC nicht mit Konsolenausgaben verunreinigen.
@@ -28,6 +29,22 @@ def heartbeat():
     while not stop.is_set():
         send("heartbeat", "", {"progress": progress})
         stop.wait(.25)
+
+
+def demucs_run(source, out):
+    # Bestandsumgebung, CPU, nur lokal vorhandene Gewichte.
+    import torch
+    def no_download(*args, **kwargs):
+        raise RuntimeError('Demucs-Gewichte fehlen lokal; separat installieren')
+    torch.hub.download_url_to_file = no_download
+    from demucs.separate import main as separate
+    staging = out / 'demucs'
+    separate(['-n', 'htdemucs', '--device', 'cpu', '-o', str(staging), str(source)])
+    names = ['vocals.wav', 'drums.wav', 'bass.wav', 'other.wav']
+    for name in names:
+        (staging / 'htdemucs' / source.stem / name).rename(out / name)
+    shutil.rmtree(staging)
+    return {'files': names, 'vram_peak_bytes': 0}
 
 
 def main():
@@ -54,10 +71,14 @@ def main():
                     if not source.is_absolute() or not out.is_absolute() or not out.is_dir() or any(out.iterdir()):
                         raise ValueError("Privater Ausgabeordner erforderlich")
                     progress = .05
-                    descriptor = run(source, out, weight)
+                    if sys.argv[1:] == ["--demucs"]:
+                        result = demucs_run(source, out)
+                    else:
+                        descriptor = run(source, out, weight)
+                        result = {"files": ["vocals.wav", "instrumental.wav"],
+                                  "vram_peak_bytes": descriptor["vram_peak_bytes"]}
                     progress = 1
-                    send("result", rid, {"files": ["vocals.wav", "instrumental.wav"],
-                                         "vram_peak_bytes": descriptor["vram_peak_bytes"]})
+                    send("result", rid, result)
                 elif kind == "health":
                     send("result", rid, {"loaded": False})
                 elif kind == "cancel":
