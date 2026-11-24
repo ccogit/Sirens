@@ -4,7 +4,10 @@ import struct
 import wave
 from pathlib import Path
 
-from adapter import PAD_TYPES, RATE, validate_job
+if __package__:
+    from .adapter import PAD_TYPES, RATE, validate_job
+else:
+    from adapter import PAD_TYPES, RATE, validate_job
 
 KEYS = ("unbekannt",) + tuple(
     f"{note} {mode}" for mode in ("major", "minor")
