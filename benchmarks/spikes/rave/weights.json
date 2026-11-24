@@ -1,0 +1,16 @@
+{
+  "models": [
+    {
+      "filename": "guitar_iil_b2048_r48000_z16.ts",
+      "url": "https://huggingface.co/Intelligent-Instruments-Lab/rave-models/resolve/8471a16/guitar_iil_b2048_r48000_z16.ts",
+      "size_bytes": null,
+      "sha256": "02458214e23890d6818504319a5b9903eabfe87a524491f6524f453e7f3dbcf0",
+      "license": "CC-BY-NC-4.0",
+      "approved": false,
+      "source": "https://huggingface.co/Intelligent-Instruments-Lab/rave-models/blob/main/guitar_iil_b2048_r48000_z16.ts",
+      "note": "164 MB gerundet; exakte Bytezahl offen. TorchScript ist ausführbarer Code; Herkunft und Vertrauensfreigabe gesondert prüfen.",
+      "rate": 48000,
+      "block": 2048
+    }
+  ]
+}
