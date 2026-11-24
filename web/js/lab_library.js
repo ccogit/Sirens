@@ -5,6 +5,16 @@ export function labWerkzeugWahl(werkzeuge, gespeichert) {
   return werkzeuge.some((tool) => tool.id === gespeichert) ? gespeichert : werkzeuge[0].id;
 }
 
+// Nur ein Panel darf aktiv sein. Erneutes Öffnen lässt laufendes Audio in Ruhe.
+export function labWerkzeugAktivieren(werkzeuge, id, bisher) {
+  if (id === bisher) return;
+  for (const tool of werkzeuge) {
+    tool.panel.hidden = tool.id !== id;
+    if (tool.id !== id) tool.anhalten?.();
+  }
+  werkzeuge.find((tool) => tool.id === id)?.aktivieren?.();
+}
+
 export function labWerkzeugNavigation(werkzeuge, waehlen) {
   const titel = h("h2", { tabindex: "-1" });
   const beschreibung = h("p", { class: "lab-workspace-description" });
