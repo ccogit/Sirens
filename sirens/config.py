@@ -16,6 +16,7 @@ class Config:
     rt_enabled: bool = False
     rt_dir: Path | None = None
     rt_mock: bool = False
+    rt_reserve_bytes: int = 5 * 1024**3 // 2
 
     @property
     def realtime_dir(self):
@@ -69,5 +70,6 @@ def load(env=None):
         rt_enabled=env.get("SIRENS_RT_ENABLED", "").strip().lower() in ("an", "1", "true", "on"),
         rt_dir=Path(env["SIRENS_RT_DIR"]) if env.get("SIRENS_RT_DIR") else None,
         rt_mock=env.get("SIRENS_RT_MOCK", "").strip().lower() in ("an", "1", "true", "on"),
+        rt_reserve_bytes=int(env.get("SIRENS_RT_RESERVE_BYTES", str(5 * 1024**3 // 2))),
         claude_start=wert("CLAUDE", "an").strip().lower() not in ("aus", "0", "nein", "off"),
     )
