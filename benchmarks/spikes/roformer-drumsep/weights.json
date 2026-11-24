@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "id": "roformer",
+      "url": "https://huggingface.co/KimberleyJSN/melbandroformer/resolve/ac9b0614ab3cd7f77219e18ba494dfd93956c348/MelBandRoformer.ckpt",
+      "filename": "MelBandRoformer.ckpt",
+      "size_bytes": 913106900,
+      "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+      "license": "MIT",
+      "license_url": "https://huggingface.co/KimberleyJSN/melbandroformer/commit/ac9b0614ab3cd7f77219e18ba494dfd93956c348",
+      "approved": true
+    },
+    {
+      "id": "drumsep",
+      "url": "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.5/model_drumsep.th",
+      "filename": "model_drumsep.th",
+      "size_bytes": null,
+      "sha256": null,
+      "license": "Ungeklärt (Code MIT, Gewichtslizenz nicht explizit belegt)",
+      "license_url": "https://github.com/inagoy/drumsep",
+      "approved": false
+    }
+  ]
+}
