@@ -41,7 +41,7 @@ $env:SIRENS_RT_SAM_AUDIO_RECEIPT = "<absoluter Receipt-Pfad>"
 ```
 
 Benchmark nur explizit und nach Audit/Netzisolation starten. Der Worker bleibt unabhängig davon
-in der Registry gesperrt. Manifest und Freigabehaken siehe WP13. Rollback: Capability deaktivieren,
+in der Registry gesperrt. Die Datei manifest.pending.json ist nur die gesperrte Vorlage; erst der Koordinator legt nach G1 und Installationsprüfung eine lokale manifest.json an. Manifest und Freigabehaken siehe WP13. Rollback: Capability deaktivieren,
 Worker beenden, Cache extern entfernen, bei Bedarf install.ps1 -Entfernen. Originale nicht ändern.
 
 Technische Grenze: 15-Sekunden-Abschnitte ohne Overlap, mono Zielschätzung auf beide Kanäle,
