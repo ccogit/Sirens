@@ -1,5 +1,4 @@
 import struct
-import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -86,3 +85,23 @@ class Workers(unittest.TestCase):
             with self.assertRaises(Ablehnung):
                 future.result(timeout=5)
             self.assertIsNotNone(self.processes[0].poll())
+
+    def test_bounded_queue(self):
+        single = WorkerSupervisor(self.registry, "mock", max_pending=1)
+        self.addCleanup(single.close)
+        single.start(user_action=True)
+        single.request("load")
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            active = pool.submit(single.request, "process", {"delay_seconds": 10})
+            end = time.monotonic() + 2
+            while not single.serial.locked() and time.monotonic() < end:
+                time.sleep(0.01)
+            self.assertTrue(single.serial.locked())
+            try:
+                with self.assertRaises(Ablehnung) as ctx:
+                    single.request("health")
+                self.assertEqual(ctx.exception.code, "unavailable")
+            finally:
+                single.cancel()
+            with self.assertRaises(Ablehnung):
+                active.result(timeout=5)
