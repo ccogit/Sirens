@@ -164,7 +164,11 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .songs-page .library-release-header { padding: .65rem .8rem .85rem; gap: 1rem; align-items: center; }
 .songs-page .library-release-header img { width: 4.5rem; box-shadow: none; }
 .songs-page .library-release-header h2 { font-size: clamp(1.45rem, 2.4vw, 2.1rem); }
-.songs-page .library-album-description { max-height: 30%; overflow: auto; flex: none; }
+.library-detail-body { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.library-detail-body .library-song-list { overflow: visible; }
+.library-album-description .library-description-text { columns: 42ch 2; column-gap: 2rem; }
+.library-album-description .library-description-text p { margin-top: 0; max-width: none; }
+.library-album-description[open] summary { margin-bottom: .65rem; }
 .songs-page .library-song { border-top-color: color-mix(in srgb, var(--linie), transparent 35%); }
 .songs-page .library-song-art { grid-column: 1; width: 1.9rem; }
 .songs-page .library-song-play { grid-column: 2; }
@@ -179,3 +183,14 @@ body.songs-page > #ansicht { flex: 1; min-height: 0; width: 100%; display: flex;
 .library-sc-numbers strong { font-weight: 650; }
 .library-sc-versions { color: var(--leise); font-size: .74rem; }
 .library-sc-versions summary { cursor: pointer; }
+
+.library-song-heading { display: flex; gap: .45rem; align-items: baseline; flex-wrap: wrap; }
+.library-sc-symbol { color: var(--akzent); display: inline-flex; font-size: .9rem; line-height: 1; text-decoration: none; }
+.library-sc-symbol.privat { color: var(--leise); }
+.library-profile-content { margin: .45rem 0 .25rem; padding: .1rem 0 .25rem; }
+.library-profile-content > p { font-size: .9rem; line-height: 1.55; margin: 0 0 .7rem; }
+.library-profile { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .45rem 1rem; margin: 0 0 .55rem; }
+.library-profile dt { font-weight: 500; font-size: .72rem; color: var(--leise); }
+.library-profile dd { color: var(--tinte); overflow-wrap: anywhere; }
+[data-theme="dark"] .songs-library select { color-scheme: dark; }
+.songs-library select option { background-color: var(--flaeche); color: var(--tinte); }

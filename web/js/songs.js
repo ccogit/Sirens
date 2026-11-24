@@ -44,30 +44,39 @@ function beschreibung(text, klasse, leer) {
   if (!text) return h("p", { class: "klein library-no-description" }, leer);
   return h("details", { class: "library-description " + klasse },
     h("summary", {}, h("span", {}, text.split("\n\n")[0])),
-    h("p", {}, text));
+    h("div", { class: "library-description-text" }, text.split(/\n\n+/).map(absatz => h("p", {}, absatz))));
 }
 
 function profilAnsicht(profil, details, tagWaehlen) {
   if (!profil) return beschreibung(details, "library-track-description", "Keine Songbeschreibung hinterlegt");
   const felder = [
-    ["Typ", profil.typ],
-    ["Stilreferenz", profil.stilreferenz || "Nicht hinterlegt"],
-    ["Tempo", profil.tempo_bpm ? profil.tempo_bpm + " BPM" : "Nicht belegt"],
-    ["SoundCloud-Genre", profil.soundcloud_genres.join(", ") || "Nicht hinterlegt"],
-    ["SoundCloud-Tags", profil.soundcloud_tags.length ? h("span", { class: "library-tags" },
-      profil.soundcloud_tags.map(tag => h("button", { type: "button", onclick: () => tagWaehlen(tag) }, tag)))
-      : "Nicht hinterlegt"],
-    ["SoundCloud", profil.soundcloud_status],
+    ["Stilreferenz", profil.stilreferenz],
+    ["Tempo", profil.tempo_bpm ? profil.tempo_bpm + " BPM" : null],
+    ["SoundCloud-Genre", profil.soundcloud_genres.join(", ")],
     ["Fassungen", profil.fassungen + " · " + profil.formate.join(", ")],
-    ["Lyrics", profil.lyrics_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
-    ["Songcover", profil.songcover_lokal ? "Lokal vorhanden" : "Lokal nicht zugeordnet"],
-    ["Beste Bewertung", profil.beste_bewertung ?? "Nicht bewertet"],
-  ];
+    ["Lyrics", profil.lyrics_lokal ? "Lokal vorhanden" : null],
+    ["Bewertung", profil.beste_bewertung],
+  ].filter(([, wert]) => wert != null && wert !== "");
   return h("details", { class: "library-description library-track-description" },
     h("summary", {}, h("span", {}, details ? profil.beschreibung : "Songinfo")),
-    h("p", {}, details || profil.beschreibung),
-    h("dl", { class: "library-profile" },
-      felder.map(([name, wert]) => [h("dt", {}, name), h("dd", {}, wert)])));
+    h("div", { class: "library-profile-content" },
+      h("p", {}, details || profil.beschreibung),
+      h("dl", { class: "library-profile" }, felder.map(([name, wert]) =>
+        h("div", {}, h("dt", {}, name), h("dd", {}, wert)))),
+      profil.soundcloud_tags.length ? h("div", { class: "library-tags" },
+        profil.soundcloud_tags.map(tag => h("button", { type: "button", onclick: () => tagWaehlen(tag) }, tag))) : null));
+}
+
+function soundcloudSymbol(song) {
+  const tracks = song.soundcloud || [];
+  if (!tracks.length) return null;
+  const öffentlich = tracks.filter(track => track.sharing !== "private");
+  const bezeichnung = öffentlich.length ? "Öffentlich auf SoundCloud" : "Privat auf SoundCloud";
+  const link = öffentlich.length === 1 && /^https:\/\/soundcloud\.com\//i.test(öffentlich[0].url || "");
+  const attrs = { class: "library-sc-symbol" + (öffentlich.length ? "" : " privat"), title: bezeichnung,
+    "aria-label": bezeichnung };
+  return link ? h("a", { ...attrs, href: öffentlich[0].url, target: "_blank", rel: "noopener noreferrer" }, "☁")
+    : h("span", { ...attrs, role: "img" }, "☁");
 }
 
 const scZaehler = [
@@ -85,7 +94,7 @@ function soundcloudZahlen(song) {
     const datum = new Date(track.zahlenstand || "");
     const stand = Number.isFinite(datum.getTime()) ? "Stand " + datumsformat.format(datum) : "";
     return h("div", { class: "library-sc-numbers", title: stand },
-      h("span", {}, tracks.length === 1 ? "SoundCloud" : track.title),
+      tracks.length > 1 ? h("span", {}, track.title) : null,
       ...scZaehler.filter(([key]) => Number.isFinite(track.zahlen[key])).map(([key, label]) =>
         h("span", {}, h("strong", {}, zahlenformat.format(track.zahlen[key])), " " + label)));
   };
@@ -134,7 +143,8 @@ function songZeile(song, albumCover, auftraege, gewaehlt, tagWaehlen) {
   return h("li", { class: "library-song" },
     cover && cover !== albumCover ? h("img", { class: "library-song-art", src: api.bildUrl(cover), alt: "", loading: "lazy" }) : player,
     cover && cover !== albumCover ? player : null,
-    h("div", { class: "library-song-identity" }, titel, status, soundcloudZahlen(song),
+    h("div", { class: "library-song-identity" }, h("div", { class: "library-song-heading" },
+      titel, soundcloudSymbol(song), status), soundcloudZahlen(song),
       profilAnsicht(song.kurzprofil, song.beschreibung, tagWaehlen)),
     fassung, aktionen);
 }
@@ -272,10 +282,10 @@ export function songsAnsicht(el) {
       h("details", { open: !haupttitel.length },
         h("summary", {}, "Weitere lokale Songs (" + weitere.length + ")"),
         h("ul", { class: "library-song-list" }, weitere.map(zeile)))) : null;
-    inhalt.append(kopf,
+    inhalt.append(kopf, h("div", { class: "library-detail-body" },
       album ? beschreibung(album.beschreibung, "library-album-description", "Keine Albumbeschreibung hinterlegt") : null,
       sichtbar.length ? h("ul", { class: "library-song-list" }, haupttitel.map(zeile), extraListe)
-        : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei."));
+        : h("p", { class: "library-album-empty klein" }, "In diesem Albumordner liegt keine Audiodatei.")));
     knoepfeAktualisieren();
   }
 

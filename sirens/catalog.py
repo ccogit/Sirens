@@ -109,16 +109,24 @@ def _release_texte(ordner):
             beschreibung = _beschreibung(_text(datei))
             if beschreibung:
                 songs[_titel_schluessel(match[1])] = beschreibung
+    albumteil = True
     for nr, zeile in enumerate(_text(ordner / "Album-info.txt").splitlines()):
         zeile = zeile.strip()
         if nr == 0 or zeile.startswith(("https://", "http://")):
             continue
-        if zeile.startswith(("Titelliste", "Musicmaker-Ergänzungen", "Weitere Titel", "Albumkonzept")):
+        if zeile.startswith("Albumkonzept"):
+            albumteil = not album
+            continue
+        if zeile.startswith(("Titelliste", "Musicmaker-Ergänzungen", "Weitere Titel", "Ergänzende Trackbeschreibungen")):
+            albumteil = False
             continue
         match = re.match(r"^\d+[.)]\s+(.+?)\s+[—–-]\s+(.+)$", zeile)
         if match:
+            albumteil = False
             notizen.setdefault(_notiz_schluessel(match[1]), match[2])
-        elif len(zeile) > 60 and not re.match(r"^(?:\d+[.)]|- )\s", zeile):
+        elif re.match(r"^(?:\d+[.)]\s|[-•]\s)", zeile):
+            albumteil = False
+        elif albumteil and zeile:
             album.append(zeile)
     lyrics = {
         _titel_schluessel(match[1])
