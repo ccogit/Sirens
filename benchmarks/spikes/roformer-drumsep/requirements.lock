@@ -1,0 +1,18 @@
+# Direkte Inferenz-Abhängigkeiten; transitive Auflösung noch nicht eingefroren.
+# MSST: 1523206d12a521bdb20673726562524cf0f9635b (MIT)
+# torch/torchaudio aus https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
+torchaudio==2.7.1+cu128
+# PyPI bzw. MSST requirements.txt am Commit oben.
+numpy==1.26.4
+PyYAML==6.0.2
+ml-collections==1.0.0
+omegaconf==2.2.3
+beartype==0.14.1
+rotary-embedding-torch==0.3.5
+einops==0.8.1
+librosa==0.11.0
+soundfile==0.13.1
+tqdm==4.67.1
+packaging==24.2
+demucs==4.0.0

@@ -1,0 +1,12 @@
+/* Nur RTX Neural Lab; Bestands-Spielzeuge behalten ihr Layout. */
+.rt-shell { display:grid; gap:1rem; padding:1rem; }
+.rt-shell section, .rt-shell details { border:1px solid currentColor; border-radius:0.8rem; padding:1rem; min-width:0; }
+.rt-shell h2, .rt-shell h3, .rt-shell p { margin:0 0 .7rem; overflow-wrap:anywhere; }
+.rt-shell .rt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:1rem; }
+.rt-shell label { display:flex; flex-direction:column; gap:.3rem; margin:.5rem 0; }
+.rt-shell select, .rt-shell input { max-width:100%; min-width:0; }
+.rt-shell .rt-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:.5rem 0; }
+.rt-shell button[aria-pressed="true"] { outline:2px solid currentColor; outline-offset:2px; }
+.rt-shell :focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+.rt-shell button:disabled, .rt-shell input:disabled, .rt-shell select:disabled { opacity:.55; cursor:not-allowed; }
+.rt-shell ul { padding-inline-start:1.25rem; overflow-wrap:anywhere; }

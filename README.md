@@ -260,6 +260,25 @@ arbeitet im Hintergrund unabhängig von der geöffneten Seite weiter.
   Im DJ-Pult startet kein CUDA-KI-Modell; nur eine ausdrücklich gewählte Stem-Trennung
   kann CUDA benutzen (nicht während Claude produziert).
 
+### Signal Room: Discovery und Sessions
+
+Das Live Lab öffnet den **Signal Room**: ein eigener dunkler, responsiver Arbeitsbereich
+mit Experiment-Index, Suche, Kategorien, Favoriten, zuletzt geöffneten Werkzeugen und
+individuellen interaktiven Signalstudien. Diese Vorschauen sind ausdrücklich rein visuell:
+Sie laden keine Audiodateien und starten weder AudioContext noch KI noch WebGL.
+„Experiment starten“ öffnet das echte bestehende Werkzeug. Fokusmodus blendet
+Navigation und Lab-Kopf aus, Vollbild nutzt die Browser-Vollbildfunktion.
+Der letzte gewählte Eintrag, Favoriten und die letzten sechs geöffneten Werkzeuge
+liegen lokal im Browser. Beim Verlassen einer Session wird deren Audio gestoppt;
+die Session wird geschlossen (Reglereinstellungen der meisten Werkzeuge werden
+nicht dauerhaft gespeichert). Bereits gestartete serverseitige KI-/Analyse-Jobs
+laufen gemäß bestehender Backend-Logik weiter; ihre Ergebnisse bleiben lokal.
+Der aktuelle Claude-Status wird im Lab angezeigt und weiterhin für die vorhandenen
+Eco-/GPU-Regeln genutzt. Die restliche Anwendung behält ihr Light-/Dark-Theme.
+
+Neue Experimente werden an einer Stelle registriert. Details, ein vollständiges
+Integrationsbeispiel und die Lifecycle-Regeln stehen in [docs/signal-room.md](docs/signal-room.md).
+
 Für Audio ist nach dem Öffnen ein Klick auf Play oder ein Pad nötig (Autoplay-Schutz des
 Browsers). Bei Verlassen des Live Lab werden die Decks gestoppt, der Audiokontext
 geschlossen und temporäre Datei-URLs freigegeben. Andere Sirens-Funktionen bleiben
@@ -327,3 +346,10 @@ Performance-Steuerung steht in [docs/stem-studio.md](docs/stem-studio.md).
 - Schreibrechte sind getrennt: Die Seite schreibt nur Wunsch, Antworten und Bewertungen; Plan, Fortschritt,
   Ergebnis und „übernommen“ schreibt nur Claude über die CLI.
 - Jede Änderung verlangt die aktuelle Revision; bei gleichzeitiger Änderung wird abgelehnt, nichts überschrieben.
+
+
+## RTX Neural Lab (Testmodus)
+
+In der lokalen `.env` `SIRENS_RT_ENABLED=1` und `SIRENS_RT_MOCK=1` setzen und den Dienst neu starten. Im Live Lab **RTX Neural Lab** wählen, synthetisches Testsignal oder eine unterstützte lokale WAV-Quelle auswählen und explizit Abspielen drücken. Der Testpfad nutzt einen CPU-Mock (Gain/Delay), einen lokalen Sidecar und den AudioWorklet-Kern. Keine KI, keine Downloads, keine Echtzeitfreigabe. Bei Ausfall des Wet-Pfads fällt der Core auf Dry zurück. Panic/Stop und Verlassen des Bereichs schließen die Sitzung und ihre eigenen Prozesse. Die bisherige CUDA-Sperre bleibt unverändert.
+
+Der Referenzpfad akzeptiert PCM16-WAV, 48 kHz, mono/stereo, 256 Frames bis 120 Sekunden; ein 48-kHz-AudioContext ist erforderlich. Andere Formate, RT-Stems, zeitadressierte Befehle, vollständiges Session-Replay und DSP-Bedienung sind noch nicht freigegeben. Aufnahme und Export landen unter dem separaten RT-Verzeichnis, nie im Musikordner. Die Quellen bleiben unverändert. DSP bleibt standardmäßig deaktiviert; BeatGrid ohne belastbares Raster bleibt unsicher. G2-Zielrechner-Messung: siehe `benchmarks/g2/README.md`; bis zur Messung keine produktive Freigabe. `SIRENS_RT_ENABLED=0` sperrt sämtliche RT-Adressen.

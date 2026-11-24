@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "id": "sam-audio-small",
+      "url": "https://huggingface.co/facebook/sam-audio-small",
+      "filename": "checkpoint.pt",
+      "size_bytes": null,
+      "sha256": null,
+      "license": "SAM License (2025-11-19), gated",
+      "license_url": "https://huggingface.co/facebook/sam-audio-small/blob/main/LICENSE",
+      "approved": false
+    },
+    {
+      "id": "t5-base",
+      "url": "https://huggingface.co/google-t5/t5-base/resolve/fe6d9bf207cd3337512ca838a8b453f87a9178ef/model.safetensors",
+      "filename": "model.safetensors",
+      "size_bytes": 891646390,
+      "sha256": "a90903540cc02cbeb7ff9f823f1a80eb778c7e22426a0e620b01c77a5ec8f5b4",
+      "license": "Apache-2.0",
+      "license_url": "https://huggingface.co/google-t5/t5-base",
+      "approved": false
+    }
+  ]
+}

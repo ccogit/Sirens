@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 # eigene Python-Umgebungen für Demucs und Basic Pitch (siehe docs/stem-studio.md)
 .venv*/
+# Lokale Testtracks und Messdaten
+/benchmarks/tracks.local.json
+/benchmarks/results/local/

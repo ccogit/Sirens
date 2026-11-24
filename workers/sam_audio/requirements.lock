@@ -1,0 +1,14 @@
+# Bekannte Pins aus WP02, KEIN vollständiger Installationslock.
+# Nur geprüfte lokale Wheels; keine Git- oder Quellinstallation durch pip.
+# CUDA-Index: https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
+torchaudio==2.7.1+cu128
+torchvision==0.22.1+cu128
+# Projektcode (lokal zu auditierende Wheels):
+# facebookresearch/sam-audio bb4c6999d2677c7402360e426afc01ddfad6dce0
+# facebookresearch/dacvae 414c20785fc3a28373073ea8ef7a1316eeeaca6e
+# facebookresearch/ImageBind 53680b02d7e37b19b124fa37bae4b6c98c38f5be
+# lematt1991/CLAP b85cb7ecac0af7d064cbf03ebd990e709e959fe7
+# facebookresearch/perception_models e72b6810b1133e1c879f2cc965d276eb73803f1f
+# Gesperrt: transitive Wheel-Hashes, torchcodec/FFmpeg und vollständige
+# Gewichtsclosure (SAM small und T5) noch nicht bestätigt (WP02).

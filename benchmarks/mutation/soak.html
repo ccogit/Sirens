@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><title>WP18 – 30-Minuten-Hörprüfung</title>
+<h1>WP18 – eigenständige Hörprüfung (synthetisches PCM)</h1>
+<p>Kein Produkt-Gate, keine KI; Szenario 3 verwendet nachgebautes Backend.</p>
+<label>Szenario <select id="scenario"><option value="4">4 Takte: DSP-Rack</option><option value="8">8 Takte: Performance-Tools</option><option value="16">16 Takte: Registry-Nachbau / Quota</option></select></label>
+<button id="start">30 Minuten starten</button> <button id="stop">Stop / Original</button>
+<button id="mute">Ton aus</button><p id="status"></p>
+<p>Vor Start Lautstärke am Gerät niedrig einstellen. Stop stellt Original wieder her; Ton aus beendet Audio. Ergebnis nach jedem Lauf als JSON außerhalb des Repository speichern.</p>
+<textarea id="result" rows="24" cols="95" readonly></textarea>
+<script type="module">
+import {createBeatGrid} from "../../web/js/realtime/beat_grid.js";
+import {MutationScheduler,dspMutationAdapters} from "../../web/js/realtime/mutation_scheduler.js";
+const $=id=>document.getElementById(id);
+let active=null, audio=null;
+const secs=1800;
+const wave=(i,rate)=>.15*Math.sin(2*Math.PI*110*i/rate)+.05*Math.sin(2*Math.PI*220*i/rate);
+function quantile(xs,p){const a=[...xs].sort((x,y)=>x-y);return a.length?a[Math.floor((a.length-1)*p)]:null;}
+function metrics(xs){return {p50_ms:quantile(xs,.5),p95_ms:quantile(xs,.95),p99_ms:quantile(xs,.99),peak_vram_mib:null,rtf:null,underruns:null};}
+function finish(reason){
+  const a=active;if(!a)return;active=null;clearInterval(a.timer);
+  const now=a.context.currentTime;
+  a.scheduler.stop(Math.max(0,Math.round((now-a.origin)*a.rate)));
+  const elapsed=Math.min(secs,Math.max(0,now-a.origin));
+  $("result").value=JSON.stringify({
+    wp:"WP18",kandidat:"Mutation "+a.bars+" Takte (synthetisch)",zeitpunkt:new Date().toISOString(),
+    befehl:"python -m http.server 8765 --bind 127.0.0.1; Browser /benchmarks/mutation/soak.html",
+    gate:"nicht_gemessen",modus:"offline",rechner:{os:navigator.platform,python:null,node:null,ffmpeg:null,gpus:[],wsl:null,disk:null,git:null,notes:[navigator.userAgent]},
+    messwerte:{kalt:metrics(a.times.slice(0,1)),warm:metrics(a.times.slice(1))},
+    notizen:["Eigenständiger Hörtest, nicht der produktive AudioCore; keine Modell- oder Gate-Messung.",
+      "Szenario: "+a.bars+" Takte, Dauer Sekunden: "+elapsed,"Ende: "+reason,
+      "Vorbereitete Blöcke: "+a.applied+", verpasste/abgelehnte Blöcke: "+a.skips+", Assets (Nachbau): "+a.scheduler.assets,
+      "Peak PCM: "+a.peak+", Samplerate: "+a.rate,"Perzentile: Vorbereitung, keine Audio-End-to-End-Latenz.",
+      "Underruns, Hörurteil, GPU- und Produkt-Deadline nicht automatisch gemessen."]
+  },null,2);
+  $("status").textContent="Original aktiv – "+reason; $("start").disabled=false;
+}
+$("stop").onclick=()=>finish("Manueller Stop");
+$("mute").onclick=async()=>{finish("Ton aus");if(audio){await audio.close();audio=null;}};
+$("start").onclick=async()=>{
+  if(active)return;
+  $("start").disabled=true;
+  try{
+    if(audio)await audio.close();
+    const context=audio=new AudioContext(),rate=context.sampleRate;
+    await context.resume();
+    const bars=Number($("scenario").value), origin=context.currentTime+1;
+    const grid=createBeatGrid({confidence:1,bpm:120,beat0:0,bar0:0},rate);
+    const dry=context.createGain();dry.connect(context.destination);
+    const b=context.createBuffer(1,rate,rate),d=b.getChannelData(0);
+    for(let i=0;i<rate;i++)d[i]=wave(i,rate);
+    const src=context.createBufferSource();src.buffer=b;src.loop=true;src.connect(dry);src.start(origin);
+    const wet=new Set(),times=[];
+    const a={context,rate,origin,bars,times,applied:0,skips:0,peak:0,busy:false};
+    const restore=()=>{for(const n of wet){try{n.stop();}catch{}}wet.clear();
+      dry.gain.cancelScheduledValues(context.currentTime);dry.gain.setValueAtTime(1,context.currentTime);};
+    const adapters=dspMutationAdapters({drum:bars===8,crossover:bars===8,acid:bars===8});
+    if(bars===16)adapters.set("rave",async(p,x)=>({track:Float32Array.from(x.dry,v=>v*.5)}));
+    const scheduler=a.scheduler=new MutationScheduler({grid,adapters,seed:42,bars,maxAssets:4,
+      capabilities:()=>({capabilities:bars===16?[{id:"rave",available:true,mock:false,mode:"lookahead"}]:[]}),
+      original:restore,log:e=>{if(e.type==="skip")a.skips++;},
+      apply:(p,r)=>{
+        const at=origin+p.frame/rate,end=origin+p.endFrame/rate;
+        if(at<context.currentTime+.02)throw Error("Deadline");
+        const node=context.createBufferSource(),buffer=context.createBuffer(1,r.track.length,rate);
+        buffer.copyToChannel(r.track,0);node.buffer=buffer;node.connect(context.destination);
+        wet.add(node);node.onended=()=>{wet.delete(node);node.disconnect();};
+        dry.gain.setValueAtTime(0,at);dry.gain.setValueAtTime(1,end);
+        node.start(at);a.applied++;a.peak=Math.max(a.peak,r.peak);
+      }});
+    active=a;scheduler.start(0);
+    a.timer=setInterval(async()=>{
+      if(active!==a||a.busy)return;
+      const now=context.currentTime, elapsed=now-origin;
+      if(elapsed>=secs){finish("30 Minuten beendet");return;}
+      $("status").textContent=Math.max(0,Math.floor(elapsed))+" / 1800 Sekunden; "+(bars===16?"Nachgebautes Backend – keine KI":scheduler.mode)+"; Blöcke "+a.applied;
+      if(scheduler.next/rate-elapsed>2)return;
+      a.busy=true;
+      try{
+        const p=scheduler.plan();
+        if(!p){if(elapsed*rate>=scheduler.next)scheduler.advance(Math.floor(elapsed*rate));return;}
+        const dry=new Float32Array(p.endFrame-p.frame);
+        for(let i=0;i<dry.length;i++)dry[i]=wave(p.frame+i,rate);
+        const t=performance.now(),r=await scheduler.prepare(p,{rate,dry,
+          drum:{stems:{drums:dry},onsets:[{kind:"kick",frame:0,velocity:.4}]},
+          crossover:{grid:{confidence:1,bpm:120,beat0:0,bar0:0},targetKey:"C major",songs:[{id:"synthetisch",track:dry,grid:{confidence:1,bpm:120,beat0:0,bar0:0},key:"C major"}]},acid:{bass:dry,onsets:[0]}});
+        times.push(performance.now()-t);
+        if(active!==a)return;
+        // Logische Vorab-Entscheidung; AudioBufferSourceNode startet exakt zum
+        // geplanten Context-Zeitpunkt, niemals per Timer am Takt.
+        if(origin+p.frame/rate<context.currentTime+.05){
+          if(context.currentTime>=origin+p.frame/rate)scheduler.advance(Math.max(p.frame,Math.floor((context.currentTime-origin)*rate)));
+          else scheduler.advance(p.frame,null);
+        }else scheduler.advance(p.frame,r);
+        if(!scheduler.running)finish("Scheduler abgebrochen");
+      }catch(e){finish(String(e));}finally{a.busy=false;}
+    },50);
+  }catch(e){$("status").textContent=String(e);$("start").disabled=false;if(audio){await audio.close();audio=null;}}
+};
+</script></html>

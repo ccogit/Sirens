@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "mock",
+  "interpreter_env": "SIRENS_RT_MOCK_PYTHON",
+  "script": "worker.py",
+  "args": [],
+  "capability": {
+    "id": "mock",
+    "mock": true,
+    "available": true,
+    "mode": "offline",
+    "sample_rates": [
+      48000
+    ],
+    "channels": 2,
+    "context_frames": 0,
+    "hop_frames": 256,
+    "latency_frames": 0,
+    "controls": [
+      {
+        "name": "gain",
+        "min": 0,
+        "max": 2,
+        "default": 1
+      },
+      {
+        "name": "delay_frames",
+        "min": 0,
+        "max": 48000,
+        "default": 0
+      }
+    ],
+    "vram_peak_bytes": "unknown",
+    "device": "cpu",
+    "license": "repository",
+    "model_revision": "mock-v1"
+  }
+}

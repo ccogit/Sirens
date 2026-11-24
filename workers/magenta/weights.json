@@ -1,0 +1,53 @@
+{
+  "revision": "7803d987f43f7142cfc7d68ba3361c5f83023931",
+  "models": [
+    {
+      "filename": "checkpoints/mrt2_small.safetensors",
+      "size_bytes": 1128840272,
+      "sha256": "5dd1cbc7c606c512c21de0bcb04d4818bf0a3b873d7cbb9d1556d67d3b034de3",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/checkpoints/mrt2_small.safetensors",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/checkpoints/mrt2_small.safetensors"
+    },
+    {
+      "filename": "resources/musiccoca/audio_preprocessor.tflite",
+      "size_bytes": 8729640,
+      "sha256": "656ca4c358451c2b85932e66efcfd2ba62492f4435953d775bfc1d3c08329a30",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/audio_preprocessor.tflite",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/audio_preprocessor.tflite"
+    },
+    {
+      "filename": "resources/musiccoca/music_encoder.tflite",
+      "size_bytes": 370935584,
+      "sha256": "0d4501af799834e383d904c34ee826c61eb53c69682bf15a981a46c1bb32793a",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/music_encoder.tflite",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/music_encoder.tflite"
+    },
+    {
+      "filename": "resources/musiccoca/pretrained_vector_quantizer.tflite",
+      "size_bytes": 72422108,
+      "sha256": "7a8a19e2119ad405818eae84a331a970f1a582b3389d4bfd27814f75b455a444",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/pretrained_vector_quantizer.tflite",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/pretrained_vector_quantizer.tflite"
+    },
+    {
+      "filename": "resources/musiccoca/spm.model",
+      "size_bytes": 517448,
+      "sha256": "ff325a99b61ba5726cf6437cde6eefbb633dbaa363a684f7a97ed99b55202cca",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/spm.model",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/spm.model"
+    },
+    {
+      "filename": "resources/musiccoca/text_encoder.tflite",
+      "size_bytes": 418674324,
+      "sha256": "e1222e3418cbe8cc2623939571bae8e9ab6f0d511404b0d83da69f4e6e11b272",
+      "license": "CC-BY-4.0",
+      "url": "https://huggingface.co/google/magenta-realtime-2/resolve/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/text_encoder.tflite",
+      "source": "https://huggingface.co/google/magenta-realtime-2/raw/7803d987f43f7142cfc7d68ba3361c5f83023931/resources/musiccoca/text_encoder.tflite"
+    }
+  ]
+}

@@ -36,7 +36,7 @@ function bauen() {
   let frequenzen = null;
   let welle = null;
   let laufend = false;
-  let laedt = false;
+  let laedt = false, generation = 0;
   let bilder = 0;
   let ansicht = (() => { try { return localStorage.getItem("sirens.spielansicht") === "emblem" ? "emblem" : "wellen"; } catch { return "wellen"; } })();
   let gl = null;                       // Emblem auf der Grafikkarte; entsteht beim ersten Umschalten
@@ -76,8 +76,10 @@ function bauen() {
   async function naechster() {
     if (laedt) return;
     laedt = true; beschriften();
+    const token = generation;
     try {
       songs ||= lieblingsDateien(await api.katalog("", 1));
+      if (token !== generation || !el.isConnected) return;
       if (!songs.length) { meldung.textContent = "Noch kein gut bewerteter Song da. Bewerte einen Take mit +1 oder +2, dann spielt er hier."; return; }
       const wahl = songs.filter((s) => s.pfad !== aktuell?.pfad);
       aktuell = (wahl.length ? wahl : songs)[Math.floor(Math.random() * (wahl.length || songs.length))];
@@ -95,8 +97,9 @@ function bauen() {
       titel.textContent = `${aktuell.titel} · ${aktuell.artist}`;
       anderer.hidden = false;
       document.getElementById("player-audio")?.pause(); // es läuft immer nur eines
-      ton.spielen();
+      if (token === generation && el.isConnected) ton.spielen();
     } catch {
+      if (token !== generation || !el.isConnected) return;
       // Diesen Song überspringen; der Knopf holt den nächsten.
       meldung.textContent = `„${aktuell?.titel || "Der Song"}“ lässt sich nicht laden. Versuch es mit einem anderen.`;
       if (aktuell) songs = songs.filter((s) => s !== aktuell);
@@ -169,7 +172,7 @@ function bauen() {
     if (zuEnde) naechster(); // nach dem Stück gleich das nächste
     requestAnimationFrame(bild);
   }
-  return { el, pause: () => { ton.pause(); beschriften(); }, wecken: () => { if (!laufend) { laufend = true; requestAnimationFrame(bild); } } };
+  return { el, pause: () => { generation++; ton.pause(); ton.flaeche(null, null); beschriften(); }, wecken: () => { if (!laufend) { laufend = true; requestAnimationFrame(bild); } } };
 }
 
 // Das eine Spielfeld der Seite; nach dem Einhängen läuft das Bild von selbst.
