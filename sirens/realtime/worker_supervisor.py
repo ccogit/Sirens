@@ -114,6 +114,8 @@ class _Process:
         self.closed = threading.Event()
         self.write_lock = threading.Lock()
         self.stop_lock = threading.Lock()
+        self.cancel_id = None
+        self.cancel_ack = threading.Event()
         try:
             if os.name == "nt":
                 self.job = _WindowsJob(self.process)
@@ -134,6 +136,8 @@ class _Process:
                 msg, audio = _read(self.process.stdout)
                 if msg["type"] == "heartbeat":
                     self.last_heartbeat = time.monotonic()
+                elif msg["request_id"] == self.cancel_id:
+                    self.cancel_ack.set()
                 else:
                     self.responses.put_nowait((msg, audio))
         except (EOFError, OSError, ValueError, TypeError, queue.Full):
@@ -153,6 +157,14 @@ class _Process:
                     self.process.stdin.flush()
         except (OSError, ValueError):
             self.closed.set()
+
+    def cancel(self):
+        if self.alive():
+            self.cancel_id = uuid4().hex
+            threading.Thread(target=self.write,
+                             args=(_frame("cancel", self.cancel_id, {}),), daemon=True).start()
+            self.cancel_ack.wait(0.2)
+        self.stop()
 
     def stop(self):
         with self.stop_lock:
@@ -233,7 +245,8 @@ class WorkerSupervisor:
                     peak = max(peak, peak_bytes)
                 if type(peak) is not int or peak <= 0:
                     raise error("busy_gpu")
-                self.lease = self.gpu.acquire(peak, priority, self._evict, user_action=True)
+                self.lease = self.gpu.acquire(peak, priority, self._evict, user_action=True,
+                                              max_leases=self.profile["max_gpu_workers"])
             try:
                 self._spawn()
             except Exception:
@@ -250,7 +263,7 @@ class WorkerSupervisor:
         try:
             self.stopped = True
             if self.worker:
-                self.worker.stop()
+                self.worker.cancel()
             self.lease = None
             return True
         finally:
@@ -278,10 +291,27 @@ class WorkerSupervisor:
         payload = {} if payload is None else payload
         if not isinstance(payload, dict) or not isinstance(audio, bytes) or len(audio) % 8:
             raise invalid("payload")
-        allowed = {"load": {"gain", "delay_frames"},
-                   "process": {"delay_seconds", "crash", "memory_bytes", "memory_limit_bytes"}} if self.entry["capability"]["mock"] else {}
+        controls = {c["name"]: c for c in self.entry["capability"]["controls"]}
+        allowed = {"load": set(controls)}
+        if self.entry["capability"]["mock"]:
+            allowed["process"] = {"delay_seconds", "crash", "memory_bytes", "memory_limit_bytes"}
         if set(payload) - allowed.get(kind, set()) or (audio and kind != "process"):
             raise invalid("payload")
+        if kind == "load":
+            for key, value in payload.items():
+                c = controls[key]
+                if type(value) not in (int, float) or not c["min"] <= value <= c["max"]:
+                    raise invalid("payload")
+        if kind == "process" and self.entry["capability"]["mock"]:
+            for key, value in payload.items():
+                if key == "crash":
+                    valid = type(value) is bool
+                elif key == "delay_seconds":
+                    valid = type(value) in (int, float) and 0 <= value <= 60
+                else:
+                    valid = type(value) is int and 0 <= value <= 2**53-1
+                if not valid:
+                    raise invalid("payload")
         if kind == "process":
             payload = {**payload, "audio_bytes": len(audio)}
         rid = uuid4().hex
@@ -309,6 +339,8 @@ class WorkerSupervisor:
                             worker.stop()
                             raise error("unavailable")
                         continue
+                    if self.stopped:
+                        raise error("unavailable")
                     if msg["request_id"] != rid:
                         worker.stop()
                         raise error("unavailable")
@@ -326,10 +358,10 @@ class WorkerSupervisor:
 
     def cancel(self):
         # Kooperatives Cancel anstoßen, dann den eigenen Prozessbaum sicher beenden.
-        worker = self.worker
-        if worker and worker.alive():
-            threading.Thread(target=worker.write,
-                             args=(_frame("cancel", uuid4().hex, {}),), daemon=True).start()
+        with self.lifecycle:
+            self.stopped = True
+            if self.worker:
+                self.worker.cancel()
         self.close()
 
     def close(self):
