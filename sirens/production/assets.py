@@ -29,6 +29,8 @@ def inspect_wav(path, *, duration_seconds=None, loop=False, speech=False):
         channels, frames = wav.getnchannels(), wav.getnframes()
         rate = wav.getframerate()
         peak = energy = clips = 0
+        totals = [0] * channels
+        silence = longest_silence = 0
         first = last = None
         while chunk := wav.readframes(8192):
             for i in range(0, len(chunk), channels * 3):
@@ -37,7 +39,10 @@ def inspect_wav(path, *, duration_seconds=None, loop=False, speech=False):
                 if first is None:
                     first = frame
                 last = frame
-                for sample in frame:
+                silence = silence + 1 if all(abs(s) < 8 for s in frame) else 0
+                longest_silence = max(longest_silence, silence)
+                for channel, sample in enumerate(frame):
+                    totals[channel] += sample
                     peak = max(peak, abs(sample))
                     energy += sample * sample
                     clips += sample in (-8388608, 8388607)
@@ -54,12 +59,22 @@ def inspect_wav(path, *, duration_seconds=None, loop=False, speech=False):
     seam = max(abs(a-b) for a,b in zip(first,last)) / 8388608
     if loop and seam > 0.02:
         raise AssetError("loop boundary discontinuity")
+    dc_offset = max(abs(total) for total in totals) / (frames * 8388608)
+    warnings = []
+    if dc_offset > .02:
+        warnings.append("DC offset")
+    if longest_silence / rate > .5:
+        warnings.append("long silence; inspect for dropout or intentional pause")
+    if not loop and max(abs(s) for s in (*first, *last)) / 8388608 > .02:
+        warnings.append("non-zero cut boundary; listen for clicks")
     return dict(sample_rate=rate, channels=channels, frames=frames,
                 sha256=sha256_file(path), measured=dict(
                     bpm=None, key=None, duration_seconds=duration,
                     peak_dbfs=20 * math.log10(peak / 8388608),
                     rms_dbfs=10 * math.log10(energy / (frames * channels) / 8388608**2),
-                    clipped_samples=clips, seam_delta=seam, listening=None))
+                    clipped_samples=clips, seam_delta=seam, dc_offset=dc_offset,
+                    longest_silence_seconds=longest_silence / rate,
+                    warnings=warnings, listening=None))
 
 
 def approved_source(source, *, commercial=False, allow_test=False):
@@ -135,6 +150,34 @@ class Worker:
         self.timeout = timeout
         self.cancelled = cancelled
         self.script = Path(__file__).resolve().parents[2] / "workers" / "production_assets" / "worker.py"
+        self._child = None
+
+    @classmethod
+    def coordinated(cls, python, gpu_adapter, *, peak_bytes, user_action, **kwargs):
+        """Use K00 GPUAdapter with confirmed process termination before release."""
+        worker = cls(python, **kwargs)
+        worker.lease = lambda: gpu_adapter.worker_lease(
+            peak_bytes, user_action=user_action, stopped=worker.stopped)
+        return worker
+
+    def stopped(self):
+        return self._child is None or self._child.poll() is not None
+
+    def verify_source(self, request, source):
+        if request["kind"] == "speech":
+            if self.model_dir is None or not (Path(self.model_dir) / "config.json").is_file():
+                raise AssetError("local Qwen3-TTS model is missing")
+            revision = Path(self.model_dir).resolve().name
+            if (not re.fullmatch(r"[0-9a-f]{40}", revision) or
+                    source.get("revision") != revision or source.get("backend") != "qwen3-tts-customvoice"):
+                raise AssetError("Qwen3-TTS requires a pinned local snapshot and matching provenance")
+            source.update(voice_preset="Ryan", voice_language="English", voice_clone=False)
+        else:
+            revision = "8bdfb53c6b0fbc62113cd571fd37373efe15fa14"
+            if source.get("backend") != "stable-audio-3-small-music" or source.get("revision") != revision:
+                raise AssetError("Stable Audio source revision does not match verified worker")
+            if self.stable_cache is None or not (Path(self.stable_cache) / "models--stabilityai--stable-audio-3-small-music" / "snapshots" / revision).is_dir():
+                raise AssetError("verified local Stable Audio snapshot missing")
 
     def _invoke(self, payload, dest):
         env = {**os.environ, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
@@ -150,6 +193,7 @@ class Worker:
             with subprocess.Popen([str(interpreter), str(self.script), str(job)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                   env=env, shell=False) as child:
+                self._child = child
                 try:
                     deadline = time.monotonic() + self.timeout
                     while child.poll() is None:
@@ -204,7 +248,7 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
     root = Path(run_dir).resolve(strict=True)
     manifest_path = safe_path(root, "assets.json")
     assets_dir = safe_path(root, "assets")
-    if manifest_path.exists() or assets_dir.exists():
+    if manifest_path.exists() or assets_dir.exists() or safe_path(root, "asset_provenance.json").exists():
         raise AssetError("run assets already exist; use a new run")
     assets_dir.mkdir()
     cache = None
@@ -249,6 +293,8 @@ def render_assets(plan, run_dir, *, resolve, worker=None, generated_sources=None
                           input_sha256=input_hash)
             if request["kind"] == "speech":
                 source["text"] = request["text"]
+            if candidate is None and isinstance(worker, Worker):
+                worker.verify_source(request, source)
             approved_source(source, commercial=commercial, allow_test=allow_test)
             key = _cache_key(request, source, input_hash, plan)
             cached = cache / (key + ".wav") if cache else None
@@ -477,3 +523,21 @@ def selected_delivery(secondroom, project_id, delivery_id, host_root, *, commerc
     approved_source(source, commercial=commercial)
     return local_candidate(root, path.relative_to(root).as_posix(), source,
                            {"bpm": row.get("bpm"), "key": row.get("musical_key")})
+
+
+def g1_requests(text, *, seed=101, speech_seconds=8):
+    """Reproducible maritime test requests; text must be supplied verbatim."""
+    if not isinstance(text, str) or not text.strip():
+        raise AssetError("G1 requires the exact spoken cue")
+    sounds = (
+        ("bell-buoy", "isolated maritime bell buoy, distant metallic ringing over calm water, no music", 4),
+        ("seagulls", "a few distant seagull calls over a quiet harbour, no music or speech", 5),
+        ("foghorn", "single low distant ship foghorn, soft natural decay, no music", 5),
+        ("ship-bell", "one clear brass ship bell strike, natural ringing decay, no music", 3),
+    )
+    requests = [dict(id=name, kind="foley", prompt=prompt, seed=seed + i,
+                     duration_seconds=duration) for i, (name, prompt, duration) in enumerate(sounds)]
+    requests.append(dict(id="spoken-cue", kind="speech", text=text,
+                         prompt="calm close male spoken word, English, no singing",
+                         seed=seed + len(sounds), duration_seconds=speech_seconds))
+    return requests
