@@ -33,6 +33,9 @@ def heartbeat():
 
 def demucs_run(source, out):
     # Bestandsumgebung, CPU, nur lokal vorhandene Gewichte.
+    from importlib.metadata import version
+    if version("demucs") != "4.0.0":
+        raise RuntimeError("Demucs 4.0.0 erforderlich")
     import torch
     def no_download(*args, **kwargs):
         raise RuntimeError('Demucs-Gewichte fehlen lokal; separat installieren')
