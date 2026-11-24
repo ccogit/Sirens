@@ -20,7 +20,10 @@ def factory():
 def main(make_model=factory):
     inp, out = sys.stdin.buffer, sys.stdout.buffer
     sys.stdout = sys.stderr
-    cap = json.loads(Path(__file__).with_name("manifest.json").read_text(encoding="utf-8"))["capability"]
+    manifest = Path(__file__).with_name("manifest.json")
+    if not manifest.is_file():
+        manifest = Path(__file__).with_name("manifest.pending.json")
+    cap = json.loads(manifest.read_text(encoding="utf-8"))["capability"]
     lock = threading.Lock()
     done, cancel = threading.Event(), threading.Event()
     model = None
