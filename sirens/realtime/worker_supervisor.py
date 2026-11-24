@@ -3,6 +3,8 @@ import json
 import math
 import os
 import queue
+import shutil
+from pathlib import Path
 import signal
 import struct
 import subprocess
@@ -110,6 +112,7 @@ class _Process:
                                         start_new_session=os.name != "nt")
         self.job = None
         self.last_heartbeat = time.monotonic()
+        self.progress = None
         self.responses = queue.Queue(maxsize=2)
         self.closed = threading.Event()
         self.write_lock = threading.Lock()
@@ -137,6 +140,9 @@ class _Process:
                 msg, audio = _read(p.stdout)
                 if msg["type"] == "heartbeat":
                     self.last_heartbeat = time.monotonic()
+                    value = msg["payload"].get("progress")
+                    if type(value) in (int, float) and 0 <= value <= 1:
+                        self.progress = value
                 elif msg["request_id"] == self.cancel_id:
                     self.cancel_ack.set()
                 else:
@@ -204,7 +210,9 @@ class _Process:
 class WorkerSupervisor:
     """Ein persistenter Worker je Instanz; niemals automatisch Modellarbeit wiederholen."""
     def __init__(self, registry, name, *, gpu=None, profile="Performance", max_pending=None,
-                 max_restarts=1):
+                 max_restarts=1, music_root=None, realtime_dir=None):
+        self.music_root = Path(music_root).resolve() if music_root is not None else None
+        self.realtime_dir = Path(realtime_dir).resolve() if realtime_dir is not None else None
         self.entry = registry.resolve(name)
         self.root = registry.root
         if profile not in PROFILES or type(max_restarts) is not int or max_restarts < 0:
@@ -317,6 +325,9 @@ class WorkerSupervisor:
                     raise invalid("payload")
         if kind == "process":
             payload = {**payload, "audio_bytes": len(audio)}
+        return self._exchange(kind, payload, audio, timeout)
+
+    def _exchange(self, kind, payload, audio, timeout):
         rid = uuid4().hex
         data = _frame(kind, rid, payload, audio)
         if not self.slots.acquire(blocking=False):
@@ -353,11 +364,80 @@ class WorkerSupervisor:
                     if msg["type"] != "result":
                         worker.stop()
                         raise error("unavailable")
+                    if kind == "file_job" and raw:
+                        worker.stop()
+                        raise invalid("payload")
                     return (msg["payload"], raw) if kind == "process" else msg["payload"]
             finally:
                 self.serial.release()
         finally:
             self.slots.release()
+
+    @property
+    def file_progress(self):
+        return self.worker.progress if self.worker else None
+
+    def request_file_job(self, job_id, source, out_dir, params, timeout):
+        """Nur serverseitig aufgelöste Pfade; Ausgabe privat bis zur Prüfung."""
+        if (not isinstance(job_id, str) or len(job_id) != 32
+                or any(c not in "0123456789abcdef" for c in job_id)
+                or self.realtime_dir is None or self.music_root is None):
+            raise invalid("job_id")
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+            raise invalid("timeout")
+        controls = {c["name"]: c for c in self.entry["capability"]["controls"]}
+        if not isinstance(params, dict) or set(params) - set(controls):
+            raise invalid("params")
+        for key, value in params.items():
+            c = controls[key]
+            if type(value) not in (int, float) or not c["min"] <= value <= c["max"]:
+                raise invalid("params")
+        source = Path(source).resolve()
+        out_dir = Path(out_dir)
+        jobs = self.realtime_dir / "jobs"
+        expected = jobs / job_id
+        published = jobs / (job_id + ".ready")
+        if (not source.is_file() or not any(root in source.parents
+                for root in (self.music_root, self.realtime_dir / "cache"))
+                or self.realtime_dir == self.music_root or self.music_root in self.realtime_dir.parents
+                or out_dir != expected or out_dir.resolve() != expected
+                or jobs == self.music_root or self.music_root in jobs.parents
+                or jobs.resolve() != jobs or out_dir.exists() or out_dir.is_symlink()
+                or published.exists() or published.is_symlink()):
+            raise invalid("path")
+        jobs.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir()
+        try:
+            result = self._exchange("file_job", {"job_id": job_id, "source": str(source),
+                                    "out_dir": str(out_dir), "params": params}, b"", timeout)
+            # Keine weiteren Schreibzugriffe des Workers nach der Antwort.
+            self.worker.stop()
+            files = result.get("files")
+            if not isinstance(files, list) or not files or any(
+                    not isinstance(name, str) or name in ("", ".", "..")
+                    or "/" in name or "\\" in name or ":" in name for name in files):
+                raise invalid("files")
+            if len(set(files)) != len(files) or out_dir.is_symlink() or {
+                    p.name for p in out_dir.iterdir()} != set(files):
+                raise invalid("files")
+            for name in files:
+                path = out_dir / name
+                if path.is_symlink() or not path.is_file() or path.resolve().parent != out_dir or path.stat().st_nlink != 1:
+                    raise invalid("files")
+            with self.lifecycle:
+                if self.stopped:
+                    raise error("unavailable")
+                out_dir.rename(published)
+            return {**result, "files": files}
+        except BaseException:
+            try:
+                self.close()
+            finally:
+                if out_dir.is_symlink():
+                    out_dir.unlink()
+                else:
+                    shutil.rmtree(out_dir, ignore_errors=True)
+            raise
 
     def cancel(self):
         # Kooperatives Cancel anstoßen, dann den eigenen Prozessbaum sicher beenden.

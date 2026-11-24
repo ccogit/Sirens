@@ -62,7 +62,7 @@ def run(source, output, weight):
     torch.cuda.synchronize(device)
     return {"id": "roformer", "mock": False, "available": True, "mode": "offline",
             "sample_rates": [44100], "channels": 2, "context_frames": 0,
-            "hop_frames": 0, "latency_frames": 0, "controls": [],
+            "hop_frames": 1, "latency_frames": 0, "controls": [],
             "vram_peak_bytes": torch.cuda.max_memory_allocated(device),
             "device": "cuda", "license": "MIT", "model_revision": PIN + ":" + SHA}
 
