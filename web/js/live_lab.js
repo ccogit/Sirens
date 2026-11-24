@@ -1,290 +1,177 @@
-// Live Lab: Musik während laufender Claude-Produktionen interaktiv hören und verändern.
+// Signal Room: discovery shell and real, exclusive audio sessions.
 import { api } from "./api.js";
 import { h, meldung } from "./dom.js";
-import { LiveAudio } from "./live_audio.js";
-import { visualisieren } from "./live_visual.js";
-import { spielAnhalten, spielwiese } from "./spielwiese.js";
-import { autoDjAnsicht } from "./auto_dj.js";
-import { kickTausch } from "./kicktausch.js";
-import { stemSpiel } from "./stems.js";
-import { createLabShell } from "./realtime/shell.js";
+import { werkzeuge, rtZustand } from "./signal_tools.js";
+import { signalArt } from "./signal_art.js";
+import { toolWahl, recentAdd, filterTools, readList, validateTools, createSession } from "./signal_model.js";
+export { katalogEintraege } from "./lab_pult.js";
 
-function minuten(t) {
-  if (!Number.isFinite(t)) return "0:00";
-  return Math.floor(t/60) + ":" + String(Math.floor(t%60)).padStart(2,"0");
-}
+const nummer = n => String(n).padStart(2,"0");
+const keys={selected:"sirens.spielzeug",favorites:"sirens.signal.favorites",recent:"sirens.signal.recent"};
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function speichern(key,value) { try { localStorage.setItem(key,value); } catch { /* private mode */ } }
+function listeLesen(key,tools) { try { return readList(localStorage,key,tools); } catch { return []; } }
+function button(text,attrs={}) { return h("button",{type:"button",...attrs},text); }
 
-export function katalogEintraege(daten) {
-  const alle = [];
-  for (const artist of daten.artists || []) {
-    for (const release of artist.releases || []) {
-      for (const song of release.songs || []) {
-        for (const d of song.dateien || []) alle.push({
-          pfad: d.pfad,
-          text: artist.slug + " · " + song.titel + (d.fassung ? " (" + d.fassung + ")" : "")
-        });
-      }
-    }
-  }
-  return alle;
-}
-
-// Verwendet die bestehende Drosselung (Auflösung und Bildrate), ohne
-// einen zweiten Renderer anzulegen. Ohne RT-Profil unveränderte Legacy-Regel.
+// Verwendet die bestehende Drosselung (Auflösung und Bildrate), ohne einen zweiten Renderer anzulegen.
+// Ohne RT-Profil gilt die bisherige Regel (nur während einer Claude-Produktion).
 export function visualGpuDrosseln(producing, profile) {
   return Boolean(producing || profile === "Neural" || profile === "Eco" || profile === "Training/Render");
 }
 
 export function liveLabAnsicht(el) {
-  const engine = new LiveAudio();
-  let beendet = false, modus = "cosmic", katalogTimer = null, produktionLaeuft = false;
-  let statusTimer = null;
-  const opt = [[], []];
-  const titel = [h("strong", {}, "Deck A bereit"), h("strong", {}, "Deck B bereit")];
-  const canvas = h("canvas", { class: "lab-canvas", "aria-label": "Musikreaktive GPU-Visualisierung" });
-  const hud = h("canvas", { class: "lab-canvas", "aria-label": "Wellenform oder Frequenzspektrum", hidden: true });
-  const status = h("span", { class: "lab-working" }, "Produktionsstatus wird geladen");
-  const demo = h("span", { class: "lab-demo" }, "DEMO · Sound laden oder Pads spielen");
-  const cross = h("input", { type: "range", min: "0", max: "100", value: "50", "aria-label": "Crossfader zwischen Deck A und B" });
-  const effectValues = {};
+  const tools=validateTools(werkzeuge);
+  if (!tools.length) { el.append(h("p",{},"Noch keine Lab-Werkzeuge registriert.")); return () => {}; }
+  let selected=toolWahl(tools,lesen(keys.selected)||"stems"), filter="all", query="";
+  let favorites=listeLesen(keys.favorites,tools), recent=listeLesen(keys.recent,tools);
+  let beendet=false, produktion=false, session=false, focusMode=false;
+  const state=h("span",{class:"sr-production",role:"status"},"STATUS WIRD GELADEN");
+  const root=h("section",{class:"signal-room lab-page","aria-label":"Sirens Signal Room"});
+  const header=h("header",{class:"sr-intro"},
+    h("div",{},h("p",{class:"sr-eyebrow"},"SIRENS / EXPERIMENTAL DIVISION"),h("h1",{},"SIGNAL ",h("em",{},"ROOM."))),
+    h("div",{class:"sr-intro-copy"},h("p",{},h("strong",{},"Music is material. Break the rules.")," Entdecke, forme und rekonstruiere deinen Sound."),state));
+  const search=h("input",{type:"search",placeholder:"Experimente suchen …","aria-label":"Experimente suchen",autocomplete:"off"});
+  const count=h("span",{class:"sr-count","aria-live":"polite"});
+  const filters=h("div",{class:"sr-filters",role:"group","aria-label":"Werkzeugfilter"});
+  const list=h("div",{class:"sr-list",role:"group","aria-label":"Experiment-Index"});
+  const index=h("aside",{class:"sr-index"},
+    h("div",{class:"sr-index-head"},h("div",{class:"sr-index-title"},h("strong",{},"Experiment-Index"),count),
+      h("label",{class:"sr-search"},h("span",{"aria-hidden":"true"},"⌕"),search),filters),
+    list,h("div",{class:"sr-index-foot"},"SIRENS / LAB SERIES",h("span",{},"01—"+nummer(tools.length))));
+  const art=h("div",{class:"sr-art","aria-hidden":"true"});
+  const category=h("p",{class:"sr-eyebrow"});
+  const headline=h("h2",{class:"sr-headline"});
+  const hook=h("p",{class:"sr-hook"});
+  const hero=h("div",{class:"sr-hero"},art,h("span",{class:"sr-graphic-note"},"⊕  SIGNAL STUDY / DEMO"),
+    h("div",{class:"sr-hero-text"},category,headline,hook));
+  const name=h("h3",{class:"sr-tool-name"}), description=h("p",{class:"sr-description"});
+  const star=button("☆",{class:"sr-star",onclick:toggleFavorite});
+  const tags=h("div",{class:"sr-tags"}), prep=h("p",{class:"sr-prep"});
+  const level=h("input",{type:"range",min:0,max:100,value:50,"aria-label":"Vorschau"});
+  const levelLabel=h("span",{}), value=h("output",{}), left=h("span",{}), right=h("span",{});
+  const preview=h("div",{class:"sr-preview"},h("label",{},h("span",{class:"sr-preview-label"},levelLabel,value),level),
+    h("div",{class:"sr-preview-ends"},left,right),h("small",{},"VISUELLE DEMO · KEIN AUDIO"));
+  const launch=button("Experiment starten →",{class:"sr-launch",onclick:openSession});
+  const detail=h("div",{class:"sr-detail"},h("div",{},h("div",{class:"sr-detail-title"},name,star),description,tags),
+    h("div",{class:"sr-action"},preview,launch,prep));
+  const stageNumber=h("span",{class:"sr-stage-number"}), mode=h("span",{},"DISCOVERY MODE");
+  const stage=h("section",{class:"sr-stage","aria-label":"Experiment-Vorschau"},
+    h("div",{class:"sr-stagebar"},stageNumber,mode),hero,detail);
+  const discovery=h("div",{class:"sr-discovery"},index,stage);
+  const sessionTitle=h("h2",{tabindex:"-1"});
+  const sessionMeta=h("p",{class:"sr-eyebrow"});
+  const back=button("← Experiment-Index",{class:"sr-secondary",onclick:()=>closeSession(true)});
+  const focus=button("Fokusmodus",{class:"sr-secondary","aria-pressed":"false",onclick:()=>setFocus(!focusMode)});
+  const full=button("Vollbild",{class:"sr-secondary",onclick:async()=>{
+    try { if(document.fullscreenElement===root) await document.exitFullscreen(); else await root.requestFullscreen(); }
+    catch { meldung("Vollbild wird von diesem Browser nicht unterstützt."); }
+  }});
+  if(!root.requestFullscreen) full.hidden=true;
+  const host=h("div",{class:"lab-toy sr-runtime"});
+  const sessionPanel=h("section",{class:"sr-session",hidden:true,"aria-label":"Aktives Werkzeug"},
+    h("header",{class:"sr-session-head"},h("div",{},sessionMeta,sessionTitle),
+      h("div",{class:"sr-session-actions"},back,focus,full)),host);
+  const footer=h("footer",{class:"sr-footer"},"LOCAL AUDIO / ORIGINALDATEIEN BLEIBEN UNVERÄNDERT",h("span",{},"SIRENS · SIGNAL ROOM"));
+  root.append(header,discovery,sessionPanel,footer);el.append(root);
+  const runtime=createSession(host,{isProducing:()=>visualGpuDrosseln(produktion,rtZustand.profil)});
+  const filterDefs=[["all","Alle"],["favorites","★ Favoriten"],["recent","Zuletzt"],
+    ...[...new Set(tools.map(t=>t.gruppe))].map(g=>["group:"+g,g]),
+    ...(tools.some(t=>t.experimental)?[["experimental","Experimental"]]:[])];
+  for(const [id,label] of filterDefs) filters.append(button(label,{class:"sr-filter","data-filter":id,
+    onclick:()=>{filter=id;renderList();}}));
 
-  function einstellungenAnwenden() {
-    engine.setCrossfade(cross.value);
-    engine.setFilter(effectValues.filter?.value || 100);
-    engine.setDrive(effectValues.drive?.value || 0);
-    engine.setEcho(effectValues.echo?.value || 0);
-  }
-
-  async function mitAudio(fn) {
-    try {
-      await engine.aktivieren();
-      einstellungenAnwenden();
-      await fn();
-      demo.textContent = "LIVE · AUDIOREAKTIV";
-    } catch (err) {
-      meldung("Audio konnte nicht gestartet werden: " + (err.message || err), "fehler");
+  function renderList(restoreId) {
+    const visible=filterTools(tools,{query,filter,favorites,recent});
+    count.textContent=nummer(visible.length)+" / "+nummer(tools.length);
+    for(const b of filters.children)b.setAttribute("aria-pressed",String(b.dataset.filter===filter));
+    list.replaceChildren();
+    if(!visible.length)list.append(h("p",{class:"sr-empty"},"Keine passenden Experimente. Filter oder Suche ändern."));
+    for(const tool of visible) {
+      const b=h("button",{type:"button",class:"sr-tool","data-id":tool.id,"aria-pressed":String(tool.id===selected.id),
+        onclick:()=>{selected=tool;speichern(keys.selected,tool.id);renderDetail();renderList(tool.id);
+          if(window.matchMedia?.("(max-width: 670px)").matches) stage.scrollIntoView({block:"start",behavior:"auto"});}},
+        h("span",{class:"sr-num"},"/"+nummer(tools.indexOf(tool)+1)),
+        h("span",{},h("strong",{},tool.kurz||tool.titel,favorites.includes(tool.id)?" ★":""),
+          h("small",{},tool.sub),tool.experimental?h("small",{class:"sr-experimental"},"EXPERIMENTAL"):null),h("span",{class:"sr-arrow","aria-hidden":"true"},"↗"));
+      b.style.setProperty("--sr-tool",tool.farbe);list.append(b);
     }
+    if(restoreId) [...list.children].find(b=>b.dataset.id===restoreId)?.focus({preventScroll:true});
   }
-
-  function deck(index) {
-    const a = engine.decks[index];
-    const waehlen = h("select", { "aria-label": "Song für Deck " + (index ? "B" : "A") },
-      h("option", { value: "" }, "Song aus dem Katalog wählen …"));
-    const lokal = h("input", { type: "file", accept: "audio/*,.mp3,.wav,.ogg,.flac",
-      "aria-label": "Eigene Audiodatei für Deck " + (index ? "B" : "A") });
-    const play = h("button", { type: "button", class: "lab-play" }, "▶ Abspielen");
-    const position = h("input", { type: "range", min: "0", max: "1000", value: "0",
-      "aria-label": "Position in Deck " + (index ? "B" : "A") });
-    const zeitanzeige = h("span", { class: "lab-clock" }, "0:00 / 0:00");
-    const tempo = h("input", { type: "range", min: "65", max: "150", value: "100",
-      "aria-label": "Abspielgeschwindigkeit Deck " + (index ? "B" : "A") });
-    const tempoWert = h("output", {}, "100 %");
-    const gesetzt = (name) => {
-      titel[index].textContent = name;
-      play.textContent = "▶ Abspielen";
-      position.value = "0";
-    };
-    const loadSong = (src, name, file = false) => {
-      engine.laden(index, src, file);
-      gesetzt(name);
-      demo.textContent = "LIVE · bereit zum Abspielen";
-    };
-    waehlen.addEventListener("change", () => {
-      const hit = opt[index].find((e) => e.pfad === waehlen.value);
-      if (hit) { lokal.value = ""; loadSong(api.audioUrl(hit.pfad), hit.text); }
-    });
-    lokal.addEventListener("change", () => {
-      const f = lokal.files?.[0];
-      if (!f) return;
-      if (!f.type.startsWith("audio/") && !/\.(wav|mp3|ogg|flac)$/i.test(f.name)) {
-        meldung("Bitte eine Audiodatei auswählen.", "fehler");
-        return;
-      }
-      waehlen.value = "";
-      loadSong(f, f.name, true);
-    });
-    play.addEventListener("click", () => {
-      if (!a.getAttribute("src")) { meldung("Zuerst einen Song wählen oder eine Datei laden."); return; }
-      mitAudio(async () => { await engine.schalten(index); });
-    });
-    a.addEventListener("play", () => { play.textContent = "❚❚ Pause"; });
-    a.addEventListener("pause", () => { play.textContent = "▶ Abspielen"; });
-    a.addEventListener("error", () => {
-      if (!beendet && a.getAttribute("src")) meldung("Dieses Audioformat kann der Browser nicht abspielen.", "fehler");
-    });
-    a.addEventListener("timeupdate", () => {
-      if (Number.isFinite(a.duration) && a.duration > 0) position.value = Math.round(a.currentTime/a.duration*1000);
-      zeitanzeige.textContent = minuten(a.currentTime) + " / " + minuten(a.duration);
-    });
-    position.addEventListener("input", () => {
-      if (Number.isFinite(a.duration)) a.currentTime = position.value/1000*a.duration;
-    });
-    tempo.addEventListener("input", () => {
-      engine.setTempo(index, tempo.value);
-      tempoWert.textContent = tempo.value + " %";
-    });
-    return { select: waehlen, el: h("section", { class: "lab-deck" },
-      h("div", { class: "lab-deck-heading" },
-        h("span", { class: "lab-deck-tag" }, "DECK " + (index ? "B" : "A")), titel[index]),
-      waehlen,
-      h("label", { class: "lab-file" }, "Oder Datei vom PC wählen", lokal),
-      h("div", { class: "lab-transport" }, play, zeitanzeige),
-      position,
-      h("div", { class: "lab-tempo" }, h("label", {}, "Speed & Pitch"), tempo, tempoWert)) };
+  function renderArt() {
+    const p=selected.preview, v=Number(level.value)/100;
+    art.replaceChildren((p?.zeichnen||signalArt)(selected.farbe,v));
+    value.textContent=level.value+" %";
   }
-
-  function regler(name, label, value, apply) {
-    const input = h("input", { type: "range", min: "0", max: "100", value: String(value), "aria-label": label });
-    const out = h("output", {}, value + " %");
-    effectValues[name] = input;
-    input.addEventListener("input", () => { out.textContent = input.value + " %"; apply(input.value); });
-    return h("label", { class: "lab-control" }, h("span", {}, label, out), input);
+  function renderDetail() {
+    root.style.setProperty("--sr-accent",selected.farbe);
+    stageNumber.textContent="EXPERIMENT "+nummer(tools.indexOf(selected)+1)+" / "+nummer(tools.length);
+    category.textContent=selected.kategorie;headline.textContent=selected.slogan;hook.textContent=selected.sub;
+    name.textContent=selected.titel;description.textContent=selected.text;prep.textContent=selected.voraussetzung;
+    tags.replaceChildren(...(selected.tags||[]).map(tag=>h("span",{},tag)),...(selected.experimental?[h("span",{class:"sr-experimental"},"EXPERIMENTAL")]:[]));
+    const fav=favorites.includes(selected.id);
+    star.textContent=fav?"★":"☆";star.setAttribute("aria-pressed",String(fav));
+    star.setAttribute("aria-label",fav?"Aus Favoriten entfernen":"Zu Favoriten hinzufügen");
+    const p=selected.preview;
+    level.value=p?.start??50;levelLabel.textContent=p?.label||"Signalform";
+    level.setAttribute("aria-label",levelLabel.textContent+" (visuelle Demo)");
+    left.textContent=p?.links||"Ruhig";right.textContent=p?.rechts||"Intensiv";
+    renderArt();
   }
-
-  const deckA = deck(0), deckB = deck(1);
-  const modeButtons = [
-    ["cosmic","◉ Neon-Tunnel"], ["spectrum","▥ Spektrum"], ["scope","〰 Oszilloskop"]
-  ].map(([key,label]) => h("button", {
-    type: "button", class: "lab-mode", "aria-pressed": String(modus === key),
-    onclick: () => {
-      modus = key;
-      for (const b of modeButtons) b.setAttribute("aria-pressed", String(b.dataset.mode === key));
-    }, "data-mode": key
-  }, label));
-  const pads = [
-    ["kick","A","KICK"], ["snare","S","SNARE"], ["hat","D","HI-HAT"],
-    ["bass","F","BASS"], ["chord","G","CHORD"]
-  ].map(([art,key,label]) => h("button", {
-    type: "button", class: "lab-pad", "aria-label": label + " mit Taste " + key,
-    onclick: () => { mitAudio(() => engine.pad(art)); }
-  }, h("span", {}, label), h("kbd", {}, key)));
-
-  const autoToy = autoDjAnsicht(() => produktionLaeuft);
-  // Spielzeuge: immer nur eines ist zu sehen und zu hören.
-  let spielzeug = (() => { try { const s = localStorage.getItem("sirens.spielzeug"); return ["wiese", "auto", "kick", "stems", "rt"].includes(s) ? s : "pult"; } catch { return "pult"; } })();
-  const kick = kickTausch();
-  const stems = stemSpiel(() => produktionLaeuft);
-  const kisten = {};
-  let rtProfile = null;
-  const rt = createLabShell({onProfile: profile => {rtProfile = profile;}});
-  const spielzeugKnoepfe = [["pult", "🎛 DJ-Pult & Beat-Pads"], ["wiese", "🌀 Emblem & Wellen"], ["auto", "♾ Auto-DJ & Endlos-Set"], ["kick", "🥁 Kick-Tausch"], ["stems", "🎚 KI Stem Studio & Warp Stage"], ["rt", "RTX Neural Lab"]].map(([key, label]) =>
-    h("button", { type: "button", class: "lab-mode", "data-toy": key, onclick: () => waehlen(key) }, label));
-  function waehlen(key) {
-    spielzeug = key;
-    try { localStorage.setItem("sirens.spielzeug", key); } catch { /* ohne Speicher */ }
-    for (const b of spielzeugKnoepfe) b.setAttribute("aria-pressed", String(b.dataset.toy === key));
-    for (const [name, kiste] of Object.entries(kisten)) kiste.hidden = name !== key;
-    if (key !== "pult") for (const audio of engine.decks) audio.pause();
-    if (key !== "wiese") spielAnhalten();
-    if (key !== "kick") kick.anhalten();
-    if (key !== "stems") stems.pausieren();
-    if (key === "rt") rt.mount(kisten.rt); else rt.pause();
-    if (key === "auto") autoToy.activate(); else { autoToy.deactivate(); autoToy.stop(); }
+  function toggleFavorite() {
+    favorites=favorites.includes(selected.id)?favorites.filter(id=>id!==selected.id):[...favorites,selected.id];
+    speichern(keys.favorites,JSON.stringify(favorites));
+    const fav=favorites.includes(selected.id);star.textContent=fav?"★":"☆";
+    star.setAttribute("aria-pressed",String(fav));star.setAttribute("aria-label",fav?"Aus Favoriten entfernen":"Zu Favoriten hinzufügen");
+    renderList();
   }
-
-  el.append(h("div", { class: "lab-page" },
-    h("header", { class: "lab-header" },
-      h("div", {},
-        h("p", { class: "lab-eyebrow" }, "SIRENS · INTERACTIVE MUSIC SPACE"),
-        h("h1", {}, "Die Wartezeit wird zum Auftritt."),
-        h("p", {}, "DJ-Pult, Auto-DJ, Kick-Tausch und KI Stem Studio mit audioreaktivem RTX Warp Stage.")),
-      h("a", { href: "#/", class: "lab-back" }, "← Zur Übersicht")),
-    h("div", { class: "lab-modes lab-toys", role: "group", "aria-label": "Spielzeug" }, spielzeugKnoepfe),
-    kisten.wiese = h("div", { class: "lab-toy" }, spielwiese()),
-    kisten.auto = h("div", { class: "lab-toy" }, autoToy.el),
-    kisten.kick = h("div", { class: "lab-toy" }, kick.el),
-    kisten.stems = h("div", { class: "lab-toy" }, stems.el),
-    kisten.rt = h("div", { class: "lab-toy" }),
-    kisten.pult = h("div", { class: "lab-toy" },
-    h("section", { class: "lab-stage", "aria-label": "Live-Musikvisualisierung" },
-      canvas, hud,
-      h("div", { class: "lab-stage-top" }, h("span", { class: "lab-live" }, "● VISUAL ENGINE"), status),
-      h("div", { class: "lab-stage-bottom" }, demo,
-        h("span", {}, "WebGL2 · GPU / Canvas-Fallback · max. 30 FPS"))),
-    h("div", { class: "lab-modes", role: "group", "aria-label": "Visualisierungsmodus" }, modeButtons),
-    h("div", { class: "lab-decks" }, deckA.el, deckB.el),
-    h("section", { class: "lab-mixer" },
-      h("div", { class: "lab-mixer-title" }, h("h2", {}, "Live-Mixer"),
-        h("p", {}, "Der Sound wird nur im Browser verändert – Originaldateien bleiben unberührt.")),
-      h("div", { class: "lab-cross" },
-        h("span", {}, "A"), cross, h("span", {}, "B"),
-        h("small", {}, "Crossfader")),
-      h("div", { class: "lab-controls" },
-        regler("filter", "Low-pass Filter", 100, (v) => engine.setFilter(v)),
-        regler("drive", "Analog Drive", 0, (v) => engine.setDrive(v)),
-        regler("echo", "Space Echo", 0, (v) => engine.setEcho(v)))),
-    h("section", { class: "lab-pads" },
-      h("div", {}, h("h2", {}, "Mach deinen eigenen Beat."),
-        h("p", {}, "Tippen oder Tasten A · S · D · F · G spielen. Original-Sounds, live synthetisiert.")),
-      h("div", { class: "lab-pad-row" }, pads))),
-    h("p", { class: "lab-foot" },
-      "Performance-Modus: begrenzte Auflösung und Bildrate, um die eigentliche Musikproduktion nicht zu behindern. Audio läuft lokal im Browser.")));
-  waehlen(spielzeug);
-  cross.addEventListener("input", () => engine.setCrossfade(cross.value));
-  const removeKeyboard = (event) => {
-    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
-        /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || "")) return;
-    const keys = { a:0, s:1, d:2, f:3, g:4 };
-    const idx = keys[event.key?.toLowerCase()];
-    if (idx !== undefined && spielzeug === "pult") { event.preventDefault(); pads[idx].click(); }
-  };
-  window.addEventListener("keydown", removeKeyboard);
-  // Bestehenden Sirens-Player nicht gleichzeitig überlagern.
-  document.getElementById("player-audio")?.pause();
-  const stopVisual = visualisieren(canvas, hud, () => engine.analyser, () => modus,
-    () => visualGpuDrosseln(produktionLaeuft, rtProfile));
-
-  async function katalogLaden() {
-    if (beendet) return;
-    try {
-      let daten = await api.katalog("", 1);
-      if (beendet) return;
-      if (daten.zustand === "laeuft" && !daten.anzahl_dateien) {
-        katalogTimer = setTimeout(katalogLaden, 1800);
-        return;
-      }
-      let liste = katalogEintraege(daten);
-      if (!liste.length) {
-        daten = await api.katalog();
-        if (beendet) return;
-        liste = katalogEintraege(daten);
-      }
-      for (const [index, select] of [deckA.select, deckB.select].entries()) {
-        opt[index] = liste.slice(0, 400);
-        for (const e of opt[index]) select.append(h("option", { value: e.pfad }, e.text));
-        if (!liste.length) select.firstChild.textContent = "Keine Songs im Katalog – eigene Datei laden";
-      }
-    } catch (err) {
-      if (!beendet) meldung("Katalog nicht verfügbar: Lokale Dateien funktionieren trotzdem.", "fehler");
+  function setFocus(on) {
+    focusMode=on;root.classList.toggle("sr-focused",on);
+    focus.setAttribute("aria-pressed",String(on));focus.textContent=on?"Fokus beenden":"Fokusmodus";
+  }
+  function openSession() {
+    if(session||beendet)return;
+    discovery.hidden=true;sessionPanel.hidden=false;
+    sessionTitle.textContent=selected.titel;sessionMeta.textContent="SESSION / "+selected.kategorie;
+    document.getElementById("player-audio")?.pause();
+    try { runtime.open(selected); }
+    catch(err) {
+      discovery.hidden=false;sessionPanel.hidden=true;
+      meldung("Experiment konnte nicht geöffnet werden: "+(err.message||err),"fehler");return;
     }
+    session=true;root.classList.add("sr-in-session");
+    recent=recentAdd(recent,selected.id);speichern(keys.recent,JSON.stringify(recent));
+    speichern(keys.selected,selected.id);
+    sessionTitle.focus();window.scrollTo(0,0);
   }
-
+  function closeSession(focusLaunch=false) {
+    if(!session)return;
+    session=false;
+    try { runtime.close(); } catch(err) { meldung("Werkzeug konnte nicht vollständig beendet werden: "+(err.message||err),"fehler"); }
+    if(document.fullscreenElement===root)document.exitFullscreen().catch(()=>{});
+    setFocus(false);root.classList.remove("sr-in-session");sessionPanel.hidden=true;discovery.hidden=false;
+    renderList();if(focusLaunch)launch.focus();
+  }
+  function onKey(e) {
+    if(e.key==="Escape"&&focusMode&&!document.fullscreenElement){e.preventDefault();setFocus(false);focus.focus();}
+  }
+  function fullscreenChanged(){full.textContent=document.fullscreenElement===root?"Vollbild beenden":"Vollbild";}
+  document.addEventListener("fullscreenchange",fullscreenChanged);
+  root.addEventListener("keydown",onKey);
+  search.addEventListener("input",()=>{query=search.value;renderList();});
+  level.addEventListener("input",renderArt);
   async function produktionsStand() {
     try {
-      const d = await api.claude();
-      if (!beendet) {
-        produktionLaeuft = Boolean(d.laeuft);
-        status.textContent = d.laeuft ? "● CLAUDE PRODUZIERT · ECO GPU" : "○ CLAUDE IM STANDBY";
-      }
-    } catch {
-      if (!beendet) status.textContent = "○ STATUS OFFLINE";
-    }
+      const d=await api.claude();if(beendet)return;
+      produktion=Boolean(d.laeuft);const label=produktion?"CLAUDE PRODUZIERT · ECO GPU":"CLAUDE IM STANDBY";
+      if(state.textContent!==label)state.textContent=label;
+      state.dataset.state=produktion?"busy":"idle";
+    } catch { if(!beendet){state.textContent="PRODUKTIONSSTATUS OFFLINE";state.dataset.state="offline";} }
   }
-
-  katalogLaden();
-  produktionsStand();
-  statusTimer = setInterval(() => { if (!document.hidden) produktionsStand(); }, 5000);
-  return () => {
-    beendet = true;
-    clearTimeout(katalogTimer);
-    clearInterval(statusTimer);
-    window.removeEventListener("keydown", removeKeyboard);
-    stopVisual();
-    spielAnhalten();
-    autoToy.destroy();
-    kick.anhalten();
-    stems.beenden();
-    rt.destroy();
-    engine.beenden();
+  renderDetail();renderList();produktionsStand();
+  const timer=setInterval(()=>{if(!document.hidden)produktionsStand();},5000);
+  return ()=>{
+    beendet=true;clearInterval(timer);
+    document.removeEventListener("fullscreenchange",fullscreenChanged);
+    root.removeEventListener("keydown",onKey);closeSession();
   };
 }

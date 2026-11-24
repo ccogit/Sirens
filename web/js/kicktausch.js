@@ -17,9 +17,9 @@ function bericht(b) {
   ].filter(Boolean);
 }
 
-// Liefert { el, anhalten() }.
+// Liefert { el, anhalten(), destroy() }. Server-Jobs können unabhängig weiterlaufen.
 export function kickTausch() {
-  let takt = null;
+  let takt = null, beendet = false, generation = 0;
   let tausch = null;   // laufender oder fertiger Tausch
   const original = h("audio", { controls: true, preload: "none" });
   const getauscht = h("audio", { controls: true, preload: "none", hidden: true });
@@ -45,11 +45,12 @@ export function kickTausch() {
   for (const audio of [original, getauscht]) audio.addEventListener("play", () => document.getElementById("player-audio")?.pause());
 
   function zeigen(job) {
+    if (beendet) return;
     tausch = job;
     los.disabled = job.stand === "wartet" || job.stand === "laeuft";
-    if (job.stand === "fehler") { stand.textContent = `Das hat nicht geklappt: ${job.fehler}`; return; }
+    if (job.stand === "fehler") { clearTimeout(takt); stand.textContent = `Das hat nicht geklappt: ${job.fehler}`; return; }
     if (job.stand !== "fertig") { stand.textContent = `${job.schritt} …`; return; }
-    clearInterval(takt);
+    clearTimeout(takt);
     stand.textContent = "Fertig. Hör beide Fassungen im Wechsel:";
     original.src = api.audioUrl(job.ziel);
     getauscht.src = api.kickUrl(job.id);
@@ -61,21 +62,38 @@ export function kickTausch() {
 
   los.addEventListener("click", async () => {
     if (!ziel.value || !spender.value) { stand.textContent = "Bitte beide Songs wählen."; return; }
-    anhalten(); ergebnis.hidden = true; clearInterval(takt);
+    anhalten(); ergebnis.hidden = true; clearTimeout(takt);
+    const token = ++generation;
+    los.disabled = true;
     try {
-      zeigen(await api.kickStart(ziel.value, spender.value));
-      if (tausch.stand !== "fertig") takt = setInterval(async () => { try { zeigen(await api.kickStand(tausch.id)); } catch { /* nächster Versuch */ } }, 1500);
-    } catch (fehler) { stand.textContent = fehler.meldung; los.disabled = false; }
+      const job = await api.kickStart(ziel.value, spender.value);
+      if (beendet || token !== generation) return;
+      zeigen(job);
+      if (["wartet","laeuft"].includes(job.stand)) {
+        async function poll() {
+          if (beendet || token !== generation) return;
+          try {
+            const next = await api.kickStand(job.id);
+            if (beendet || token !== generation) return;
+            zeigen(next);
+            if (!["wartet","laeuft"].includes(next.stand)) return;
+          } catch { /* nächster Versuch */ }
+          takt = setTimeout(poll, 1500);
+        }
+        takt = setTimeout(poll, 1500);
+      }
+    } catch (fehler) { if (!beendet && token === generation) { stand.textContent = fehler.meldung || fehler.message; los.disabled = false; } }
   });
 
   (async () => {
     try {
       const [einstellungen, katalog] = await Promise.all([api.einstellungen(), api.katalog("", 1)]);
+      if (beendet) return;
       const songs = lieblingsDateien(katalog).sort((a, b) => a.titel.localeCompare(b.titel, "de"));
       for (const s of songs) for (const liste of [ziel, spender]) liste.append(h("option", { value: s.pfad }, `${s.titel} · ${s.artist}`));
       if (!einstellungen.kicktausch) { los.disabled = true; stand.textContent = "Die Stem-Trennung ist auf diesem Rechner nicht eingerichtet (SIRENS_STEMS_CMD in der .env oder ein installiertes demucs)."; }
       else if (!songs.length) stand.textContent = "Noch kein gut bewerteter Song da. Bewerte einen Take mit +1 oder +2, dann steht er hier zur Wahl.";
-    } catch (fehler) { stand.textContent = fehler.meldung; }
+    } catch (fehler) { if (!beendet) stand.textContent = fehler.meldung; }
   })();
 
   const el = h("section", { class: "kicktausch", "aria-label": "Kick-Tausch" },
@@ -86,5 +104,8 @@ export function kickTausch() {
       h("label", {}, h("span", {}, "… bekommt die Kick von"), spender),
       los),
     stand, ergebnis);
-  return { el, anhalten: () => { anhalten(); } };
+  return { el, anhalten, destroy() {
+    beendet = true; generation++; clearTimeout(takt); anhalten();
+    for (const audio of [original,getauscht]) { audio.removeAttribute("src"); audio.load(); }
+  } };
 }
