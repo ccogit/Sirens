@@ -42,3 +42,27 @@ test("Transport: begrenzte Credits, Epoch und Sequenz",()=>{
     assert.equal(t.push(block(8)),true);t.reset(1,0);
     assert.equal(t.push(block(9)),false);assert.equal(t.push(block(0,1)),true);
 });
+
+import {RenderPath,limit,CEILING} from "../../web/js/realtime/worklet_processor.js";
+test("Dry/Wet: Impuls und Latenzausgleich, zwei gleiche Spuren",()=>{
+    const a=new RenderPath(3,1), b=new RenderPath(3,1);
+    a.target=1;b.target=0;
+    const wet=new Float32Array(16);wet[6]=wet[7]=0.25;
+    a.wet.write(0,0,wet);b.wet.write(0,0,wet);
+    for(let i=0;i<8;i++){
+        const v=i===0?.25:0;a.sample(v,v);b.sample(v,v);
+        assert.equal(a.out[0],b.out[0]);assert.equal(a.out[0],i===3?.25:0);
+        assert.equal(limit(a.out[0]+b.out[0]),i===3?.5:0);
+    }
+});
+test("Dry bitgleich, Limiter, nicht-endliche Samples und Jitter-Fallback",()=>{
+    const p=new RenderPath(0,4);p.target=0;
+    for(const v of [Math.fround(.123),-.25,0]){p.sample(v,v);assert.equal(p.out[0],v);}
+    p.target=1;p.wet.write(0,3,new Float32Array(8).fill(.5));
+    for(let i=0;i<4;i++)p.sample(0,0);
+    assert.equal(p.out[0],.5);
+    for(let i=1;i<=4;i++){p.sample(0,0);assert.equal(p.out[0],.5*(1-i/4));}
+    assert.equal(p.wet.underruns,7);
+    for(const v of [NaN,Infinity,-Infinity,2,-2,0]){const x=limit(v);assert.ok(Number.isFinite(x)&&Math.abs(x)<=CEILING);}
+    p.reset(1,100);assert.equal(p.wet.write(0,100,new Float32Array([.5,.5])),false);
+});

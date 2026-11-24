@@ -34,6 +34,11 @@ export class Transport {
             this.cursor = Math.max(this.cursor, message.cursor ?? 0);
         }
     }
+    advance(epoch,cursor) {
+        if(epoch!==this.epoch) return;
+        this.cursor=Math.max(this.cursor,cursor);
+        for(const [seq,end] of this.pending) if(end<=this.cursor) this.pending.delete(seq);
+    }
     push(block) {
         const {header:h,payload} = unpack(new Uint8Array(block));
         // v1 start_frame ist bereits ein Master-Ausgabeframe.
@@ -47,7 +52,7 @@ export class Transport {
         if (this.pending.size >= 8 || start < this.cursor || start + samples.length/2 > this.cursor+this.lookahead) {
             this.dropped++; return false;
         }
-        this.seq = h.seq; this.pending.set(h.seq, true);
+        this.seq = h.seq; this.pending.set(h.seq, start + samples.length/2);
         this.port.postMessage({type:"pcm",stream:this.stream,epoch:h.epoch,seq:h.seq,start,samples},[samples.buffer]);
         return true;
     }
