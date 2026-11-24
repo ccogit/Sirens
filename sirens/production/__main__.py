@@ -7,6 +7,7 @@ from ..config import load, umgebung
 from .contracts import ContractError, read_manifest, validate_plan
 from .jobs import RunStore
 from .runner import Runner
+from . import integration
 
 
 def parser():
@@ -17,7 +18,7 @@ def parser():
     sub.add_parser("validate").add_argument("--plan", required=True)
     render = sub.add_parser("render")
     render.add_argument("--brief", required=True)
-    render.add_argument("--plan", required=True)
+    render.add_argument("--plan")
     render.add_argument("--mode", choices=("preview", "full"), required=True)
     for name in ("inspect", "cancel", "resume", "revise", "export"):
         cmd = sub.add_parser(name)
@@ -44,8 +45,19 @@ def main(argv=None, *, cfg=None, backend=None):
     try:
         if args.action == "inventory":
             result = {"schema_version": 1, "music_root_available": cfg.music_root.is_dir(),
-                      "data_dir_available": cfg.data_dir.is_dir(), "render_available": backend is not None,
+                      "data_dir_available": cfg.data_dir.is_dir(),
+                      "render_available": True if backend is not None else None,
+                      "configured": bool(integration.settings()),
                       "gpu_available": None, "ableton_available": None}
+            if cfg.music_root.is_dir():
+                from .references import collect
+                _, coverage = collect(cfg)
+                result["references"] = coverage
+        elif args.action == "references":
+            result = integration.references(cfg, read_manifest(args.brief))
+        elif args.action == "benchmark":
+            from .quality import benchmark
+            result = benchmark(args.manifest)
         elif args.action == "validate":
             validate_plan(read_manifest(args.plan))
             result = {"schema_version": 1, "valid": True}
@@ -55,22 +67,30 @@ def main(argv=None, *, cfg=None, backend=None):
             RunStore(cfg).cancel(args.run)
             result = {"schema_version": 1, "cancel_requested": True}
         elif args.action in ("render", "revise", "resume"):
-            if backend is None:
-                raise ContractError("real production adapter unavailable; no synthetic fallback")
-            runner = Runner(cfg, backend)
+            runner = Runner(cfg, backend if backend is not None else integration.RealBackend(cfg))
             if args.action == "render":
-                result = runner.render(read_manifest(args.brief), read_manifest(args.plan), args.mode)
+                brief = read_manifest(args.brief)
+                plan = read_manifest(args.plan) if args.plan else integration.plan_for(brief, args.mode)
+                result = runner.render(brief, plan, args.mode)
             elif args.action == "revise":
                 result = runner.revise(args.run, read_manifest(args.plan), args.mode)
             else:
                 result = runner.resume(args.run, args.mode)
-        elif args.action == "ableton" and args.ableton_action == "probe":
-            result = {"schema_version": 1, "available": False, "reason": "adapter not connected"}
+        elif args.action == "export":
+            result = integration.export_master(RunStore(cfg), args.run, args.destination)
+        elif args.action == "ableton":
+            if args.ableton_action == "probe":
+                from .ableton import probe
+                result = probe()
+            elif args.ableton_action == "export":
+                result = integration.export_ableton(RunStore(cfg), args.run)
+            else:
+                result = integration.import_ableton(RunStore(cfg), args.export, args.confirm)
         else:
             raise ContractError("adapter unavailable; integration P08")
         print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 1 if result.get("status") in ("failed", "cancelled") else 0
-    except (ContractError, OSError) as exc:
+    except (ValueError, OSError) as exc:
         print(json.dumps({"schema_version": 1, "error": type(exc).__name__, "message": str(exc)},
                          ensure_ascii=False), file=sys.stderr)
         return 1
