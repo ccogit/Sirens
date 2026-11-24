@@ -5,6 +5,7 @@ import sys
 import threading
 
 from adapter import Adapter
+from file_job import render_file
 
 MAX = 1024 * 1024
 adapter = Adapter()
@@ -43,6 +44,8 @@ def work(kind, rid, payload):
         elif kind == "unload" and not payload:
             adapter.unload()
             result = {}
+        elif kind == "file_job":
+            result = render_file(adapter, payload)
         elif kind == "process" and payload.get("audio_bytes") == 0:
             params = {k: v for k, v in payload.items() if k != "audio_bytes"}
             if set(params) == {"job"}:
