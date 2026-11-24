@@ -15,6 +15,9 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | gemergt |
 | KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | gemergt |
 | KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | gemergt |
+| KETTE-14 | Welle 1: Messpfad DEMON | 22 | KETTE-13 gemergt | offen |
+| KETTE-15 | Welle 1: Messpfad RAVE und AFTER | 23 | KETTE-13 gemergt | offen |
+| KETTE-16 | Welle 1: Messpfad Magenta RealTime | 24 | KETTE-13 gemergt | offen |
 | KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | gemergt |
 | KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 gemergt | gemergt |
 | KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | gemergt |
@@ -24,10 +27,10 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 SAM Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | vergeben (24.11.2026) |
 | KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
-| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
-| KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-13 gemergt, KETTE-14 gemergt, Gate G1 DEMON gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
+| KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, KETTE-15 gemergt, Gate G1 RAVE/AFTER gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
 | KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gesperrt (wartet auf G1-Messung am Zielrechner) |
-| KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
+| KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, KETTE-16 gemergt, Gate G1 Magenta gemessen | gesperrt (optional, wartet auf G1-Messung und Freigabe) |
 | KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
 | KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | offen |
 | KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt, ein neuronaler Pfad freigegeben | gesperrt (optional, wartet auf neuronalen Pfad und Freigabe) |
@@ -39,6 +42,24 @@ starten, sobald ihre Voraussetzung vergeben ist, und bauen auf deren Branch auf 
 Modellen bleiben gesperrt, bis das Gate am Zielrechner gemessen ist; KETTE-37 und KETTE-41 arbeiten bis dahin
 mit den vorhandenen Demucs-Stems und binden weitere Modelle nur über die Registry ein.
 
+## Engpässe (pflegt der Koordinator)
+
+Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. Stand 24.11.2026.
+
+| Engpass | Wer | Schaltet frei | Stand |
+|---|---|---|---|
+| G1 RoFormer messen | Claude | KETTE-26 | erledigt: grün (offline) |
+| Hugging-Face-Zugang SAM Audio, Stable Audio 3 | Nutzer | Messung → KETTE-27, KETTE-35 | Token angelegt, Anmeldung lokal offen |
+| G1 SAM Audio, Stable Audio 3 messen | Claude | KETTE-27, KETTE-35 | wartet auf Zugang; Umgebungen vorab anlegen |
+| Messpfade DEMON, RAVE/AFTER, Magenta | Externe | Messung → KETTE-33, 34, 36 | KETTE-14, 15, 16 |
+| G1 DEMON, RAVE/AFTER, Magenta messen | Claude | KETTE-33, 34, 36 | nach KETTE-14/15/16; Magenta braucht vermutlich WSL2 |
+| C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
+| G2: 30 Minuten Mock-Durchlauf im Browser mit Ton | Claude | Freigabe KI-Integration | nach KETTE-31 |
+| G3 je Funktion, Hörprüfung | Claude, Hörurteil Nutzer | Aufnahme ins Release | ab KETTE-41 |
+| G4: 2 Stunden Soak | Claude | KETTE-52 | nach KETTE-51 |
+| Merge nach `main`, Release | Nutzer | Abschluss | am Ende |
+| Parallele Codex-Arbeit an Song-/Albumliste auf `main` | Claude | Konfliktfreiheit | `main` regelmäßig in den Integrationszweig mergen |
+
 ## Dateien je Kette
 
 Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern keine Datei einer anderen Kette.
@@ -46,7 +67,7 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | Kette | Eigene Dateien |
 |---|---|
 | KETTE-11 | `docs/realtime/*.md`, `docs/realtime/adr/`, `docs/realtime/examples/`, `sirens/realtime/contracts.py`, `pcm.py`, `mock.py`, `routes.py`, `schemas/`, `web/js/realtime/pcm.js`, `mock_api.js`, Weiche in `sirens/server.py`, `sirens/config.py`, `.env.example` |
-| KETTE-12, KETTE-13 | `benchmarks/spikes/` |
+| KETTE-12 bis KETTE-16 | `benchmarks/spikes/` (je Kette nur der Ordner ihres Kandidaten, dazu je eine Zeile in `benchmarks/spikes/README.md`) |
 | KETTE-21 | `sirens/realtime/gpu_manager.py`, `worker_supervisor.py`, `model_registry.py`, `telemetry.py`, `workers/mock/`; in `routes.py` nur die Adressen `gpu` und `capabilities` |
 | KETTE-22 | `web/js/realtime/audio_core.js`, `clock.js`, `ringbuffer.js`, `transport.js`, `worklet_processor.js`, `stem_adapter.js`, `sirens/realtime/sidecar.py`, `benchmarks/audio_core/` |
 | KETTE-23 | `web/js/realtime/shell.js`, `api.js`, `capabilities.js`, `gpu_panel.js`, `controls.js`, `web/realtime.css`; Registrierung in `web/js/live_lab.js`, `web/js/main.js`, `web/index.html` |

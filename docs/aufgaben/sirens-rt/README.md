@@ -51,6 +51,9 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 | 19 | `AUFGABE-19-SYSTEMABNAHME.md` | Regression, Soak-Skripte, Gate G4 | 17 |
 | 20 | `AUFGABE-20-ROLLOUT.md` | Installer, Runbook, Release Candidate | 19 |
 | 21 | `AUFGABE-21-SPIKES-MESSPFADE.md` | Rest von WP02: Pins, Gewichte, lauffähige Messpfade | 02 |
+| 22 | `AUFGABE-22-MESSPFAD-DEMON.md` | Messpfad DEMON | 21 |
+| 23 | `AUFGABE-23-MESSPFAD-RAVE-AFTER.md` | Messpfad RAVE und AFTER | 21 |
+| 24 | `AUFGABE-24-MESSPFAD-MAGENTA.md` | Messpfad Magenta RealTime | 21 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 
