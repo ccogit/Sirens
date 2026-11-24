@@ -28,12 +28,12 @@ Integration nach deren Merge (ae58b386) übernommen; kein Force-Push.
 
 | Nr. | Beleg | Stand |
 |---|---|---|
-| 1 | test_music_analysis.MusicAnalysis.test_click_truth: WP00-Klickspuren 120/140/150 BPM, 24 s, BPM-Toleranz 0,2; alle Beat-/Downbeat-Positionen ab 2 s innerhalb 960 Frames bei 48 kHz (20 ms) | erster Test-CI-Lauf bestanden |
-| 2 | test_corrections, test_silence_noise, test_chroma, test_midi_adapter; Persistenz nach Neuinstanziierung, Rate, Hash-Isolation, fehlerhafte Taps, deterministisches Rauschen/Stille, C-Dur | erster Test-CI-Lauf bestanden |
-| 3 | beat_grid.test.mjs über test_web.Seite.test_logik_mit_node: konstante/variable Karte, Rundlauf, Quantisierung, Taktwechsel, invalid/unsicher; zusätzlich Quellgrenzen | erster Lauf bestanden, ergänzte Grenztests im abschließenden CI-Lauf |
-| 4 | fünf unveränderte test_beat-Tests | erster Lauf bestanden |
-| 5 | benchmarks.beatgrid.measure, test_reference_report (Mock), siehe Aufruf unten | reale Tracks nicht gemessen |
-| 6 | python -m unittest discover -s tests -v | maßgeblicher abschließender Status im PR; board.md gemäß KETTEN.md nicht geändert |
+| 1 | test_music_analysis.MusicAnalysis.test_click_truth: WP00-Klickspuren 120/140/150 BPM, 24 s, BPM-Toleranz 0,2; alle Beat-/Downbeat-Positionen ab 2 s innerhalb 960 Frames bei 48 kHz (20 ms) | CI 45453225006 bestanden |
+| 2 | test_corrections, test_silence_noise, test_chroma, test_midi_adapter; Persistenz nach Neuinstanziierung, Rate, Hash-Isolation, fehlerhafte Taps, deterministisches Rauschen/Stille, C-Dur | CI 45453225006 bestanden |
+| 3 | beat_grid.test.mjs über test_web.Seite.test_logik_mit_node: konstante/variable Karte, Rundlauf, Quantisierung, Taktwechsel, invalid/unsicher; zusätzlich Quellgrenzen | CI 45453225006 bestanden, ergänzte Grenztests im abschließenden CI-Lauf |
+| 4 | fünf unveränderte test_beat-Tests | CI 45453225006 bestanden |
+| 5 | benchmarks.beatgrid.measure, test_reference_report (Mock), siehe Aufruf unten | Mock in CI 45453225006 bestanden; reale Tracks nicht gemessen |
+| 6 | python -m unittest discover -s tests -v | CI 45453225006 grün; abschließender Status im PR; board.md gemäß KETTEN.md nicht geändert |
 
 Erster CI-Lauf [45452789735](https://github.com/ccogit/Sirens/actions/runs/45452789735)
 auf b2543552: 106 Tests, 1 Fehler, 4 Skips. Alle damaligen WP10-Tests und
@@ -42,6 +42,12 @@ test_beat.py grün; Fehler im damaligen KETTE-11-Importinventar:
 KETTE-11 hat den Alt-CLI-Fall korrigiert und den Schema-Validator nach
 `sirens.realtime.schemas` verschoben; beides durch Merge übernommen, eigene
 Imports angepasst. Nachfolgende Läufe wurden durch neue Pushes abgelöst.
+CI [45453225006](https://github.com/ccogit/Sirens/actions/runs/45453225006)
+auf 99c954c2: 108 Tests, OK (4 Bestands-Skips), 15,457 s. Alle sieben
+WP10-Python-Tests einschließlich Modell-Sperre und Referenzbericht,
+die Node-Suite und fünf unveränderten Beat-Tests bestanden.
+Danach Quellgrenztests und Dokumentation ergänzt, KETTE-12-Merge
+(329db196) konfliktfrei übernommen.
 Abschließender Lauf: [PR Checks](https://github.com/ccogit/Sirens/pull/13/checks).
 Lokal vollständiger Checkout nicht möglich: `Could not resolve host: github.com`.
 Alle Änderungen über GitHub gepusht; keine lokale Vollsuite behauptet.
