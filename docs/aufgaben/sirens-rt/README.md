@@ -54,6 +54,8 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 | 22 | `AUFGABE-22-MESSPFAD-DEMON.md` | Messpfad DEMON | 21 |
 | 23 | `AUFGABE-23-MESSPFAD-RAVE-AFTER.md` | Messpfad RAVE und AFTER | 21 |
 | 24 | `AUFGABE-24-MESSPFAD-MAGENTA.md` | Messpfad Magenta RealTime | 21 |
+| 25 | `AUFGABE-25-STEM-STUDIO-2.md` | Rest von WP08: Dateijob, RoFormer im Produkt | 08 |
+| 26 | `AUFGABE-26-INTEGRATION-2.md` | Rest von WP17 | 17 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 

@@ -87,6 +87,16 @@ def dispatch(handler, path, body):
                         raise invalid("start_frame")
                     start = uint(int(tail[3]), "start_frame")
                     return handler._json(200, recorder.append(sid, tail[1], start, recording_block(handler)))
+        if method == "GET" and tail == ["export-source"]:
+            # Nur die bereits geladene Quelle dieser Sitzung; keine Pfade vom Client.
+            with s.lock, s.manager.sources.lock:
+                if s.asset is None or s.data["state"] not in ("ready", "playing", "paused"):
+                    raise error("unavailable")
+                aid = s.asset["id"]
+                digest = s.manager.sources.digests.get(aid)
+                if digest is None:
+                    raise error("unavailable")
+                return handler._json(200, {"asset_id": aid, "sha256": digest})
         if tail and tail[0] == "exports":
             if method == "POST" and len(tail) == 1:
                 return handler._json(201, recorder.export(s.data["id"], body))
@@ -123,6 +133,11 @@ def dispatch(handler, path, body):
             if body != {}:
                 raise invalid("body")
             return handler._json(200, service(handler).job(parts[1], cancel=True))
+    if method == "POST" and parts == ["assets", "cached-stem"]:
+        if not isinstance(body, dict) or set(body) != {"pfad", "modell", "stem"}:
+            raise invalid("asset")
+        return handler._json(201, service(handler).sources.register_stem(
+            handler.app.stems, body["pfad"], body["modell"], body["stem"]))
     if method == "POST" and parts == ["assets", "resolve"]:
         if not isinstance(body, dict) or set(body) != {"pfad"}:
             raise invalid("asset")
