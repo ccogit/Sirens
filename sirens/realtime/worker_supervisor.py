@@ -430,11 +430,13 @@ class WorkerSupervisor:
                 out_dir.rename(published)
             return {**result, "files": files}
         except BaseException:
-            self.close()
-            if out_dir.is_symlink():
-                out_dir.unlink()
-            else:
-                shutil.rmtree(out_dir, ignore_errors=True)
+            try:
+                self.close()
+            finally:
+                if out_dir.is_symlink():
+                    out_dir.unlink()
+                else:
+                    shutil.rmtree(out_dir, ignore_errors=True)
             raise
 
     def cancel(self):
