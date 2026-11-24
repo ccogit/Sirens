@@ -14,7 +14,7 @@
     ],
     "channels": 2,
     "context_frames": 0,
-    "hop_frames": 0,
+    "hop_frames": 1,
     "latency_frames": 0,
     "controls": [],
     "vram_peak_bytes": "unknown",
