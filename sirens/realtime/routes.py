@@ -141,6 +141,11 @@ def dispatch(handler, path, body):
             return handler._json(202, s.render(body))
     if method == "POST" and parts == ["separation", "jobs"]:
         return handler._json(202, service(handler).separation.start(body))
+    if method == "GET" and len(parts) == 3 and parts[:2] == ["separation", "jobs"]:
+        detail = service(handler).separation.job(parts[2])
+        if detail is None:
+            raise error("not_found")
+        return handler._json(200, detail)
     if method == "PUT" and len(parts) == 3 and parts[0] == "jobs" and parts[2] == "export":
         try:
             length = int(handler.headers.get("Content-Length", "0"))
@@ -160,13 +165,13 @@ def dispatch(handler, path, body):
         if method == "GET" and len(parts) == 2:
             manager = service(handler)
             job = manager.separation.job(parts[1])
-            return handler._json(200, job if job is not None else manager.job(parts[1]))
+            return handler._json(200, manager.separation.contract_job(job) if job is not None else manager.job(parts[1]))
         if method == "POST" and parts[2:] == ["cancel"]:
             if body != {}:
                 raise invalid("body")
             manager = service(handler)
             job = manager.separation.job(parts[1], cancel=True)
-            return handler._json(200, job if job is not None else manager.job(parts[1], cancel=True))
+            return handler._json(200, manager.separation.contract_job(job) if job is not None else manager.job(parts[1], cancel=True))
     if method == "POST" and parts == ["assets", "cached-stem"]:
         if not isinstance(body, dict) or set(body) != {"pfad", "modell", "stem"}:
             raise invalid("asset")
