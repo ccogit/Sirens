@@ -37,6 +37,7 @@ import hashlib
 import socket
 import struct
 import time
+import threading
 import wave
 import urllib.request
 import urllib.error
@@ -211,3 +212,52 @@ class MockHTTP(ServerFall):
         self.assertEqual(self.request("GET", "assets/"+exported["id"]), exported)
         self.request("POST", endpoint + "/close", {})
         self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
+
+    def test_render_backpressure_and_mock_oom(self):
+        s = self.create()
+        path = "sessions/" + s["id"]
+        s = self.command(s, "play")
+        instance = self.server.app.rt_sessions.get(s["id"])
+        request = instance.worker.request
+        entered, release = threading.Event(), threading.Event()
+        self.addCleanup(release.set)
+
+        def inject(kind, payload=None, **kwargs):
+            if kind == "process":
+                entered.set()
+                if not release.wait(5):
+                    raise RuntimeError("Testfreigabe fehlt")
+                return request(kind, {"memory_bytes": 2, "memory_limit_bytes": 1}, **kwargs)
+            return request(kind, payload, **kwargs)
+
+        instance.worker.request = inject
+        def block(seq):
+            return {"epoch": s["epoch"], "seq": seq, "source_frame": seq*256,
+                    "start_frame": seq*256, "nframes": 256}
+        try:
+            self.request("POST", path+"/render", block(0), 202)
+            self.assertTrue(entered.wait(3))
+            for seq in range(1, 9):
+                self.request("POST", path+"/render", block(seq), 202)
+            self.assertEqual(self.request("POST", path+"/render", block(9), 503)["error"], "unavailable")
+        finally:
+            release.set()
+        self.wait_state(s["id"], "error")
+        self.assertEqual(self.request("POST", path+"/render", block(10), 409)["error"], "busy_gpu")
+        self.request("POST", path+"/close", {})
+
+    def test_invalid_pcm_and_oversized_body(self):
+        from sirens.server import MAX_BODY
+        s = self.create()
+        instance = self.server.app.rt_sessions.get(s["id"])
+        with self.assertRaises(Ablehnung):
+            instance.sidecar.request(b"P" + s["id"].encode("ascii") + b"invalid")
+        req = urllib.request.Request(self.basis+self.PREFIX+"sessions",
+                                     data=b"x"*(MAX_BODY+1), method="POST",
+                                     headers={"Content-Type":"application/json"})
+        # Der Server darf schon anhand der Länge ablehnen, ohne Body zu lesen.
+        with self.assertRaises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(req, timeout=5)
+        self.assertEqual(exc.exception.code, 413)
+        exc.exception.close()
+        self.request("POST", "sessions/"+s["id"]+"/close", {})
