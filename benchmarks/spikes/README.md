@@ -23,12 +23,30 @@ Alle Gates `nicht_gemessen`. Lizenzampel ist nur Vorprüfung, keine Gate-Freigab
 
 ## Aktueller Teilstand
 
-Installationsskripte erzeugen/leeren nur die isolierten Umgebungen; Bezug ist bis zur Prüfung der Abhängigkeiten und Gewichte absichtlich gesperrt. Drei experimentelle Inferenzpfade (RAVE, SA3, SAM Audio) sind vorhanden; die übrigen vier Modellpfade fehlen. Aufruf im Repo-Root ohne Modell:
+Außer dem experimentellen RoFormer-Bezug erzeugen/leeren Installationsskripte nur isolierte Umgebungen; Modellbezug bleibt gesperrt. Experimentelle Inferenzpfade existieren für RoFormer, RAVE, SA3 und SAM Audio; keine Hardwareabnahme. Aufruf im Repo-Root ohne Modell:
 
 ```powershell
+python -m benchmarks.spikes.roformer-drumsep.messen --dry-run
 python -m benchmarks.spikes.rave.messen --dry-run
 python -m benchmarks.spikes.stable-audio-3.messen --dry-run
 python -m benchmarks.spikes.sam-audio.messen --dry-run
 ```
 
 Nach manuell geprüfter Installation im jeweiligen venv: `python -m benchmarks.spikes.<kandidat>.messen --model <lokaler Pfad> --device cpu` bzw. `--device cuda`. RAVE benötigt zusätzlich `--sha256 <Hash>` des TorchScript-Exports; SA3 erwartet den lokalen HF-Cache, SAM den lokalen Snapshot. Kein vollständiger Hardware- oder Streaming-Nachweis. RAVE/AFTER/GPU Audio SDK haben nichtkommerzielle Lizenzbestandteile; keine kommerzielle Freigabe.
+
+## AUFGABE-21 – Versuch RoFormer (Windows, Repo-Root)
+
+Nur nach Prüfung des Berichts und der Lizenz, mit Python 3.11 und Git im PATH. Der transitive Lock ist noch nicht reproduzierbar; Installation und Hardwarelauf sind nicht abgenommen. Ohne Schalter wird nur ein venv angelegt.
+
+```powershell
+.\benchmarks\spikes\roformer-drumsep\install.ps1
+.\benchmarks\spikes\roformer-drumsep\install.ps1 -ModelleLaden
+$py = ".\.venv-spike-roformer-drumsep\Scripts\python.exe"
+$weight = ".\.venv-spike-roformer-drumsep\weights\MelBandRoformer.ckpt"
+$sha = "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e"
+& $py -m benchmarks.spikes.roformer-drumsep.messen --dry-run
+& $py -m benchmarks.spikes.roformer-drumsep.messen --model $weight --sha256 $sha --device cpu
+& $py -m benchmarks.spikes.roformer-drumsep.messen --model $weight --sha256 $sha --device cuda
+```
+
+DrumSep bleibt gesperrt (Gewichtslizenz, Größe, Hash). Reihenfolge der weiteren Bearbeitung: SAM Audio, Stable Audio 3, dann übrige Kandidaten. SAM und SA3 benötigen zunächst authentifizierte, lizenzkonforme Metadaten und vollständige Pins; ihre bestehenden Dry-Runs sind keine Freigabe zur Modellinstallation. Details in den Kandidatenberichten und der Ergebnisdatei AUFGABE-21.
