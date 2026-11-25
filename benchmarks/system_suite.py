@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from pathlib import Path
 
 from benchmarks.result import METRICS, read, write
@@ -155,6 +156,37 @@ def report(path, rows, errors, dry):
                      funktionen=rows, profile=list(PROFILES), dry_run=dry))
 
 
+def preflight(cid, steps, music):
+    """RoFormer verlangt eine lokale WAV-Datei mit 44,1 kHz Stereo."""
+    if cid != "separation":
+        return
+    for argv in steps:
+        if not isinstance(argv, list):
+            continue
+        for i, arg in enumerate(argv):
+            if not isinstance(arg, str):
+                continue
+            if arg == "benchmarks.separation.product_job" or arg.replace("\\", "/").endswith("benchmarks/separation/product_job.py"):
+                if music is None or i + 1 >= len(argv) or not isinstance(argv[i + 1], str):
+                    raise ValueError("Vorprüfung Separation: Musikordner und relativer WAV-Song erforderlich")
+                relative = Path(argv[i + 1])
+                try:
+                    if relative.is_absolute() or relative.drive or ".." in relative.parts:
+                        raise ValueError("Relativer Songpfad erforderlich")
+                    source = (music / relative).resolve(strict=True)
+                    if not source.is_relative_to(music) or source.suffix.lower() != ".wav":
+                        raise ValueError("WAV im Musikordner erforderlich")
+                    with wave.open(str(source), "rb") as stream:
+                        rate, channels = stream.getframerate(), stream.getnchannels()
+                except (OSError, EOFError, wave.Error, ValueError) as exc:
+                    raise ValueError(f"Vorprüfung Separation: WAV nicht lesbar ({exc})") from exc
+                if (rate, channels) != (44100, 2):
+                    raise ValueError(f"Vorprüfung Separation: RoFormer benötigt 44100 Hz (44,1 kHz) Stereo (2 Kanäle); "
+                                     f"Testdaten: {rate} Hz, {channels} Kanäle")
+                return
+    raise ValueError("Vorprüfung Separation: product_job mit relativem Songpfad fehlt")
+
+
 def run(out, music, plan, dry=False, snapshot=process_snapshot):
     out = out.resolve()
     if ROOT == out or ROOT in out.parents:
@@ -205,6 +237,7 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 steps = job.get("steps", [job.get("argv")])
                 if not isinstance(steps, list) or not steps:
                     raise ValueError("steps muss eine nichtleere Liste sein")
+                preflight(cid, steps, music)
                 result_path = out / (cid + ".json")
                 if result_path.exists():
                     raise ValueError("Messdatei existiert bereits")
