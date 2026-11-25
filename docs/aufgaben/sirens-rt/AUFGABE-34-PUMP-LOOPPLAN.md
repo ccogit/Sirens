@@ -1,7 +1,8 @@
 # Aufgabe 34: Browser-Pumpe füllt den Wet-Puffer vor dem Loop-Sprung vor
 
-Gemeinsame Bedingungen, Begriffe und Regeln: `docs/aufgaben/sirens-rt/README.md`. Setzt Aufgabe 33 (in
-derselben Kette davor) und die gemergte Aufgabe 30 voraus.
+Gemeinsame Bedingungen, Begriffe und Regeln: `docs/aufgaben/sirens-rt/README.md`. Setzt Aufgabe 37 (in
+derselben Lane davor) sowie die gemergten Aufgaben 30 und 33 voraus. Erlaubte Dateien: `web/js/realtime/shell.js`,
+`audio_core.js`, `transport.js`, Tests unter `tests/realtime/`.
 
 ## Ziel
 
@@ -16,8 +17,8 @@ Der Wet-Pfad läuft über Loop-Sprünge ohne unerwartete Lücke. Gate G4 verlang
   `unexpectedUnderruns` im Status. Test: `tests/realtime/loop_epoch_30.test.mjs`.
 - Offen laut Übergabe: `web/js/realtime/shell.js`, Funktion `pump()` (ab Zeile ~156) nutzt den Plan nicht. Sie
   wechselt erst, wenn `core.clock.epoch` schon gestiegen ist (Zeile ~162), also nach dem Sprung.
-- Aufgabe 33 (davor in dieser Kette): Server nimmt Aufträge für laufende und nächste Audio-Epoch an, Seq je
-  Epoch ab 0, Feld `seek`.
+- Aufgabe 33 (gemergt) und 37 (davor in dieser Lane): Server und Sidecar führen laufende und nächste
+  Audio-Epoch nebeneinander, Seq je Epoch ab 0, Seek als Bit 0 in `flags`.
 
 ## Umfang
 

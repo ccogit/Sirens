@@ -63,9 +63,10 @@ Widerspruch vor. Welche Aufgaben zu welcher Kette gehören, steht nur in `KETTEN
 | 31 | `AUFGABE-31-DSP-STEUERLATENZ.md` | DSP-Steuerlatenz | 09 |
 | 32 | `AUFGABE-32-MESSHARNESS-G4.md` | Mess-Harness für G4 | 04, 16, 19 |
 | 33 | `AUFGABE-33-ZWEI-EPOCHEN-SERVER.md` | Server rendert laufende und nächste Audio-Epoch | 30 |
-| 34 | `AUFGABE-34-PUMP-LOOPPLAN.md` | Browser-Pumpe füllt vor dem Loop-Sprung vor | 30, 33 |
+| 34 | `AUFGABE-34-PUMP-LOOPPLAN.md` | Browser-Pumpe füllt vor dem Loop-Sprung vor | 30, 33, 37 |
 | 35 | `AUFGABE-35-GERAETE-ABTASTRATE.md` | Mock-Pfad mit 44,1 und 48 kHz | 34 |
 | 36 | `AUFGABE-36-G4-UNDERRUNS-GETRENNT.md` | G4-Bericht: erwartete/unerwartete Underruns | 30 |
+| 37 | `AUFGABE-37-SIDECAR-PCM-ZWEI-EPOCHEN.md` | Sidecar und PCM-Kopf: zwei Audio-Epochs, Seek-Bit | 33 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 
