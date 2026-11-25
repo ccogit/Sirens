@@ -1,0 +1,73 @@
+{
+  "wp": "WP19",
+  "kandidat": "Performance",
+  "zeitpunkt": "2026-11-25T17:44:30.872Z",
+  "befehl": "benchmarks/g4/soak.js; python -m benchmarks.g4.report",
+  "gate": "nicht_gemessen",
+  "modus": "streaming",
+  "rechner": {
+    "os": {
+      "system": "Windows",
+      "release": "10"
+    },
+    "python": "3.11.9",
+    "node": "24.20.0",
+    "ffmpeg": "9.0.2",
+    "gpus": [
+      {
+        "driver": "621.24",
+        "name": "NVIDIA GeForce RTX 5080",
+        "vram_total_mib": 16303,
+        "vram_free_mib": 14473
+      }
+    ],
+    "wsl": true,
+    "disk": {
+      "drive": "C:",
+      "free_bytes": 1009516163072
+    },
+    "git": {
+      "sha": "95704e9979ab67d3c0a88f63aa54382364dbc90f",
+      "clean": true
+    },
+    "audio_device": null,
+    "notes": [
+      "Audio-Gerät und Treiber separat am Zielrechner erfassen (nicht gemessen)"
+    ]
+  },
+  "messwerte": {
+    "warm": {
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "peak_vram_mib": null,
+      "rtf": null,
+      "underruns": 0,
+      "unexpected_underruns": 0,
+      "expected_underruns": 0
+    },
+    "kalt": {
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "peak_vram_mib": null,
+      "rtf": null,
+      "underruns": null,
+      "unexpected_underruns": null,
+      "expected_underruns": null
+    }
+  },
+  "soak_status": "bestanden",
+  "elapsed_seconds": 7200.050399999976,
+  "notizen": [
+    "Audio-Sekunden: 7199.910022675737",
+    "Soak-Wertung: bestanden",
+    "Unerwartete Underruns: 0",
+    "Erwartete Underruns: 0",
+    "Unterbrechungen: 0",
+    "Tabwechsel: 0",
+    "Epoch-Wechsel: 1800",
+    "Fehler: None",
+    "Keine analoge Geräte-/Modelllatenz gemessen; keine Gate-Entscheidung."
+  ]
+}
