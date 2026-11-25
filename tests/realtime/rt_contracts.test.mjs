@@ -16,13 +16,13 @@ test('PCM: Referenzbytes in beiden Richtungen, BigInt und Payload',()=>{
         for(let i=0;i<256;i++){view.setFloat32(i*8,samples[0],true);view.setFloat32(i*8+4,samples[1],true);}
         const block=fixture(name);
         assert.deepEqual(pack(header,payload),block);
-        assert.deepEqual(unpack(block),{header,payload});
+        assert.deepEqual(unpack(block),{header:{...header,seek:false},payload});
         assert.deepEqual(pack(...Object.values(unpack(block))),block);
     }
 });
 test('PCM: ungültiger Kopf und Länge',()=>{
     const block=fixture('pcm-python.hex');
-    for (const [offset,value] of [[0,2],[26,1],[25,9],[27,1]]) {
+    for (const [offset,value] of [[0,2],[26,1],[25,9],[27,2]]) {
         const bad=block.slice();bad[offset]=value;
         assert.throws(()=>unpack(bad),RangeError);
     }
