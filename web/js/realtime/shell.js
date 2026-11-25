@@ -178,7 +178,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     stopPump();
     // Ein bereits gesendeter Renderauftrag ist durch den HTTP-Timeout begrenzt.
     // Vor dem Zerstören der Ressourcen seine Pumpe vollständig abwickeln.
-    await pumpTask;
+    await pumpTask?.catch(()=>{});
     await stopRecorder();
     const c=core;core=null;
     try{if(c)await c.destroy();}
@@ -228,7 +228,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
       ws.addEventListener("close",()=>{if(isCurrent(current)){fallback=true;core?.param(1,{mix:0});inform();}});
     }catch(e){check();fallback=true;core.param(1,{mix:0});}
     check();
-    timer=timerHost.setInterval(startPump,20);
+    timer=timerHost.setInterval(()=>{if(isCurrent(current))startPump();},20);
   }
   function begin(offset,seek=seekPending){
     if(!core||!buffer)return;
