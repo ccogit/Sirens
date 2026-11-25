@@ -2,7 +2,7 @@
 export const HEADER_SIZE = 32;
 function check(h) {
     const limits = {protocol_version:[1,1], stream_id:[1,0xffffffff], epoch:[0,0xffffffff],
-        seq:[0,0xffffffff], nframes:[256,2048], channels:[2,2], flags:[0,0], sample_rate:[8000,192000]};
+        seq:[0,0xffffffff], nframes:[256,2048], channels:[2,2], flags:[0,1], sample_rate:[8000,192000]};
     for (const [k,[lo,hi]] of Object.entries(limits))
         if (!Number.isInteger(h[k]) || h[k]<lo || h[k]>hi) throw new RangeError(k);
     if (typeof h.start_frame !== "bigint" || h.start_frame<0n ||
@@ -25,5 +25,6 @@ export function unpack(block) {
         epoch:v.getUint32(8,true),seq:v.getUint32(12,true),start_frame:v.getBigUint64(16,true),
         nframes:v.getUint16(24,true),channels:v.getUint8(26),flags:v.getUint8(27),sample_rate:v.getUint32(28,true)});
     if (block.byteLength!==HEADER_SIZE+h.nframes*8) throw new RangeError("payload");
+    h.seek = Boolean(h.flags & 1);
     return {header:h,payload:block.slice(HEADER_SIZE)};
 }
