@@ -50,7 +50,7 @@ PRs und Chats darauf verweisen.
 | KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 merged | merged |
 | KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 merged | merged |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 merged, KETTE-43 merged, KETTE-28 merged | merged |
-| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 merged | assigned (24.11.2026) |
+| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 merged | merged |
 | KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | merged |
 | KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | merged |
 | KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | merged |
@@ -92,7 +92,7 @@ Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. St
 | C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
 | G2: 30 Minuten Mock-Durchlauf im Browser mit Ton | Claude | Freigabe KI-Integration | nach KETTE-31 |
 | G3 je Funktion, Hörprüfung | Claude, Hörurteil Nutzer | Aufnahme ins Release | ab KETTE-41 |
-| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); KETTE-53/54/55 gemergt; KETTE-56/57/58 merged; Wiederholung jetzt fällig |
+| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); KETTE-53/54/55 gemergt; KETTE-56/57/58 merged; 2. Lauf 25.11.2026 bestanden (7200 s, 0 unerwartete Underruns, 1800 Loop-Wechsel, 44,1 kHz, nur digitale Zähler; Beleg benchmarks/results/g4/performance-soak-2026-11-25.json); KETTE-52 merged. Offen: Hörprüfung, Störfälle, Streaming-Modelle |
 | Merge nach `main`, Release | Nutzer | Abschluss | am Ende |
 | Parallele Codex-Arbeit an Song-/Albumliste auf `main` | Claude | Konfliktfreiheit | `main` regelmäßig in den Integrationszweig mergen |
 
