@@ -100,6 +100,8 @@ def process_snapshot():
             if not rows or any(not isinstance(row, dict)
                                or type(row.get("ProcessId")) is not int
                                or type(row.get("ParentProcessId")) is not int
+                               or (row.get("CommandLine") is not None
+                                   and not isinstance(row["CommandLine"], str))
                                for row in rows):
                 raise ValueError("Ungültiges Prozessinventar")
             return rows
