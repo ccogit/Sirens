@@ -33,8 +33,8 @@ Ein WebSocket-Binärmessage entspricht genau einem Block. Keine Base64-Daten, ke
 | 16 | 8 | start_frame (Master-Ausgabeframe, JS BigInt) |
 | 24 | 2 | nframes (256…2048) |
 | 26 | 1 | channels = 2 |
-| 27 | 1 | flags = 0 (reserviert) |
+| 27 | 1 | flags: Bit 0 = seek; Bits 1–7 = 0 (reserviert) |
 | 28 | 4 | sample_rate (8000…192000, tatsächliche Context-Rate) |
 | 32 | nframes × 8 | Float32 LE, L/R interleaved |
 
-Maximal 16416 Byte je Nachricht. Falsche Länge, Version, Flags, Kanalzahl, Framezahl oder Frame-Überlauf verwerfen; Codec erhält sämtliche Payload-Bits (auch NaN), Empfänger vor Audioausgabe nicht-endliche Werte durch Stille ersetzen. Transport prüft Stream, Epoch und Sequenz, verwirft alte Chunks. Begrenzte Queues, maximal 8 Blöcke je Stream initial; Backpressure statt wachsender Latenz. Kein Überlauf der Zähler. Bei Unterlauf Dry/Fallback, keine Blockade des Audio-Callbacks.
+Maximal 16416 Byte je Nachricht. Falsche Länge, Version, Flags, Kanalzahl, Framezahl oder Frame-Überlauf verwerfen; Codec erhält sämtliche Payload-Bits (auch NaN), Empfänger vor Audioausgabe nicht-endliche Werte durch Stille ersetzen. Bit 0 kennzeichnet den ersten Block nach einem manuellen Seek; beim Lesen wird daraus das boolesche Feld `seek` abgeleitet. Sender ohne Seek setzen weiterhin 0. Der Sidecar hält je Stream höchstens zwei Audio-Epochs mit getrennten Sequenzen; eine dritte neuere Epoch schließt die älteste. Ein Steuer-Epoch-Wechsel leert beide Generationen. Transport prüft Stream, Epoch und Sequenz, verwirft alte Chunks. Begrenzte Queues, maximal 8 Blöcke je Stream initial; Backpressure statt wachsender Latenz. Kein Überlauf der Zähler. Bei Unterlauf Dry/Fallback, keine Blockade des Audio-Callbacks.

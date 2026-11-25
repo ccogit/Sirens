@@ -10,7 +10,7 @@ byId("stop").onclick=stop;
 byId("start").onclick=async()=>{
     if(!stopped)return;stopped=false;byId("start").disabled=true;byId("save").disabled=true;
     const profile=byId("profile").value,stems=Number(byId("stems").value);
-    result={backend:"cpu",profile,stems,rate:null,impulse:null,control_ms:[],render_ack_ms:[],timeouts:0,device_underruns:null,output_latency_ms:null};
+    result={backend:"cpu",profile,stems,rate:null,impulse:null,control_ms:[],control_samples:[],render_ack_ms:[],timeouts:0,device_underruns:null,output_latency_ms:null,base_latency_ms:null};
     try{
         context=new AudioContext();await context.resume();result.rate=context.sampleRate;
         await context.audioWorklet.addModule("./worklet.js");
@@ -30,11 +30,23 @@ byId("start").onclick=async()=>{
                 result.render_ack_ms.push(now-issued);
                 // AudioContext-Zeitstempel bildet die Renderposition auf die
                 // geschätzte Ausgabezeit ab; kein physischer Loopback.
+                const latency=value=>Number.isFinite(value)&&value>=0?value*1000:null;
+                result.output_latency_ms=latency(context.outputLatency);
+                result.base_latency_ms=latency(context.baseLatency);
                 if(ts&&ts.contextTime>0&&ts.performanceTime>0){
-                    const heard=ts.performanceTime+(m.frame/context.sampleRate-ts.contextTime)*1000;
-                    result.control_ms.push(Math.max(0,heard-issued));
+                    const heard=frame=>ts.performanceTime+(frame/context.sampleRate-ts.contextTime)*1000;
+                    const total=heard(m.frame)-issued;
+                    if(Number.isFinite(total)&&total>=0){
+                        result.control_ms.push(total);
+                        result.control_samples.push({
+                            total_ms:total,base_latency_ms:result.base_latency_ms,
+                            output_latency_ms:result.output_latency_ms,
+                            rack_latency_ms:result.impulse.declared/context.sampleRate*1000,
+                            received_to_first_ms:(m.firstFrame-m.receivedFrame)/context.sampleRate*1000,
+                            first_to_90_ms:(m.frame-m.firstFrame)/context.sampleRate*1000
+                        });
+                    }
                 }
-                if(Number.isFinite(context.outputLatency))result.output_latency_ms=context.outputLatency*1000;
                 pending=null;show();
                 if(result.render_ack_ms.length>=100){byId("save").disabled=false;stop();}
             }

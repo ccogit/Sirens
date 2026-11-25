@@ -21,7 +21,7 @@ class SystemFaults(unittest.TestCase):
             header = dict(protocol_version=1, stream_id=1, epoch=epoch, seq=0,
                           start_frame=start, nframes=count, channels=2, flags=0, sample_rate=rate)
             received, payload = pcm.unpack(pcm.pack(header, raw))
-            self.assertEqual(received, header)
+            self.assertEqual(received, dict(header, seek=False))
             decoded = struct.unpack("<" + "f" * len(samples), payload)
             self.assertEqual(adapter.process(decoded), [x * .5 for x in decoded])
             with self.assertRaises(Ablehnung):

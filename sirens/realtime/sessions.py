@@ -390,12 +390,14 @@ class Session:
     def _job_state(self, target):
         self.job["state"] = transition(JOB_TRANSITIONS, self.job["state"], target)
 
-    def _epoch(self):
+    def _epoch(self, *, reset_sidecar=True):
         if self.data["epoch"] == 2**32 - 1:
             raise invalid("epoch")
         self.data["epoch"] += 1
         self.data["seq"] = None
         self.render_seq = -1
+        if reset_sidecar and self.sidecar is not None:
+            self.sidecar.json(op="reset", session=self.data["id"])
 
     def command(self, body):
         with self.lock:
@@ -463,8 +465,11 @@ class Session:
     def render(self, body):
         """Nur Steuerdaten: PCM entsteht serverseitig im Worker-Thread."""
         fields = {"epoch", "seq", "source_frame", "start_frame", "nframes"}
-        if not isinstance(body, dict) or set(body) not in (fields, fields | {"audio_epoch"}):
+        if not isinstance(body, dict) or not fields <= set(body) <= fields | {"audio_epoch", "seek"}:
             raise invalid("render")
+        seek = body.get("seek", False)
+        if type(seek) is not bool:
+            raise invalid("seek")
         with self.lock:
             if self.data["state"] != "playing":
                 if self.last_error == "busy_gpu":
@@ -474,10 +479,15 @@ class Session:
             if epoch != self.data["epoch"]:
                 raise error("stale_epoch")
             audio_epoch = uint(body.get("audio_epoch", epoch), "audio_epoch", 2**32-1)
-            if audio_epoch < self.audio_epoch:
+            # _epoch() setzt render_seq weiterhin auf -1 und entwertet damit
+            # beide Generationen auch bei einem Steuer-Epoch-Wechsel.
+            sequences = self.render_seq if isinstance(self.render_seq, dict) else {}
+            if audio_epoch not in sequences and audio_epoch < self.audio_epoch:
                 raise error("stale_epoch")
             seq = uint(body["seq"], "seq", 2**32-1)
-            if audio_epoch == self.audio_epoch and seq <= self.render_seq:
+            if seq <= sequences.get(audio_epoch, -1):
+                raise invalid("seq")
+            if audio_epoch not in sequences and seq != 0:
                 raise invalid("seq")
             source = uint(body["source_frame"], "source_frame")
             start = uint(body["start_frame"], "start_frame")
@@ -486,12 +496,14 @@ class Session:
                 raise invalid("nframes")
             try:
                 self.pending.put_nowait((epoch, audio_epoch, seq, source, start, count,
-                                         dict(self.params), self.bypass))
+                                         dict(self.params), self.bypass, seek))
             except queue.Full:
                 self.dropped += 1
                 raise error("unavailable") from None
-            self.audio_epoch = audio_epoch
-            self.render_seq = seq
+            self.audio_epoch = max(self.audio_epoch, audio_epoch)
+            self.render_seq = {**sequences, audio_epoch: seq}
+            if len(self.render_seq) > 2:
+                del self.render_seq[min(self.render_seq)]
             return {"accepted": True}
 
     def _run(self):
@@ -525,11 +537,11 @@ class Session:
                 if not worker.worker.alive() or sidecar.process.poll() is not None:
                     raise error("unavailable")
                 try:
-                    epoch, audio_epoch, seq, source, start, count, params, bypass = self.pending.get(timeout=.1)
+                    epoch, audio_epoch, seq, source, start, count, params, bypass, seek = self.pending.get(timeout=.1)
                 except queue.Empty:
                     continue
                 with self.lock:
-                    if epoch != self.data["epoch"] or audio_epoch != self.audio_epoch or self.data["state"] != "playing":
+                    if epoch != self.data["epoch"] or (not isinstance(self.render_seq, dict) or audio_epoch not in self.render_seq) or self.data["state"] != "playing":
                         continue
                 if params != loaded or previous != (audio_epoch, source):
                     worker.request("load", params)
@@ -538,10 +550,10 @@ class Session:
                 _, wet = worker.request("process", audio=chunk)
                 previous = (audio_epoch, source + count)
                 block = pack(dict(protocol_version=1, stream_id=1, epoch=audio_epoch, seq=seq,
-                                  start_frame=start, nframes=count, channels=2, flags=0,
+                                  start_frame=start, nframes=count, channels=2, flags=int(seek),
                                   sample_rate=self.data["sample_rate"]), chunk if bypass else wet)
                 with self.lock:
-                    if (self.stop.is_set() or epoch != self.data["epoch"] or audio_epoch != self.audio_epoch
+                    if (self.stop.is_set() or epoch != self.data["epoch"] or (not isinstance(self.render_seq, dict) or audio_epoch not in self.render_seq)
                             or self.data["state"] != "playing"):
                         continue
                     if not sidecar.request(b"P" + self.data["id"].encode("ascii") + block).get("ok"):
@@ -577,7 +589,8 @@ class Session:
             if self.data["state"] == "closed":
                 return self.snapshot()
             if self.data["state"] != "stopping":
-                self._epoch()
+                # Der Sidecar wird beim Schließen widerrufen; auch nach einem Worker-Fehler.
+                self._epoch(reset_sidecar=False)
                 self._state("stopping")
             self.stop.set()
             self.token = None

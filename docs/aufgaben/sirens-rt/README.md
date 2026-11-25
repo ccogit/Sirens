@@ -25,7 +25,7 @@ NVIDIA RTX 5080 (16 GB VRAM). Alles Neue ist einzeln abschaltbar und hinter dem 
 
 Eine Aufgabe entspricht einem Arbeitspaket (WP) des Plans: `AUFGABE-nn` = `WPnn`. Der Abschnitt „WPnn“ in
 `PLAN.md`, Kapitel 5, gehört verbindlich zum Umfang der Aufgabe; die Aufgabendatei schärft ihn und geht bei
-Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer der Kettennummer = Welle.
+Widerspruch vor. Welche Aufgaben zu welcher Kette gehören, steht nur in `KETTEN.md` (eine Kette umfasst eine oder mehrere Aufgaben).
 
 | Nr | Datei | Inhalt | Setzt voraus |
 |---|---|---|---|
@@ -59,6 +59,14 @@ Widerspruch vor. Die Wellen des Plans (Kapitel 6) sind die Ketten: erste Ziffer 
 | 27 | `AUFGABE-27-PADS-2.md` | Rest von WP12: Verdrahtung der Pads | 12 |
 | 28 | `AUFGABE-28-HOOKS-EINBAU.md` | Alle offenen Hooks in die Oberfläche | 17, 26 |
 | 29 | `AUFGABE-29-GPU-REGEL.md` | GPU-Regel, Profile, dauerhafter Supervisor | 03, 26 |
+| 30 | `AUFGABE-30-NAHTLOSER-LOOP.md` | Loop- und Epoch-Wechsel im Worklet | 04, 06 |
+| 31 | `AUFGABE-31-DSP-STEUERLATENZ.md` | DSP-Steuerlatenz | 09 |
+| 32 | `AUFGABE-32-MESSHARNESS-G4.md` | Mess-Harness für G4 | 04, 16, 19 |
+| 33 | `AUFGABE-33-ZWEI-EPOCHEN-SERVER.md` | Server rendert laufende und nächste Audio-Epoch | 30 |
+| 34 | `AUFGABE-34-PUMP-LOOPPLAN.md` | Browser-Pumpe füllt vor dem Loop-Sprung vor | 30, 33, 37 |
+| 35 | `AUFGABE-35-GERAETE-ABTASTRATE.md` | Mock-Pfad mit 44,1 und 48 kHz | 34 |
+| 36 | `AUFGABE-36-G4-UNDERRUNS-GETRENNT.md` | G4-Bericht: erwartete/unerwartete Underruns | 30 |
+| 37 | `AUFGABE-37-SIDECAR-PCM-ZWEI-EPOCHEN.md` | Sidecar und PCM-Kopf: zwei Audio-Epochs, Seek-Bit | 33 |
 
 ## 4. Feste Bedingungen (nicht ändern)
 

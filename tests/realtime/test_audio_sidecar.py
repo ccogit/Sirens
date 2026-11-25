@@ -76,8 +76,11 @@ class SidecarTests(unittest.TestCase):
         for seq in range(8):
             self.assertTrue(self.server.hub.publish(SID,pcm(seq)))
         self.assertFalse(self.server.hub.publish(SID,pcm(8)))
+        self.assertFalse(self.server.hub.publish(SID,pcm(0,1)))
+        self.server.hub.take(self.server.hub.sessions[SID])
         self.assertTrue(self.server.hub.publish(SID,pcm(0,1)))
-        self.assertFalse(self.server.hub.publish(SID,pcm(9,0)))
+        self.server.hub.take(self.server.hub.sessions[SID])
+        self.assertTrue(self.server.hub.publish(SID,pcm(9,0)))
 
     def test_client_data_rejected(self):
         sock,response=connect(self.port,self.token)

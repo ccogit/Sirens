@@ -11,7 +11,7 @@ def validate_header(h):
     limits = {"protocol_version": (1, 1), "stream_id": (1, 2**32-1),
               "epoch": (0, 2**32-1), "seq": (0, 2**32-1),
               "start_frame": (0, 2**64-1), "nframes": (MIN_FRAMES, MAX_FRAMES),
-              "channels": (2, 2), "flags": (0, 0), "sample_rate": (8000, 192000)}
+              "channels": (2, 2), "flags": (0, 1), "sample_rate": (8000, 192000)}
     for key, (lo, hi) in limits.items():
         value = h.get(key)
         if type(value) is not int or not lo <= value <= hi:
@@ -35,4 +35,5 @@ def unpack(block):
     h = validate_header(dict(zip(FIELDS, HEADER.unpack_from(block))))
     if len(block) != HEADER.size + h["nframes"] * 8:
         raise invalid("payload")
+    h["seek"] = bool(h["flags"] & 1)
     return h, bytes(block[HEADER.size:])

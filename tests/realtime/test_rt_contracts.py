@@ -126,12 +126,12 @@ class PCM(unittest.TestCase):
                  "nframes":256,"channels":2,"sample_rate":rate,"flags":0}
             payload = struct.pack("<ff", *samples) * 256
             self.assertEqual(pcm.pack(h,payload),block)
-            self.assertEqual(pcm.unpack(block),(h,payload))
+            self.assertEqual(pcm.unpack(block),(dict(h, seek=False),payload))
             self.assertEqual(pcm.pack(*pcm.unpack(block)), block)
 
     def test_invalid(self):
         block = bytes.fromhex((EXAMPLES / "pcm-python.hex").read_text())
-        for offset, value in ((0,2),(26,1),(24,0),(25,9),(27,1)):
+        for offset, value in ((0,2),(26,1),(24,0),(25,9),(27,2)):
             mutated = bytearray(block)
             mutated[offset] = value
             if offset == 24:
