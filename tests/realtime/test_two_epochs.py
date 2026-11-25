@@ -122,19 +122,20 @@ class TwoEpochs(unittest.TestCase):
         self.render(12, 0)
         self.assertEqual(self.packets(1), [(12, 0)])
 
-    def test_seek_type_and_unavailable_until_protocol_is_extended(self):
+    def test_seek_type_and_pcm_flag(self):
         self.rejected("invalid", 10, 0, seek=1)
         self.rejected("invalid", 10, 0, seek="true")
-        self.rejected("unavailable", 10, 0, seek=True)
-        self.render(10, 0, seek=False)
-        self.assertEqual(self.packets(1), [(10, 0)])
+        self.render(10, 0, seek=True)
+        self.render(10, 1, seek=False)
+        self.worker.release.set()
+        first = self.sidecar.blocks.get(timeout=5)
+        second = self.sidecar.blocks.get(timeout=5)
+        self.assertEqual((first["flags"], first["seek"]), (1, True))
+        self.assertEqual((second["flags"], second["seek"]), (0, False))
 
 
 class SidecarBoundary(unittest.TestCase):
-    @unittest.expectedFailure
     def test_interleaved_epochs_survive_real_sidecar(self):
-        # Bekannte Blockade der Übergabe: Hub.publish löscht bisher die alte
-        # Warteschlange. Nach Freigabe/Änderung des Sidecars expectedFailure entfernen.
         hub = Hub()
         sid = "a" * 32
         hub.issue(sid, [1])
@@ -146,6 +147,40 @@ class SidecarBoundary(unittest.TestCase):
         self.assertEqual([(h["epoch"], h["seq"]) for h in
                           (unpack(hub.take(hub.sessions[sid]))[0] for _ in range(4))],
                          [(10, 0), (11, 0), (10, 1), (11, 1)])
+
+    def test_third_epoch_and_reset(self):
+        hub = Hub()
+        sid = "a" * 32
+        hub.issue(sid, [1])
+        def block(epoch, seq=0):
+            return pack(dict(protocol_version=1, stream_id=1, epoch=epoch, seq=seq,
+                             start_frame=seq * 256, nframes=256, channels=2,
+                             flags=0, sample_rate=48000), bytes(256 * 8))
+        for epoch in (10, 11, 12):
+            self.assertTrue(hub.publish(sid, block(epoch)))
+        for epoch in (9, 10, 11):
+            self.assertFalse(hub.publish(sid, block(epoch)))
+        self.assertTrue(hub.publish(sid, block(11, 1)))
+        self.assertEqual([unpack(hub.take(hub.sessions[sid]))[0]["epoch"]
+                          for _ in range(3)], [11, 12, 11])
+        self.assertTrue(hub.publish(sid, block(12, 1)))
+        hub.reset(sid)
+        self.assertIsNone(hub.take(hub.sessions[sid]))
+        self.assertTrue(hub.publish(sid, block(13)))
+
+    def test_pcm_flags(self):
+        h = dict(protocol_version=1, stream_id=1, epoch=10, seq=0,
+                 start_frame=0, nframes=256, channels=2, flags=1, sample_rate=48000)
+        payload = bytes(256 * 8)
+        block = bytearray(pack(h, payload))
+        self.assertEqual(block[27], 1)
+        self.assertIs(unpack(block)[0]["seek"], True)
+        self.assertIs(unpack(pack(dict(h, flags=0), payload))[0]["seek"], False)
+        with self.assertRaises(Ablehnung):
+            pack(dict(h, flags=2), payload)
+        block[27] = 2
+        with self.assertRaises(Ablehnung):
+            unpack(block)
 
 
 if __name__ == "__main__":
