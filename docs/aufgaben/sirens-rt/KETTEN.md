@@ -4,8 +4,17 @@ Die Aufgaben dieses Verzeichnisses werden als **Ketten** an externe Bearbeiter v
 feste Folge von Aufgaben, die ein Bearbeiter in **einem** Branch und **einem** PR liefert. Der Koordinator
 vergibt, prüft und merged.
 
-Die Ketten bilden die Wellen aus `PLAN.md`, Kapitel 6, ab: Die erste Ziffer der Kettennummer ist die Welle.
-Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt sind.
+**Begriffe.** *Aufgabe* = Datei `AUFGABE-nn-….md` mit Ziel, Umfang und Abnahme; ihre Nummer gehört nur ihr.
+*Kette* = **eine oder mehrere** Aufgaben in fester Reihenfolge (Spalte „Aufgaben“, z. B. `33 → 34 → 35`), ein
+Bearbeiter, ein Branch, ein PR. Abhängigkeiten zwischen Aufgaben einer Kette erledigt die Reihenfolge, zwischen
+Ketten die Spalte „Voraussetzung“. Schnitt: hohe Kohäsion in der Kette (dieselben Dateien, aufeinander
+aufbauend), geringe Kopplung zwischen Ketten (keine gemeinsam geänderten Dateien), damit möglichst viele Ketten
+parallel laufen und kaum Merge-Konflikte entstehen. Eine Kette mit nur einer Aufgabe ist ein Sonderfall und wird
+unter „Schnitt“ begründet.
+
+Kettennummern werden ab KETTE-56 fortlaufend vergeben und tragen keine Bedeutung. KETTE-00 bis KETTE-55 folgten
+noch der alten Regel „erste Ziffer = Welle aus `PLAN.md`, Kapitel 6“; diese Nummern bleiben, weil Branches,
+PRs und Chats darauf verweisen.
 
 ## Register
 
@@ -41,9 +50,22 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | gemergt |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | vergeben (24.11.2026) |
-| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | vergeben (25.11.2026) |
-| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | vergeben (25.11.2026) |
-| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | vergeben (25.11.2026) |
+| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | gemergt |
+| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | gemergt |
+| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | gemergt |
+| KETTE-56 | Loop-Wechsel Ende-zu-Ende: Server, Pumpe, Geräterate | 33 → 34 → 35 | – | offen |
+| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | offen |
+
+### Schnitt der Ketten ab der G4-Folge
+
+- **KETTE-56 (33 → 34 → 35)**: eine Kette, weil die Aufgaben aufeinander aufbauen und Dateien teilen. 34 braucht
+  den Code von 33 (Server nimmt zwei Audio-Epochs an), 34 und 35 ändern beide `web/js/realtime/shell.js`.
+- **KETTE-57 (36)**: Einzelaufgabe, weil sie nur `benchmarks/g4/` ändert, keine Datei mit KETTE-56 teilt und
+  keinen Code aus ihr braucht (die Zähler liefert der gemergte Worklet). Sie läuft parallel.
+- **Korrektur zu KETTE-53/54/55:** Aufgaben 30 und 31 ändern beide `web/js/realtime/worklet_processor.js`;
+  richtig wäre eine Kette `30 → 31` gewesen. Nur Aufgabe 32 (Harness, eigene Dateien) war als eigene Kette
+  begründet. Alle drei sind gemergt; die offenen Punkte aus Aufgabe 30 stehen in den Aufgaben 33 bis 36.
+- KETTE-00 bis KETTE-52 bilden je ein Arbeitspaket des Plans ab (Aufgabe nn = WPnn), deshalb je eine Aufgabe.
 
 Im Register steht als Voraussetzung nur, wessen **Code** gebraucht wird. Ketten werden **vorgezogen**: Sie
 starten, sobald ihre Voraussetzung vergeben ist, und bauen auf deren Branch auf (Regel 11). Ketten zu echten
@@ -65,7 +87,7 @@ Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. St
 | C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
 | G2: 30 Minuten Mock-Durchlauf im Browser mit Ton | Claude | Freigabe KI-Integration | nach KETTE-31 |
 | G3 je Funktion, Hörprüfung | Claude, Hörurteil Nutzer | Aufnahme ins Release | ab KETTE-41 |
-| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); Wiederholung nach KETTE-53/54/55 |
+| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); KETTE-53/54/55 gemergt; Wiederholung nach KETTE-56/57 |
 | Merge nach `main`, Release | Nutzer | Abschluss | am Ende |
 | Parallele Codex-Arbeit an Song-/Albumliste auf `main` | Claude | Konfliktfreiheit | `main` regelmäßig in den Integrationszweig mergen |
 
@@ -94,6 +116,8 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-53 | `web/js/realtime/worklet_processor.js` (außer `dspParam`/`dspPreset`), `audio_core.js`, `ringbuffer.js`, `transport.js`, `clock.js`, `mock_api.js`, `workers/mock/`, `benchmarks/g4/` |
 | KETTE-54 | `web/js/realtime/effects/`, `benchmarks/dsp/`; im Worklet nur `dspParam`/`dspPreset` |
 | KETTE-55 | `benchmarks/` außer `benchmarks/g4/` und `benchmarks/dsp/`; in `workers/stable_audio/` nur die Cache-Suche |
+| KETTE-56 | `sirens/realtime/sessions.py` (`render`, `_run`), `workers/mock/`, `web/js/realtime/shell.js` (`pump`, Raten-Sperre), bei Bedarf `audio_core.js` |
+| KETTE-57 | `benchmarks/g4/` |
 
 Jede Kette schreibt außerdem ihre Tests unter `tests/realtime/` (Dateinamen mit dem eigenen Thema, z. B.
 `test_gpu_manager.py`, `audio_core.test.mjs`), ihre Ergebnisdatei und bei Bedarf `docs/realtime/hooks/WPnn.md`.
