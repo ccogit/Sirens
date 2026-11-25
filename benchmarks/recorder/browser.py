@@ -3,6 +3,7 @@ import argparse
 import datetime
 import json
 import secrets
+import re
 import tempfile
 import time
 import wave
@@ -94,16 +95,19 @@ def main():
 
             def do_GET(self):
                 if not self.host_ok():
-                    self.reply(403, {}); return
+                    self.reply(404, {}); return
                 if self.path == "/":
                     page = PAGE.replace("TOKEN", json.dumps(token)).replace("SECONDS", str(args.seconds))
                     self.reply(200, page.encode(), "text/html; charset=utf-8"); return
                 if self.path.startswith("/js/"):
                     name = self.path[4:]
-                    if name.isascii() and name.replace("_", "").replace(".", "").isalnum() and name.endswith(".js"):
-                        file = MODULES / name
-                        if file.is_file():
-                            self.reply(200, file.read_bytes(), "text/javascript"); return
+                    if re.fullmatch(r"(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.js", name):
+                        try:
+                            file = (MODULES / name).resolve(strict=True)
+                            if file.is_relative_to(MODULES) and file.is_file():
+                                self.reply(200, file.read_bytes(), "text/javascript"); return
+                        except (OSError, RuntimeError, ValueError):
+                            pass
                 self.reply(404, {})
 
             def do_POST(self):
