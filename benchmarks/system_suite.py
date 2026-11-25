@@ -168,8 +168,14 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
     rows = inventory()
     errors = []
     before_hash = hashes(music) if music else {}
-    before_workers = worker_processes(snapshot()) if not dry else set()
-    known_workers = set(before_workers)
+    before_workers = set() if dry else None
+    initial_failure = None
+    if not dry:
+        try:
+            before_workers = worker_processes(snapshot())
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            initial_failure = exc
+    known_workers = set(before_workers or ())
     try:
         for row in rows:
             cid = row["id"]
@@ -188,6 +194,12 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 errors.append("Messpfad fehlt: " + cid)
                 continue
             try:
+                if initial_failure is not None:
+                    exc, initial_failure = initial_failure, None
+                    raise RuntimeError("Prozessinventar vor Messstart: " + str(exc)) from exc
+                if before_workers is None:
+                    before_workers = worker_processes(snapshot())
+                    known_workers.update(before_workers)
                 if job.get("instruction"):
                     print(job["instruction"], flush=True)
                 steps = job.get("steps", [job.get("argv")])
@@ -235,11 +247,17 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                         raise ValueError("Soak-Dauer nicht belegt")
                 row["status"] = "messdatei_vorhanden"
             except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
+                row["status"] = "fehler"
+                row["fehler"] = str(exc)
                 errors.append(cid + ": " + str(exc))
     finally:
         try:
+            if before_workers is None:
+                errors.append("Nachkontrolle: Kein ursprüngliches Prozessinventar verfügbar" +
+                              (": " + str(initial_failure) if initial_failure else ""))
+            after_workers = worker_processes(snapshot(), known=known_workers) if not dry else set()
             errors.extend(verify(before_hash, hashes(music) if music else {},
-                                 before_workers, worker_processes(snapshot(), known=known_workers) if not dry else set()))
+                                 before_workers if before_workers is not None else after_workers, after_workers))
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             errors.append("Nachkontrolle: " + str(exc))
         report(out / "suite.json", rows, errors, dry)
