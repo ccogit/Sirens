@@ -56,7 +56,7 @@ PRs und Chats darauf verweisen.
 | KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | merged |
 | KETTE-56 | Loop-Wechsel: Server-Teil (Übergabe, Rest in KETTE-58) | 33 | – | merged |
 | KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | merged |
-| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | assigned (25.11.2026) |
+| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | merged |
 
 ### Schnitt der Ketten ab der G4-Folge
 
@@ -92,7 +92,7 @@ Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. St
 | C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
 | G2: 30 Minuten Mock-Durchlauf im Browser mit Ton | Claude | Freigabe KI-Integration | nach KETTE-31 |
 | G3 je Funktion, Hörprüfung | Claude, Hörurteil Nutzer | Aufnahme ins Release | ab KETTE-41 |
-| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); KETTE-53/54/55 gemergt; Wiederholung nach KETTE-56/57 |
+| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); KETTE-53/54/55 gemergt; KETTE-56/57/58 merged; Wiederholung jetzt fällig |
 | Merge nach `main`, Release | Nutzer | Abschluss | am Ende |
 | Parallele Codex-Arbeit an Song-/Albumliste auf `main` | Claude | Konfliktfreiheit | `main` regelmäßig in den Integrationszweig mergen |
 
