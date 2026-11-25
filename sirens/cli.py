@@ -1,4 +1,5 @@
 """Zugang für Claude: arbeitet direkt auf der Ablage, Ausgabe immer JSON."""
+import dataclasses
 import argparse
 import json
 import sys
@@ -129,7 +130,7 @@ def main(argv=None, env=None, out=None):
         if args.befehl == "serve":
             from .server import serve
             if args.port:
-                cfg = config.Config(cfg.music_root, cfg.data_dir, args.port, cfg.host)
+                cfg = dataclasses.replace(cfg, port=args.port)  # alle übrigen Einstellungen behalten
             serve(cfg)
             return 0
         result = _ausfuehren(args, cfg)
