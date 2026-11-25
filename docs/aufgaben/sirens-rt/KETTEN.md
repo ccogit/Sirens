@@ -41,6 +41,9 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | gemergt |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | vergeben (24.11.2026) |
+| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | offen |
+| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | offen |
+| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | offen |
 
 Im Register steht als Voraussetzung nur, wessen **Code** gebraucht wird. Ketten werden **vorgezogen**: Sie
 starten, sobald ihre Voraussetzung vergeben ist, und bauen auf deren Branch auf (Regel 11). Ketten zu echten
@@ -62,7 +65,7 @@ Was die Externe grundsätzlich nicht kann und deshalb früh angestoßen wird. St
 | C++-Build-Tools für Pakete mit Quellbau | Nutzer (Installation) | nur falls ein Kandidat sie zwingend braucht | vermeiden (nur Wheels) |
 | G2: 30 Minuten Mock-Durchlauf im Browser mit Ton | Claude | Freigabe KI-Integration | nach KETTE-31 |
 | G3 je Funktion, Hörprüfung | Claude, Hörurteil Nutzer | Aufnahme ins Release | ab KETTE-41 |
-| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | läuft parallel zu KETTE-52 |
+| G4: 2 Stunden Soak | Claude, Beobachtung Nutzer | Merge KETTE-52 | 1. Lauf 25.11.2026 nicht bestanden (75 ms Lücke je Loop-Sprung, DSP 80 ms, Harness); Wiederholung nach KETTE-53/54/55 |
 | Merge nach `main`, Release | Nutzer | Abschluss | am Ende |
 | Parallele Codex-Arbeit an Song-/Albumliste auf `main` | Claude | Konfliktfreiheit | `main` regelmäßig in den Integrationszweig mergen |
 
@@ -88,6 +91,9 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-44 | gemeinsame Dateien und `web/js/realtime/` (außer `gpu_panel.js`), `sirens/realtime/routes.py`, `sessions.py` |
 | KETTE-45 | `sirens/realtime/gpu_manager.py`, `worker_supervisor.py`, `model_registry.py`, `telemetry.py`, `web/js/realtime/gpu_panel.js`, CUDA-Sperre in `sirens/server.py` |
 | KETTE-31 | `sirens/realtime/sessions.py`, alle Adressen in `routes.py`, Einbau aller Hooks, `benchmarks/g2/` |
+| KETTE-53 | `web/js/realtime/worklet_processor.js` (außer `dspParam`/`dspPreset`), `audio_core.js`, `ringbuffer.js`, `transport.js`, `clock.js`, `mock_api.js`, `workers/mock/`, `benchmarks/g4/` |
+| KETTE-54 | `web/js/realtime/effects/`, `benchmarks/dsp/`; im Worklet nur `dspParam`/`dspPreset` |
+| KETTE-55 | `benchmarks/` außer `benchmarks/g4/` und `benchmarks/dsp/`; in `workers/stable_audio/` nur die Cache-Suche |
 
 Jede Kette schreibt außerdem ihre Tests unter `tests/realtime/` (Dateinamen mit dem eigenen Thema, z. B.
 `test_gpu_manager.py`, `audio_core.test.mjs`), ihre Ergebnisdatei und bei Bedarf `docs/realtime/hooks/WPnn.md`.
