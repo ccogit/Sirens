@@ -41,9 +41,9 @@ Ketten derselben Welle laufen nebeneinander, sobald ihre Voraussetzungen gemergt
 | KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | gemergt |
 | KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
 | KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | vergeben (24.11.2026) |
-| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | offen |
-| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | offen |
-| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | offen |
+| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | vergeben (25.11.2026) |
+| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | vergeben (25.11.2026) |
+| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | vergeben (25.11.2026) |
 
 Im Register steht als Voraussetzung nur, wessen **Code** gebraucht wird. Ketten werden **vorgezogen**: Sie
 starten, sobald ihre Voraussetzung vergeben ist, und bauen auf deren Branch auf (Regel 11). Ketten zu echten
