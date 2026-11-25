@@ -11,3 +11,7 @@
 4. Diese Datei. Soak (nicht gemessen): Performance-Profil, synthetisches Testsignal, 100 % Wet, 4-s-Loop starten; vorhandenes `benchmarks/g4/soak.js` in DevTools für 7200 s ausführen. `py -3.11 -m benchmarks.g4.report <Rohdatei> --candidate Performance --out <Ergebnisdatei>`; unexpected_underruns=0 prüfen.
 
 Keine neuen Abhängigkeiten, Versionen/Pins/Lizenzen fremder Projekte oder Modellgewichte. Python 3.11, Node 22, CPU-Simulation. Browser/Hardware nicht gemessen. Offenes Risiko: IPC-Backpressure und tatsächliche Renderlatenz/Timer-Jitter unter realer Last, Testausführung ausstehend. Rückbau: nach AUFGABE-35 die Commits AUFGABE-34 revertieren.
+
+## Ergänzender Prüfbeleg / Übergabe
+Gezielte JS-Teilausführung: beide Tests aus `pump_loop_34.test.mjs` (Originalpumpe, AudioCore, Worklet, Transport, Ring; Assert-/Timer-Shims, DSP aus) in V8 bestanden. 100 Wechsel: 0 unerwartete Underruns, Negativkontrolle >0; manueller Seek: nur erwartete Underruns, alte Epoch abgelehnt. Regulärer Node-Lauf weiterhin offen.
+Fertig: Code und Testfälle. Offen: vollständige Suite sowie Browser-/Sidecar-Last. Nächster Schritt: oben genannte Befehle beim Koordinator ausführen. Fehlerausgabe und Übergabe der gesamten Kette in AUFGABE-35.md.
