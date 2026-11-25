@@ -53,13 +53,17 @@ PRs und Chats darauf verweisen.
 | KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | gemergt |
 | KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | gemergt |
 | KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | gemergt |
-| KETTE-56 | Loop-Wechsel Ende-zu-Ende: Server, Pumpe, Geräterate | 33 → 34 → 35 | – | vergeben (25.11.2026) |
-| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | vergeben (25.11.2026) |
+| KETTE-56 | Loop-Wechsel: Server-Teil (Übergabe, Rest in KETTE-58) | 33 | – | gemergt |
+| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | gemergt |
+| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | offen |
 
 ### Schnitt der Ketten ab der G4-Folge
 
 - **KETTE-56 (33 → 34 → 35)**: eine Kette, weil die Aufgaben aufeinander aufbauen und Dateien teilen. 34 braucht
   den Code von 33 (Server nimmt zwei Audio-Epochs an), 34 und 35 ändern beide `web/js/realtime/shell.js`.
+- **KETTE-58 (37 → 34 → 35)**: KETTE-56 endete als Übergabe. Nur Task 33 in `sessions.py` war möglich; die
+  Datei-Liste der Lane war zu eng (`sidecar.py`, `pcm.py`, `pcm.js` fehlten). Der Rest von 33 ist Task 37; 34 und
+  35 folgen in derselben Lane, weil 34 den Sidecar-Code aus 37 braucht und 34/35 beide `shell.js` ändern.
 - **KETTE-57 (36)**: Einzelaufgabe, weil sie nur `benchmarks/g4/` ändert, keine Datei mit KETTE-56 teilt und
   keinen Code aus ihr braucht (die Zähler liefert der gemergte Worklet). Sie läuft parallel.
 - **Korrektur zu KETTE-53/54/55:** Aufgaben 30 und 31 ändern beide `web/js/realtime/worklet_processor.js`;
@@ -118,6 +122,7 @@ Parallele Ketten legen nur die Dateien ihrer eigenen Aufgabe an und ändern kein
 | KETTE-55 | `benchmarks/` außer `benchmarks/g4/` und `benchmarks/dsp/`; in `workers/stable_audio/` nur die Cache-Suche |
 | KETTE-56 | `sirens/realtime/sessions.py` (`render`, `_run`), `workers/mock/`, `web/js/realtime/shell.js` (`pump`, Raten-Sperre), bei Bedarf `audio_core.js` |
 | KETTE-57 | `benchmarks/g4/` |
+| KETTE-58 | `sirens/realtime/sidecar.py`, `pcm.py`, `sessions.py`, `web/js/realtime/pcm.js`, `shell.js`, `audio_core.js`, `transport.js`, `docs/realtime/protocol.md` |
 
 Jede Kette schreibt außerdem ihre Tests unter `tests/realtime/` (Dateinamen mit dem eigenen Thema, z. B.
 `test_gpu_manager.py`, `audio_core.test.mjs`), ihre Ergebnisdatei und bei Bedarf `docs/realtime/hooks/WPnn.md`.
