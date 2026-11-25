@@ -6,11 +6,97 @@ import { kickTausch } from "./kicktausch.js";
 import { stemSpiel } from "./stems.js";
 import { deckArt, morphArt, transitionArt, kickArt, stemArt } from "./signal_art.js";
 import { createLabShell } from "./realtime/shell.js";
+import { productionAnsicht } from "./production.js";
 
 // Gewähltes GPU-Profil des RTX Neural Lab; der Signal Room drosselt danach die Visualisierung.
 export const rtZustand = { profil: null };
 
+function productionSession() {
+  const base = "/api/production/v1/";
+  let active = null;
+  let disposed = false;
+  const controller = new AbortController();
+  const cancel = document.createElement("button");
+  cancel.textContent = "Produktion abbrechen";
+  cancel.disabled = true;
+  const message = document.createElement("p");
+  message.setAttribute("role", "status");
+  async function request(action, signal, data) {
+    const response = await fetch(base + action, {
+      signal,
+      ...(data === undefined ? {} : { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.meldung || "Produktionsaktion fehlgeschlagen");
+    return result;
+  }
+  function delay(signal) {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) { reject(new Error("Session geschlossen")); return; }
+      const onAbort = () => { clearTimeout(timer); reject(new Error("Session geschlossen")); };
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, 500);
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+  async function run(action, data, signal) {
+    const started = await request(action, signal, data);
+    active = started.run_id;
+    cancel.disabled = false;
+    try {
+      while (!signal.aborted) {
+        const result = await request("status?run=" + encodeURIComponent(active), signal);
+        message.textContent = result.stage || result.status;
+        if (result.status === "succeeded") return result;
+        if (["failed", "cancelled"].includes(result.status)) {
+          throw new Error(result.error?.next_action || result.error || "Produktion abgebrochen");
+        }
+        await delay(signal);
+      }
+      throw new Error("Session geschlossen");
+    } finally {
+      active = null;
+      cancel.disabled = true;
+    }
+  }
+  const tool = productionAnsicht({ api: {
+    mode: "real",
+    create: (data, signal) => run("start", data, signal),
+    revise: (id, text, signal) => run("revise", { run: id, text }, signal),
+    exportAbleton: (id, signal) => request("ableton-export", signal, { run: id }),
+    checkReturn: (id, signal) => request("return?export=" + encodeURIComponent(id), signal),
+    importAbleton: (id, signal) => request("ableton-import", signal, { export: id, confirm: true }),
+  } });
+  cancel.onclick = async () => {
+    if (!active || disposed) return;
+    try {
+      await request("cancel", controller.signal, { run: active });
+      if (!disposed) message.textContent = "Abbruch angefordert";
+    } catch (e) {
+      if (!disposed) message.textContent = e.message;
+    }
+  };
+  tool.el.append(cancel, message);
+  return { el: tool.el, destroy() {
+    disposed = true;
+    controller.abort();
+    cancel.onclick = null;
+    tool.destroy();
+  } };
+}
+
 export const werkzeuge = [
+  {
+    id: "production", titel: "Production Engine", kurz: "Production", gruppe: "Sound Design",
+    slogan: "CREATE\nA SONG.", sub: "Produzieren, anhören und optional in Ableton bearbeiten.",
+    kategorie: "OFFLINE / PRODUCTION", farbe: "#8eb8ff",
+    text: "Nutze lokal vorbereitete Songpläne und vorhandene Instrumente, Assets und Mix-Adapter.",
+    tags: ["OFFLINE", "PREVIEW", "ABLETON"], voraussetzung: "LOKAL · konfigurierte Produktionsadapter",
+    mount: productionSession,
+  },
   {
     id: "pult", titel: "DJ-Pult & Beat-Pads", kurz: "DJ-Pult", gruppe: "Live",
     slogan: "MAKE IT\nMOVE.", sub: "Zwei Tracks. Ein eigener Groove.",

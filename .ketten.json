@@ -1,9 +1,12 @@
 {
-  "name": "Sirens",
+  "name": "Sirens-Production",
   "repo": "ccogit/Sirens",
-  "branch": "integration/sirens-rt",
-  "register": "docs/aufgaben/sirens-rt/KETTEN.md",
-  "task_dir": "docs/aufgaben/sirens-rt",
-  "stack": "Python 3.11 (nur Standardbibliothek im Hauptprozess), ES-Module ohne Build, Node 22 für Tests",
-  "rules": "Zielzweig ist integration/sirens-rt (nicht main); nur die Dateien der eigenen Kette anlegen (Tabelle „Dateien je Kette“ in KETTEN.md), docs/realtime/board.md nicht anfassen; kein Torch-/Modell-Import im Paket sirens/; keine Modellgewichte, Musikdateien oder Downloads im Repo"
+  "branch": "integration/sirens-production",
+  "register": "docs/aufgaben/sirens-production/KETTEN.md",
+  "task_dir": "docs/aufgaben/sirens-production",
+  "chain_pattern": "KETTE-P\\d+",
+  "task_token": "\\d\\d|K\\d\\d",
+  "task_file": "AUFGABE-(\\d\\d|K\\d\\d)-.*\\.md$",
+  "stack": "Python 3.11 (Standardbibliothek im Hauptprozess; Audio-/Modellbibliotheken nur in Worker-venvs unter workers/), ES-Module ohne Build, Node 22 für Tests",
+  "rules": "Zielzweig ist integration/sirens-production (nicht main); Branch extern/KETTE-P0x statt feat/production-…; nur die Owner-Dateien der eigenen Kette laut Register in KETTEN.md plus docs/aufgaben/sirens-production/ergebnisse/K0x.md; REUSE-AMM.md ist verbindlich (AMM/SecondRoom/Producer Pal zuerst); kein Modell-Import im Paket sirens/; keine Audiodateien, Bewertungen, Modellgewichte oder Downloads im Repo; CI ohne Netz, GPU, Plugins, Live; GitHub Actions ist abgeschaltet: keine CI, nicht darauf warten, Ready setzen, wenn fertig – der Koordinator testet lokal unter Windows"
 }

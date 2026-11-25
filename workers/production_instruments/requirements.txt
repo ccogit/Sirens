@@ -1,0 +1,6 @@
+# Instrument worker, Python 3.11. Versions from AMM 26c5ce2fe9641ed958414f78d58643527bc3032f.
+# Install in the isolated instrument venv, alongside the local AMM backend requirements.
+# No DawDreamer, no fallback host.
+pedalboard==0.9.16
+numpy==1.26.4
+soundfile==0.12.1

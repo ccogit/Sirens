@@ -51,6 +51,10 @@ class App:
         self.kick = KickTausch(cfg, umgebung())
         self.stems = StemDienst(cfg)
         self.stem_noten = StemNoten(self.stems)
+        from .production.integration import ProductionService, RealBackend
+        from .production.gpu import GPUAdapter
+        self.production = ProductionService(cfg, backend_factory=lambda cfg, options:
+            RealBackend(cfg, options, gpu_adapter_factory=lambda: GPUAdapter.from_app(self)))
 
     def aktion(self, name, oid, data):
         """Führt eine Nutzeraktion aus und startet Claude, wenn der Auftrag danach bei Claude liegt."""
@@ -133,6 +137,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise Ablehnung("forbidden_host", "Diese Adresse ist nicht erlaubt.", status=403)
             teile = urlsplit(self.path)
             pfad, query = unquote(teile.path), {k: v[-1] for k, v in parse_qs(teile.query).items()}
+            if pfad.startswith("/api/production/v1/"):
+                from .production.integration import dispatch
+                return dispatch(self, pfad, query, self._body() if schreibend else None)
             if pfad == "/api/rt/v1/profile":
                 return self._rt_profile()
             if pfad.startswith("/api/rt/v1/"):
