@@ -26,6 +26,7 @@ function setup(rate=48000){
   globalThis.sampleRate=rate;globalThis.currentFrame=0;
   const context={sampleRate:rate,currentTime:0,destination:{}};
   const core=new AudioCore(context,[0]);
+  core.configureSourceRate(48000);
   clearInterval(core.timer);
   const pending=[];
   const render=async(_session,p)=>{pending.push({due:currentFrame+rate/20,p});};
@@ -49,7 +50,7 @@ async function simulate(rate,preload){
   const {core,render,deliver,tick,status}=setup(rate);
   const length=rate*4, start=rate*22/100;
   const state=core.reset(0,true,start,length);
-  const plan=makeRenderPlan(state,0,length,length);
+  const plan=makeRenderPlan(state,0,48000*4,length,false,rate);
   const view=preload?core:Object.create(core,{loopPlan:{value:null}});
   // Der Vergleichspfad sieht den Plan nicht, wie die frühere Pumpe.
   if(!preload){
@@ -94,4 +95,8 @@ test("WP34: manueller Seek mit erwartetem Aussetzer und Ablehnung alter Pakete",
   assert.equal(first.seq,0);
   assert.ok(core.status.streams[0].expectedUnderruns>0);
   assert.equal(core.status.streams[0].unexpectedUnderruns,0);
+});
+
+test("WP35: 100 Loop-Wechsel bei 44,1 kHz mit 48-kHz-Produzent",async()=>{
+  assert.equal((await simulate(44100,true)).unexpectedUnderruns,0);
 });
