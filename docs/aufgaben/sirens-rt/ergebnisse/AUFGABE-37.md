@@ -14,3 +14,7 @@
 5. Diese Datei.
 
 Keine neuen Abhängigkeiten, Pins, Gewichte oder Hardwareanforderungen. Python 3.11, Node 22, CPU. Kein Hardwarewert gemessen. Risiko: reale IPC-/WebSocket-Last und vollständige Regression noch nicht geprüft. Rückbau: AUFGABE-37-Commits in umgekehrter Reihenfolge revertieren (nach Rückbau der abhängigen Aufgaben).
+
+## Ergänzender Prüfbeleg / Übergabe
+Gezielte JS-Teilausführung: `pcm_seek_37.test.mjs` mit Original-PCM-Funktionen und Assert-Shim in V8 bestanden. Python-Tests und regulärer Node-Lauf offen.
+Fertig: Code und Testfälle. Offen: vollständige Suite sowie Browser-/Sidecar-Last. Nächster Schritt: oben genannte Befehle beim Koordinator ausführen. Fehlerausgabe und Übergabe der gesamten Kette in AUFGABE-35.md.
