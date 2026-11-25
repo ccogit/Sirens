@@ -94,6 +94,7 @@ export function makeRenderPlan(state, offset, length, loop, seek=false, rate=MOC
     next:null, loop, length, offset, rate};
 }
 export async function fillRenderPlan(plan, core, session, render, active=()=>true) {
+  if(!active())return;
   const now=core.frame(), capacity=core.transports[0].lookahead, rate=plan.rate;
   const lead=Math.min(12288,capacity-2048);
   let current=plan.current;
@@ -137,6 +138,7 @@ export async function fillRenderPlan(plan, core, session, render, active=()=>tru
       if(e.status!==503 && e.error!=="stale_epoch")throw e;
       break;
     }
+    if(!active())return;
     g.seq++;g.source+=n;g.output=deviceFrame(g,g.source,rate);
   }
 }
@@ -144,9 +146,9 @@ export async function fillRenderPlan(plan, core, session, render, active=()=>tru
 // Ein gemeinsamer AudioContext, keine PCM-Übertragung über JSON. Der Client
 // meldet lediglich begrenzte Quell-/Master-Frame-Aufträge; Wet kommt per Sidecar.
 export function createAudioSessionController(api, selection, {openCore=()=>AudioCore.open([0]),
-    onStatus=()=>{}}={}) {
+    onStatus=()=>{},timerHost=globalThis}={}) {
   let session=null, core=null, asset=null, buffer=null, grid=null, recorder=null;
-  let tail=Promise.resolve(), closed=false, generation=0, timer=null, pumping=false;
+  let tail=Promise.resolve(), closed=false, generation=0, timer=null, pumpTask=null;
   let plan=null, source=0, mix=0, bypass=false, fallback=false, fault=null, seekPending=false;
   let recorded=[], timeline=[], lastExport=null, historyFull=false;
   const enqueue=fn=>{
@@ -155,9 +157,15 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     return result;
   };
   const inform=()=>onStatus();
-  const silence=()=>{
-    if(core)core.param(1,{mix:0,bypass:true,gain:0});
+  const isCurrent=current=>!closed && current===generation;
+  const cancelled=Symbol("Sitzung gestoppt");
+  const stopPump=()=>{
     plan=null;
+    if(timer!==null){timerHost.clearInterval(timer);timer=null;}
+  };
+  const silence=()=>{
+    stopPump();
+    if(core)core.param(1,{mix:0,bypass:true,gain:0});
   };
   const stopRecorder=async()=>{
     if(!recorder)return;
@@ -167,8 +175,10 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     inform();
   };
   async function cleanup(){
-    plan=null;
-    clearInterval(timer);timer=null;
+    stopPump();
+    // Ein bereits gesendeter Renderauftrag ist durch den HTTP-Timeout begrenzt.
+    // Vor dem Zerstören der Ressourcen seine Pumpe vollständig abwickeln.
+    await pumpTask;
     await stopRecorder();
     const c=core;core=null;
     try{if(c)await c.destroy();}
@@ -178,35 +188,47 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
       asset=null;buffer=null;grid=null;source=0;seekPending=false;fallback=false;recorded=[];timeline=[];lastExport=null;historyFull=false;
     }
   }
-  async function initialize(){
+  async function initialize(current){
     if(session)return;
+    const check=()=>{if(!isCurrent(current))throw cancelled;};
     // openCore wird vor dem ersten HTTP-Await aus der Nutzeraktion ausgelöst.
     core=await openCore();
-    core.configureSourceRate(MOCK_RATE);
-    if(closed)throw new Error("Sitzung geschlossen");
+    check();
+    // Gleichratige AudioCore-Adapter benötigen keine zusätzliche Konfiguration.
+    if(typeof core.configureSourceRate==="function")core.configureSourceRate(MOCK_RATE);
+    else if(core.rate!==MOCK_RATE)throw new Error("PCM-Ratenadapter fehlt");
     const selected=selection();
     asset=selected.stem?await api.cachedStem(selected.path,selected.model,selected.stem):
       selected.path==="fixture"?await api.asset(MOCK_ASSET):await api.resolve(selected.path);
+    check();
     session=await api.create("mock",MOCK_RATE);
+    check();
     session=await api.command(session,"load",{asset_id:asset.id});
+    check();
     const end=Date.now()+20000;
-    while(session.state==="loading" && Date.now()<end && !closed){
-      await wait(50);session=await api.session(session);
+    while(session.state==="loading" && Date.now()<end && isCurrent(current)){
+      await wait(50);check();session=await api.session(session);
     }
-    if(session.state!=="ready"||closed)throw new Error("Mock-Sitzung nicht bereit");
-    buffer=decodeDry(core,await api.dry(session),asset);
+    check();
+    if(session.state!=="ready")throw new Error("Mock-Sitzung nicht bereit");
+    const raw=await api.dry(session);check();
+    buffer=decodeDry(core,raw,asset);
     try{grid=createBeatGrid(await api.beatgrid(asset.id),asset.sample_rate);}catch{grid=null;}
+    check();
     try{
       const transport=await api.transport(session);
+      check();
       const ws=core.connect("ws://127.0.0.1:"+transport.port+"/pcm",transport.token);
       await timed(new Promise((resolve,reject)=>{
         ws.addEventListener("open",resolve,{once:true});
         ws.addEventListener("error",reject,{once:true});
         ws.addEventListener("close",reject,{once:true});
       }),4000);
-      ws.addEventListener("close",()=>{fallback=true;core?.param(1,{mix:0});inform();});
-    }catch{fallback=true;core.param(1,{mix:0});}
-    timer=setInterval(()=>{pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});},20);
+      check();
+      ws.addEventListener("close",()=>{if(isCurrent(current)){fallback=true;core?.param(1,{mix:0});inform();}});
+    }catch(e){check();fallback=true;core.param(1,{mix:0});}
+    check();
+    timer=timerHost.setInterval(startPump,20);
   }
   function begin(offset,seek=seekPending){
     if(!core||!buffer)return;
@@ -219,25 +241,35 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     seekPending=false;
     plan=makeRenderPlan(state,offset,asset.nframes,loop,seek,core.rate);
     core.param(1,{mix:fallback?0:mix,bypass,gain:1});
-    void pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});
+    startPump();
   }
-  async function pump(){
-    if(recorder && core?.context.state==="suspended")recorder.fail("AudioContext angehalten");
-    if(pumping || !plan || !core || !session || session.state!=="playing" || fallback)return;
-    pumping=true;
-    const active=plan;
-    try{
-      if(!active.loop && core.frame()>=active.current.end){
-        plan=null;source=0;
-        core.pause();
-        void enqueue(async()=>{if(session?.state==="playing")session=await api.command(session,"pause");inform();}).catch(e=>{fault=e;inform();});
-        return;
+  function startPump(){
+    if(pumpTask || closed || timer===null)return;
+    const current=generation, active=plan;
+    pumpTask=pump(current,active).catch(e=>{
+      if(isCurrent(current) && plan===active){
+        fault=e;fallback=true;core?.param(1,{mix:0});inform();
       }
-      await fillRenderPlan(active,core,session,(s,payload)=>api.render(s,payload),
-        ()=>plan===active && !!core && !!session && !fallback);
-    }finally{pumping=false;}
+    }).finally(()=>{pumpTask=null;});
   }
-  const cancelled=Symbol("Sitzung gestoppt");
+  async function pump(current,active){
+    if(!isCurrent(current))return;
+    if(recorder && core?.context.state==="suspended")recorder.fail("AudioContext angehalten");
+    if(!active || !core || !session || session.state!=="playing" || fallback)return;
+    if(!active.loop && core.frame()>=active.current.end){
+      plan=null;source=0;
+      core.pause();
+      // Der automatische Pause-Befehl darf nach Panic keinen neuen Befehl starten.
+      void enqueue(async()=>{
+        if(!isCurrent(current))return;
+        if(session?.state==="playing")session=await api.command(session,"pause");
+        if(isCurrent(current))inform();
+      }).catch(e=>{if(isCurrent(current)){fault=e;inform();}});
+      return;
+    }
+    await fillRenderPlan(active,core,session,(s,payload)=>api.render(s,payload),
+      ()=>isCurrent(current) && plan===active && !!core && !!session && !fallback);
+  }
   async function command(current,name,args={}){
     if(closed||current!==generation)throw cancelled;
     const before=session;
@@ -268,7 +300,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
       return enqueue(async()=>{
         if(closed||current!==generation)return;
         try{
-          await initialize();
+          await initialize(current);
           if(closed||current!==generation)return;
           await fn((name,args)=>command(current,name,args),()=>session.state);
         }catch(e){
