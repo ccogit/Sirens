@@ -5,7 +5,7 @@ import {runInNewContext} from "node:vm";
 
 // Das tatsächliche DevTools-Snippet ausführen; nur Browserimport und Umgebung ersetzen.
 const source=readFileSync(new URL("../../benchmarks/g4/soak.js",import.meta.url),"utf8")
-  .replace('await import("/js/realtime/audio_core.js")',"({AudioCore})");
+  .replace('await import("/js/realtime/audio_core.js")',"({AudioCore:globalThis.AudioCore})");
 
 async function soak(streams){
   let now=0, index=0, blob;
