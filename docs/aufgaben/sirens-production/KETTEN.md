@@ -6,27 +6,28 @@ Vergeben wird mit dem Werkzeug `ketten` (`.ketten.json` auf diesem Zweig). Kette
 Branch `extern/KETTE-P0x` (ersetzt `feat/production-k0x-…` unten), ein PR auf `integration/sirens-production`.
 Owner-Dateien je Kette: Tabelle weiter unten. Den Stand pflegt nur der Koordinator.
 
-| Kette | Titel | Aufgaben | Voraussetzung | Stand |
+| Lane | Title | Tasks | Depends on | Status |
 |---|---|---|---|---|
-| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | gemergt |
-| KETTE-P01 | Persönliches Referenzwissen | K01 | – | gemergt |
-| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | gemergt |
-| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | gemergt |
-| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | gemergt |
-| KETTE-P05 | Mixing und Mastering | K05 | – | gemergt |
-| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | gemergt |
-| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | gemergt |
-| KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 gemergt, KETTE-P01 gemergt, KETTE-P02 gemergt, KETTE-P03 gemergt, KETTE-P04 gemergt, KETTE-P05 gemergt, KETTE-P06 gemergt, KETTE-P07 gemergt | gemergt |
-| KETTE-P09 | Mix byte-reproduzierbar (Folge aus K05/K08) | K09 | – | gemergt |
-| KETTE-P10 | Instrument-Host unter Windows | 10 | – | gemergt |
-| KETTE-P11 | PCM24-Extensible und Sprache im Worker | 11 → 12 | – | gemergt |
-| KETTE-P12 | AMM-Export, Inventur, Benchmark-Messung | 13 → 14 → 15 | – | gemergt |
-| KETTE-P13 | Laufzeiten je Stufe | 16 | – | gemergt |
-| KETTE-P14 | Mix: Bass ist nicht Sub | 17 | – | gemergt |
-| KETTE-P15 | Preview-Plan aus Sprachdauern | 18 | – | gemergt |
+| KETTE-P00 | Runner, Verträge, Mock-Durchstich (Umfang 1–2) | K00 | – | merged |
+| KETTE-P01 | Persönliches Referenzwissen | K01 | – | merged |
+| KETTE-P02 | Komposition, Groove, Dramaturgie | K02 | – | merged |
+| KETTE-P03 | Instrumente und Offline-Rendering | K03 | – | merged |
+| KETTE-P04 | Generative Klangbausteine, Spoken Word | K04 | – | merged |
+| KETTE-P05 | Mixing und Mastering | K05 | – | merged |
+| KETTE-P06 | Qualitätsbenchmark und schlanke Oberfläche | K06 | – | merged |
+| KETTE-P07 | Ableton-Adapter, Export/Return | K07 | – | merged |
+| KETTE-P08 | Integration: echter CLI-Durchstich, Signal-Room, Export (K00 Umfang 3) | K08 | KETTE-P00 merged, KETTE-P01 merged, KETTE-P02 merged, KETTE-P03 merged, KETTE-P04 merged, KETTE-P05 merged, KETTE-P06 merged, KETTE-P07 merged | merged |
+| KETTE-P09 | Mix byte-reproduzierbar (Folge aus K05/K08) | K09 | – | merged |
+| KETTE-P10 | Instrument-Host unter Windows | 10 | – | merged |
+| KETTE-P11 | PCM24-Extensible und Sprache im Worker | 11 → 12 | – | merged |
+| KETTE-P12 | AMM-Export, Inventur, Benchmark-Messung | 13 → 14 → 15 | – | merged |
+| KETTE-P13 | Laufzeiten je Stufe | 16 | – | merged |
+| KETTE-P14 | Mix: Bass ist nicht Sub | 17 | – | merged |
+| KETTE-P15 | Preview-Plan aus Sprachdauern | 18 | – | merged |
 
-**Begriffe:** *Aufgabe* = Datei `AUFGABE-nn-….md` mit eigener Abnahme. *Kette* = eine oder mehrere Aufgaben in
-fester Reihenfolge, ein Branch, ein PR. Abhängigkeiten zwischen Aufgaben derselben Kette erledigt die Reihenfolge,
+**Begriffe** (seit 25.11.2026 englisch; IDs `KETTE-Pnn`, Dateien `AUFGABE-…` und Präfix `ÜBERGABE` bleiben): *Task*
+(früher Aufgabe) = Datei `AUFGABE-nn-….md` mit eigener Abnahme. *Lane* (früher Kette) = ein oder mehrere Tasks in
+fester Reihenfolge, ein Branch, ein PR. Ledger = diese Tabelle, Spalte „Depends on“, Status open/assigned/merged/blocked. Abhängigkeiten zwischen Aufgaben derselben Kette erledigt die Reihenfolge,
 zwischen Ketten die Spalte „Voraussetzung“. Schnitt: hohe Kohäsion innerhalb, geringe Kopplung zwischen Ketten.
 Die Dateien `AUFGABE-K00` … `K08` beschreiben je eine (gemergte) Kette; ihre Umfangspunkte waren die Aufgaben.
 Neue Arbeit wird nach dem Ziel geschnitten, nicht nach Form: Aufgaben, die dieselben Dateien ändern, in eine
