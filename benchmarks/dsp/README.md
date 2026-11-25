@@ -39,4 +39,4 @@ python -m unittest discover -s tests/realtime -p test_dsp_control_latency.py -v
 ```
 
 Festes Delay des schnellen Profils: 896 Frames wie zuvor; Wet-Rampe 256 → 128
-Frames und Morph-Rampe 512 → 128 Frames. Keine Änderung an Transport oder Epoch.
+Frames und Morph-Rampe 512 → 448 Frames. Die Morph-Rampe bleibt wegen der Klickgrenze bei gegenphasigen IRs länger. Keine Änderung an Transport oder Epoch.
