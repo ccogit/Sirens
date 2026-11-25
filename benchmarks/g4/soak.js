@@ -8,7 +8,7 @@
   const seconds=Number(prompt("Messdauer: 7200 (Performance) oder 1800 (Streaming-Modell)","7200"));
   if(![7200,1800].includes(seconds))throw Error("Ungültige Messdauer");
   const raw={zeitpunkt:new Date().toISOString(),requested_seconds:seconds,elapsed_seconds:0,
-    audio_seconds:0,underruns:0,interruptions:0,visibility_changes:0,epoch_changes:0,
+    audio_seconds:0,underruns:0,unexpected_underruns:0,expected_underruns:0,interruptions:0,visibility_changes:0,epoch_changes:0,
     completed:false,error:null};
   const started=performance.now(), firstFrame=core.status.cursor;
   let previous=core.status, hidden=document.hidden;
@@ -24,9 +24,23 @@
       if(status.epoch!==previous.epoch)raw.epoch_changes++;
       if(status.streams.length!==previous.streams.length)throw Error("Spurzahl geändert");
       status.streams.forEach((s,i)=>{
-        const old=previous.streams[i].underruns;
-        if(!Number.isInteger(s.underruns)||!Number.isInteger(old))throw Error("Underrun-Zähler fehlt");
-        raw.underruns+=s.underruns>=old?s.underruns-old:s.underruns;
+        const old=previous.streams[i];
+        // Alte Worklets kennen nur underruns (alles unerwartet).
+        const counters=stream=>({
+          unexpected:stream.unexpectedUnderruns ?? stream.underruns,
+          expected:stream.expectedUnderruns ?? 0,
+        });
+        const before=counters(old), after=counters(s);
+        const delta=(value,prev)=>{
+          if(!Number.isInteger(value)||!Number.isInteger(prev)||value<0||prev<0)
+            throw Error("Underrun-Zähler fehlt oder ungültig");
+          return value>=prev?value-prev:value;
+        };
+        const unexpected=delta(after.unexpected,before.unexpected);
+        const expected=delta(after.expected,before.expected);
+        raw.unexpected_underruns+=unexpected;
+        raw.expected_underruns+=expected;
+        raw.underruns=raw.unexpected_underruns; // Kompatibilität mit alten Auswertungen.
       });
       if(document.hidden&&!hidden)raw.interruptions++;
       hidden=document.hidden;
