@@ -87,12 +87,25 @@ def process_snapshot():
     # Nur lesender Zugriff; niemals fremde Prozesse automatisch beenden.
     if os.name != "nt":
         raise RuntimeError("Hardware-Suite benötigt Windows-Prozessinventar")
-    command = ("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,"
+    command = ("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+               "Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,"
                "CreationDate,CommandLine | ConvertTo-Json -Compress")
-    raw = subprocess.check_output(["powershell.exe", "-NoProfile", "-Command", command],
-                                  encoding="utf-8", errors="replace", timeout=60)
-    data = json.loads(raw)
-    return data if isinstance(data, list) else [data]
+    for attempt in range(5):
+        try:
+            raw = subprocess.check_output(["powershell.exe", "-NoProfile", "-Command", command],
+                                          encoding="utf-8", timeout=60)
+            data = json.loads(raw.lstrip("\ufeff"))
+            rows = data if isinstance(data, list) else [data]
+            if not rows or any(not isinstance(row, dict)
+                               or type(row.get("ProcessId")) is not int
+                               or type(row.get("ParentProcessId")) is not int
+                               for row in rows):
+                raise ValueError("Ungültiges Prozessinventar")
+            return rows
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            if attempt == 4:
+                raise RuntimeError(f"Prozessinventar nach 5 Versuchen fehlgeschlagen: {exc}") from exc
+            time.sleep(.5)
 
 
 def worker_processes(rows, root=ROOT, known=()):
