@@ -4,14 +4,16 @@ import {EffectRack} from "../../web/js/realtime/effects/rack.js";
 import {ConvolutionEffect} from "../../web/js/realtime/effects/convolution.js";
 
 const rate=48000;
-function measure(legacy=false){
+function measure(legacy=false,key="morph"){
     const rack=new EffectRack("fast");
     // Kontrollierte, gültige Impulsantworten: Identität und Stille.
     // Damit ist die Zielwirkung (90 % Pegelreduktion) eindeutig.
     const conv=new ConvolutionEffect("fast",Float32Array.of(1),Float32Array.of(0));
+    conv.wet.frames=rack.convolution.wet.frames;
     rack.effects[2]=rack.convolution=conv;
-    if(legacy)conv.morph.frames=512;
-    rack.setParameter(2,"wet",1);
+    if(legacy){conv.morph.frames=512;conv.wet.frames=256;}
+    if(key==="wet"){rack.setParameter(2,"morph",1);rack.setParameter(2,"wet",0);}
+    else rack.setParameter(2,"wet",1);
     const out=new Float32Array(2);
     let impulse=-1;
     for(let i=0;i<4096;i++){
@@ -21,7 +23,7 @@ function measure(legacy=false){
     // Nach dem Impuls stationärer Pegel: keine Quellflanke während der Rampe.
     for(let i=0;i<4096;i++)rack.process(.25,-.25,out);
     assert.ok(Math.abs(out[0]-.25)<1e-5);
-    rack.setParameter(2,"morph",1);
+    rack.setParameter(2,key,1);
     let previous=out[0],jump=0,frames=null;
     for(let i=1;i<=2048;i++){
         rack.process(.25,-.25,out);
@@ -42,5 +44,14 @@ test("fast: Rack-Impuls, 90 Prozent Zielwirkung und klickarme Rampe",()=>{
     assert.ok(after.ms<30);
     assert.ok(after.frames<before.frames);
     // 0,01 FS entspricht 4 % des stationären Testpegels je Sample.
+    assert.ok(after.jump<.01);
+});
+
+test("fast: Wet-Steuerung erreicht Zielpegel ohne Klickflanke",()=>{
+    const before=measure(true,"wet"),after=measure(false,"wet");
+    console.log(JSON.stringify({wetBefore:before,wetAfter:after,rate}));
+    assert.equal(after.impulse,896);
+    assert.ok(after.ms<30);
+    assert.ok(after.frames<before.frames);
     assert.ok(after.jump<.01);
 });
