@@ -28,8 +28,7 @@ GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 class Stream:
     def __init__(self):
         self.queue = collections.deque()
-        self.epoch = -1
-        self.seq = -1
+        self.sequences = {}
         self.credit = MAX_QUEUE * 2048
         self.stamp = time.monotonic()
 
@@ -90,6 +89,15 @@ class Hub:
                 if item is s:
                     del self.sessions[key]
 
+    def reset(self, session_id):
+        """Steuer-Epoch-Wechsel: beide Generationen und die Queue verwerfen."""
+        with self.lock:
+            s = self.sessions.get(session_id)
+            if s and not s.closed:
+                for st in s.streams.values():
+                    st.queue.clear()
+                    st.sequences.clear()
+
     def publish(self, session_id, block):
         if len(block) > MAX_BLOCK:
             raise ValueError("PCM zu groß")
@@ -99,20 +107,27 @@ class Hub:
             if not s or s.closed or h["stream_id"] not in s.streams:
                 return False
             st = s.streams[h["stream_id"]]
-            if h["epoch"] < st.epoch or (h["epoch"] == st.epoch and h["seq"] <= st.seq):
+            epoch = h["epoch"]
+            if epoch not in st.sequences and st.sequences and epoch < max(st.sequences):
+                return False
+            if h["seq"] <= st.sequences.get(epoch, -1):
                 return False
             now = time.monotonic()
             st.credit = min(MAX_QUEUE * 2048, st.credit + (now - st.stamp) * h["sample_rate"])
             st.stamp = now
             if h["nframes"] > st.credit:
                 return False
-            if h["epoch"] > st.epoch:
-                st.queue.clear()
-                st.epoch, st.seq = h["epoch"], -1
-            if len(st.queue) >= MAX_QUEUE:
+            # Nur die älteste Epoch einer dritten Generation aus der Queue entfernen.
+            evicted = min(st.sequences) if epoch not in st.sequences and len(st.sequences) == 2 else None
+            remaining = st.queue if evicted is None else collections.deque(
+                b for b in st.queue if struct.unpack_from("<I", b, 8)[0] != evicted)
+            if len(remaining) >= MAX_QUEUE:
                 return False
+            if evicted is not None:
+                del st.sequences[evicted]
+                st.queue = remaining
             st.credit -= h["nframes"]
-            st.seq = h["seq"]
+            st.sequences[epoch] = h["seq"]
             st.queue.append(bytes(block))
             return True
 
@@ -318,6 +333,9 @@ def main():
                         req = json.loads(data[1:])
                         if req["op"] == "issue":
                             reply({"token": server.hub.issue(req["session"], req["streams"])})
+                        elif req["op"] == "reset":
+                            server.hub.reset(req["session"])
+                            reply({"ok": True})
                         elif req["op"] == "revoke":
                             server.hub.revoke(req["session"])
                             reply({"ok": True})

@@ -1,4 +1,4 @@
-import {Transport} from "./transport.js";
+import {Transport, frameAtRate} from "./transport.js";
 import {Clock} from "./clock.js";
 
 // Pro Suite ein Ausgabepfad. Erzeugung und Resume ausschließlich nach Nutzeraktion.
@@ -29,6 +29,7 @@ export class AudioCore {
         this.transports=latencies.map((_,i)=>new Transport(this.node.port,i+1,context.sampleRate));
         this.nextTransports=latencies.map((_,i)=>new Transport(this.node.port,i+1,context.sampleRate));
         this.loopPlan=null; this.loopBase=null;
+        this.renderRequests=new Map(); this.renderLatencyFrames=0; this.wireRate=null;
         this.latency=Math.max(...latencies); this.dspLatency=dspEnabled===true?896:0; this.buffers=[];
         this.status=null; this.socket=null; this.waiting=false; this.closed=false;
         this.node.port.onmessage=({data:m})=>{
@@ -44,7 +45,8 @@ export class AudioCore {
                 this.clock.epoch=m.epoch;
                 if(this.loopPlan?.epoch===m.epoch) {
                     const old=this.transports; this.transports=this.nextTransports; this.nextTransports=old;
-                } else for(const t of this.transports) t.reset(m.epoch,m.cursor);
+                } else for(const t of this.transports) t.reset(m.epoch,m.cursor,
+                    this.wireRate===null?m.source:frameAtRate(m.source,this.rate,this.wireRate));
                 this.loopPlan=null;
                 this.prepareLoop();
             }
@@ -67,21 +69,27 @@ export class AudioCore {
         if(!Number.isSafeInteger(frame))return;
         const preroll=this.transports[0].lookahead+this.latency;
         this.loopPlan=Object.freeze({epoch,frame,source:b.source,length:b.length,preroll});
-        for(const t of this.nextTransports)t.reset(epoch,frame);
+        for(const t of this.nextTransports)t.reset(epoch,frame,b.wireSource);
         this.node.port.postMessage({type:"prepareLoop",epoch,frame});
+    }
+    // Vor dem ersten Play konfigurieren; andere PCM-Nutzer bleiben unverändert.
+    configureSourceRate(rate){
+        if(this.clock.playing)throw new Error("PCM-Rate während Wiedergabe");
+        for(const t of [...this.transports,...this.nextTransports])t.setWireRate(rate);
+        this.wireRate=rate;
     }
     get rate(){return this.context.sampleRate;}
     frame(){return Clock.frame(this.context.currentTime,this.rate);}
-    reset(source=0,active=true,frame=this.frame()+Math.round(this.rate*.1),loopLength=0,expectedSeek=false) {
+    reset(source=0,active=true,frame=this.frame()+Math.round(this.rate*.1),loopLength=0,expectedSeek=false,wireSource=this.wireRate===null?source:frameAtRate(source,this.rate,this.wireRate)) {
         if(!Number.isSafeInteger(frame)||frame<this.frame()||!Number.isSafeInteger(loopLength)||loopLength<0)
             throw new RangeError("Startframe");
         // Auch die angekündigte Epoch ist verbraucht: verspätete Pre-Roll-Pakete
         // dürfen nach einem manuellen Reset nicht erneut gültig werden.
         if(this.loopPlan)this.clock.epoch=Math.max(this.clock.epoch,this.loopPlan.epoch);
         const epoch=this.clock.seek(source);
-        this.clock.playing=active; this.loopPlan=null;
-        this.loopBase=active && loopLength?{epoch,frame,source,length:loopLength}:null;
-        for(const t of this.transports) t.reset(epoch,frame);
+        this.clock.playing=active; this.loopPlan=null; this.renderRequests.clear();
+        this.loopBase=active && loopLength?{epoch,frame,source,wireSource,length:loopLength}:null;
+        for(const t of this.transports) t.reset(epoch,frame,wireSource);
         this.node.port.postMessage({type:"reset",epoch,frame,source,active,loopLength,expectedSeek});
         this.prepareLoop();
         return {epoch,frame};
@@ -90,9 +98,9 @@ export class AudioCore {
         for(const s of this.sources){try{s.stop();}catch{} s.disconnect();}
         this.sources=[];
     }
-    play(buffers,{source=0,frame=this.frame()+Math.round(this.rate*.1),loopLength=0,expectedSeek=false}={}) {
+    play(buffers,{source=0,frame=this.frame()+Math.round(this.rate*.1),loopLength=0,expectedSeek=false,wireSource=undefined}={}) {
         if(buffers.length>this.transports.length) throw new RangeError("Spuren");
-        const state=this.reset(source,true,frame,loopLength,expectedSeek);
+        const state=this.reset(source,true,frame,loopLength,expectedSeek,wireSource);
         this.stopSources(); this.buffers=buffers.slice(); this.loopLength=loopLength;
         for(let i=0;i<buffers.length;i++){
             const s=this.context.createBufferSource();s.buffer=buffers[i];s.connect(this.node,0,i);
@@ -107,13 +115,24 @@ export class AudioCore {
     dspParam(stream,family,key,value){this.node.port.postMessage({type:"dspParam",stream,family,key,value});}
     dspPreset(stream,name){this.node.port.postMessage({type:"dspPreset",stream,name});}
     param(stream,values){this.node.port.postMessage({...values,type:"param",stream});}
+    // Vom HTTP-Renderauftrag bis zum angekommenen PCM-Block, in Geräteframes.
+    noteRenderRequest(epoch,seq){
+        if(this.renderRequests.size>=32)this.renderRequests.delete(this.renderRequests.keys().next().value);
+        this.renderRequests.set(epoch+":"+seq,this.frame());
+    }
+    forgetRenderRequest(epoch,seq){this.renderRequests.delete(epoch+":"+seq);}
     push(block){
         if(this.closed) return false;
         const view=new DataView(block instanceof ArrayBuffer?block:block.buffer,block.byteOffset??0,block.byteLength);
         if(view.byteLength<32) return false;
         const epoch=view.getUint32(8,true);
         const transports=epoch===this.loopPlan?.epoch?this.nextTransports:this.transports;
-        return transports[view.getUint32(4,true)-1]?.push(block)??false;
+        const accepted=transports[view.getUint32(4,true)-1]?.push(block)??false;
+        const key=epoch+":"+view.getUint32(12,true), requested=this.renderRequests.get(key);
+        this.renderRequests.delete(key);
+        if(accepted && requested!==undefined)
+            this.renderLatencyFrames=Math.max(this.renderLatencyFrames,this.frame()-requested);
+        return accepted;
     }
     connect(url,token){
         const u=new URL(url);
