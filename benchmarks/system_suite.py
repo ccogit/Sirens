@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from pathlib import Path
 
 from benchmarks.result import METRICS, read, write
@@ -87,12 +88,27 @@ def process_snapshot():
     # Nur lesender Zugriff; niemals fremde Prozesse automatisch beenden.
     if os.name != "nt":
         raise RuntimeError("Hardware-Suite benötigt Windows-Prozessinventar")
-    command = ("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,"
+    command = ("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+               "Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,"
                "CreationDate,CommandLine | ConvertTo-Json -Compress")
-    raw = subprocess.check_output(["powershell.exe", "-NoProfile", "-Command", command],
-                                  encoding="utf-8", errors="replace", timeout=60)
-    data = json.loads(raw)
-    return data if isinstance(data, list) else [data]
+    for attempt in range(5):
+        try:
+            raw = subprocess.check_output(["powershell.exe", "-NoProfile", "-Command", command],
+                                          encoding="utf-8", timeout=60)
+            data = json.loads(raw.lstrip("\ufeff"))
+            rows = data if isinstance(data, list) else [data]
+            if not rows or any(not isinstance(row, dict)
+                               or type(row.get("ProcessId")) is not int
+                               or type(row.get("ParentProcessId")) is not int
+                               or (row.get("CommandLine") is not None
+                                   and not isinstance(row["CommandLine"], str))
+                               for row in rows):
+                raise ValueError("Ungültiges Prozessinventar")
+            return rows
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            if attempt == 4:
+                raise RuntimeError(f"Prozessinventar nach 5 Versuchen fehlgeschlagen: {exc}") from exc
+            time.sleep(.5)
 
 
 def worker_processes(rows, root=ROOT, known=()):
@@ -142,6 +158,37 @@ def report(path, rows, errors, dry):
                      funktionen=rows, profile=list(PROFILES), dry_run=dry))
 
 
+def preflight(cid, steps, music):
+    """RoFormer verlangt eine lokale WAV-Datei mit 44,1 kHz Stereo."""
+    if cid != "separation":
+        return
+    for argv in steps:
+        if not isinstance(argv, list):
+            continue
+        for i, arg in enumerate(argv):
+            if not isinstance(arg, str):
+                continue
+            if arg == "benchmarks.separation.product_job" or arg.replace("\\", "/").endswith("benchmarks/separation/product_job.py"):
+                if music is None or i + 1 >= len(argv) or not isinstance(argv[i + 1], str):
+                    raise ValueError("Vorprüfung Separation: Musikordner und relativer WAV-Song erforderlich")
+                relative = Path(argv[i + 1])
+                try:
+                    if relative.is_absolute() or relative.drive or ".." in relative.parts:
+                        raise ValueError("Relativer Songpfad erforderlich")
+                    source = (music / relative).resolve(strict=True)
+                    if not source.is_relative_to(music) or source.suffix.lower() != ".wav":
+                        raise ValueError("WAV im Musikordner erforderlich")
+                    with wave.open(str(source), "rb") as stream:
+                        rate, channels = stream.getframerate(), stream.getnchannels()
+                except (OSError, EOFError, wave.Error, ValueError) as exc:
+                    raise ValueError(f"Vorprüfung Separation: WAV nicht lesbar ({exc})") from exc
+                if (rate, channels) != (44100, 2):
+                    raise ValueError(f"Vorprüfung Separation: RoFormer benötigt 44100 Hz (44,1 kHz) Stereo (2 Kanäle); "
+                                     f"Testdaten: {rate} Hz, {channels} Kanäle")
+                return
+    raise ValueError("Vorprüfung Separation: product_job mit relativem Songpfad fehlt")
+
+
 def run(out, music, plan, dry=False, snapshot=process_snapshot):
     out = out.resolve()
     if ROOT == out or ROOT in out.parents:
@@ -155,8 +202,14 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
     rows = inventory()
     errors = []
     before_hash = hashes(music) if music else {}
-    before_workers = worker_processes(snapshot()) if not dry else set()
-    known_workers = set(before_workers)
+    before_workers = set() if dry else None
+    initial_failure = None
+    if not dry:
+        try:
+            before_workers = worker_processes(snapshot())
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            initial_failure = exc
+    known_workers = set(before_workers or ())
     try:
         for row in rows:
             cid = row["id"]
@@ -175,11 +228,18 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                 errors.append("Messpfad fehlt: " + cid)
                 continue
             try:
+                if initial_failure is not None:
+                    exc, initial_failure = initial_failure, None
+                    raise RuntimeError("Prozessinventar vor Messstart: " + str(exc)) from exc
+                if before_workers is None:
+                    before_workers = worker_processes(snapshot())
+                    known_workers.update(before_workers)
                 if job.get("instruction"):
                     print(job["instruction"], flush=True)
                 steps = job.get("steps", [job.get("argv")])
                 if not isinstance(steps, list) or not steps:
                     raise ValueError("steps muss eine nichtleere Liste sein")
+                preflight(cid, steps, music)
                 result_path = out / (cid + ".json")
                 if result_path.exists():
                     raise ValueError("Messdatei existiert bereits")
@@ -222,11 +282,17 @@ def run(out, music, plan, dry=False, snapshot=process_snapshot):
                         raise ValueError("Soak-Dauer nicht belegt")
                 row["status"] = "messdatei_vorhanden"
             except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
+                row["status"] = "fehler"
+                row["fehler"] = str(exc)
                 errors.append(cid + ": " + str(exc))
     finally:
         try:
+            if before_workers is None:
+                errors.append("Nachkontrolle: Kein ursprüngliches Prozessinventar verfügbar" +
+                              (": " + str(initial_failure) if initial_failure else ""))
+            after_workers = worker_processes(snapshot(), known=known_workers) if not dry else set()
             errors.extend(verify(before_hash, hashes(music) if music else {},
-                                 before_workers, worker_processes(snapshot(), known=known_workers) if not dry else set()))
+                                 before_workers if before_workers is not None else after_workers, after_workers))
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             errors.append("Nachkontrolle: " + str(exc))
         report(out / "suite.json", rows, errors, dry)

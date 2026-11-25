@@ -54,7 +54,8 @@ export class ConvolutionEffect extends Effect {
         a=a??generatedIR(len,8);b=b??generatedIR(len,2);
         for(const ir of [a,b])if(!(ir instanceof Float32Array)||!ir.length||ir.length>len||ir.some(v=>!Number.isFinite(v)||Math.abs(v)>1))throw new TypeError("Ungültige IR");
         this.channels=[new PartitionedChannel(a,b,size),new PartitionedChannel(a,b,size)];
-        this.morph=new Smooth(0,0,1,512);
+        // Morph mit gegenphasigen IRs benötigt eine längere Rampe als Wet.
+        this.morph=new Smooth(0,0,1,profile==="fast"?448:512);
     }
     setMorph(v){this.morph.set(v);}
     render(l,r,out){const m=this.morph.tick();out[0]=this.channels[0].step(l,m);out[1]=this.channels[1].step(r,m);}

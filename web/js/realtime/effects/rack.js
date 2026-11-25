@@ -15,6 +15,9 @@ export class EffectRack {
         this.effects=[this.spectral,this.granular,this.convolution];
         this.latencyFrames=this.effects.reduce((n,e)=>n+e.latencyFrames,0);
         this.a=new Float32Array(2);this.b=new Float32Array(2);
+        // Wet-Regler im schnellen Profil: 128 Samples (2,67 ms bei 48 kHz).
+        // Festes Delay und Bypass-Rampe bleiben unverändert.
+        if(profile==="fast")for(const effect of this.effects)effect.wet.frames=128;
         this.applyPreset("neutral");
     }
     applyPreset(name){
