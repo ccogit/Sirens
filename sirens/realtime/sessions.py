@@ -463,8 +463,15 @@ class Session:
     def render(self, body):
         """Nur Steuerdaten: PCM entsteht serverseitig im Worker-Thread."""
         fields = {"epoch", "seq", "source_frame", "start_frame", "nframes"}
-        if not isinstance(body, dict) or set(body) not in (fields, fields | {"audio_epoch"}):
+        if not isinstance(body, dict) or not fields <= set(body) <= fields | {"audio_epoch", "seek"}:
             raise invalid("render")
+        seek = body.get("seek", False)
+        if type(seek) is not bool:
+            raise invalid("seek")
+        # PCM v1 reserviert sämtliche Flags; bis zur Vertragsfreigabe
+        # keinen Seek stillschweigend als normalen Render-Auftrag senden.
+        if seek:
+            raise error("unavailable")
         with self.lock:
             if self.data["state"] != "playing":
                 if self.last_error == "busy_gpu":
@@ -474,10 +481,15 @@ class Session:
             if epoch != self.data["epoch"]:
                 raise error("stale_epoch")
             audio_epoch = uint(body.get("audio_epoch", epoch), "audio_epoch", 2**32-1)
-            if audio_epoch < self.audio_epoch:
+            # _epoch() setzt render_seq weiterhin auf -1 und entwertet damit
+            # beide Generationen auch bei einem Steuer-Epoch-Wechsel.
+            sequences = self.render_seq if isinstance(self.render_seq, dict) else {}
+            if audio_epoch not in sequences and audio_epoch < self.audio_epoch:
                 raise error("stale_epoch")
             seq = uint(body["seq"], "seq", 2**32-1)
-            if audio_epoch == self.audio_epoch and seq <= self.render_seq:
+            if seq <= sequences.get(audio_epoch, -1):
+                raise invalid("seq")
+            if audio_epoch not in sequences and seq != 0:
                 raise invalid("seq")
             source = uint(body["source_frame"], "source_frame")
             start = uint(body["start_frame"], "start_frame")
@@ -490,8 +502,10 @@ class Session:
             except queue.Full:
                 self.dropped += 1
                 raise error("unavailable") from None
-            self.audio_epoch = audio_epoch
-            self.render_seq = seq
+            self.audio_epoch = max(self.audio_epoch, audio_epoch)
+            self.render_seq = {**sequences, audio_epoch: seq}
+            if len(self.render_seq) > 2:
+                del self.render_seq[min(self.render_seq)]
             return {"accepted": True}
 
     def _run(self):
@@ -529,7 +543,7 @@ class Session:
                 except queue.Empty:
                     continue
                 with self.lock:
-                    if epoch != self.data["epoch"] or audio_epoch != self.audio_epoch or self.data["state"] != "playing":
+                    if epoch != self.data["epoch"] or (not isinstance(self.render_seq, dict) or audio_epoch not in self.render_seq) or self.data["state"] != "playing":
                         continue
                 if params != loaded or previous != (audio_epoch, source):
                     worker.request("load", params)
@@ -541,7 +555,7 @@ class Session:
                                   start_frame=start, nframes=count, channels=2, flags=0,
                                   sample_rate=self.data["sample_rate"]), chunk if bypass else wet)
                 with self.lock:
-                    if (self.stop.is_set() or epoch != self.data["epoch"] or audio_epoch != self.audio_epoch
+                    if (self.stop.is_set() or epoch != self.data["epoch"] or (not isinstance(self.render_seq, dict) or audio_epoch not in self.render_seq)
                             or self.data["state"] != "playing"):
                         continue
                     if not sidecar.request(b"P" + self.data["id"].encode("ascii") + block).get("ok"):
