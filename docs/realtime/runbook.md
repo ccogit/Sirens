@@ -38,7 +38,10 @@ PowerShell-Einstieg erforderlich; DEMON und Magenta bleiben dort blockiert.
 Installationsbericht hält Exitcode und Baseline fest; keine Modell- oder
 Audio-Latenzen, keine automatische Gate-Entscheidung. Installationslauf,
 Legacy-Sichtprüfung und Deinstallation zusätzlich protokollieren.
-G4-Soak gemäß [abnahme.md](abnahme.md); G4 derzeit **nicht gemessen**.
+G4-Soak gemäß [abnahme.md](abnahme.md): Performance-Soak am 25.11.2026 bestanden
+(7200 s, 0 unerwartete Underruns, 1800 Loop-Wechsel, Mock-Quelle, nur digitale Zähler;
+Beleg `benchmarks/results/g4/performance-soak-2026-11-25.json`). Hörprüfung, Störfälle
+und Streaming-Modelle (1800 s) **nicht gemessen**.
 CI, vollständige Locks, erfolgreiche frische Installation, G3/G4,
 Lizenzprüfung und Eigentümerfreigabe vor RC. Kein Tag/Release/Merge
 nach main durch WP20. Bei negativem Modell-Gate betreffende Funktion

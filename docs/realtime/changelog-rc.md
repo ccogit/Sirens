@@ -5,4 +5,5 @@
 - Nutzerhandbuch mit vorhandenen G1-Belegen und Betriebs-/Fehler-Runbook.
 - Installationsversuch im gemeinsamen Benchmark-Format.
 - Offene RC-Bedingungen: vollständige Hash-Locks, frische Zielinstallation,
-  G4 nicht gemessen. Kein Tag oder Release erstellt.
+  G4-Soak (Performance, 7200 s, digitale Zähler) bestanden; Hörprüfung, Störfälle
+  und Streaming-Modelle offen. Kein Tag oder Release erstellt.
