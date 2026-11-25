@@ -94,7 +94,7 @@ def main():
                 return self.headers.get("Host") == f"127.0.0.1:{self.server.server_port}"
 
             def do_GET(self):
-                if not self.host_ok():
+                if not self.host_ok() or self.requestline.split()[1] != self.path:
                     self.reply(404, {}); return
                 if self.path == "/":
                     page = PAGE.replace("TOKEN", json.dumps(token)).replace("SECONDS", str(args.seconds))
