@@ -53,8 +53,8 @@ PRs und Chats darauf verweisen.
 | KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | gemergt |
 | KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | gemergt |
 | KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | gemergt |
-| KETTE-56 | Loop-Wechsel Ende-zu-Ende: Server, Pumpe, Geräterate | 33 → 34 → 35 | – | offen |
-| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | offen |
+| KETTE-56 | Loop-Wechsel Ende-zu-Ende: Server, Pumpe, Geräterate | 33 → 34 → 35 | – | vergeben (25.11.2026) |
+| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | vergeben (25.11.2026) |
 
 ### Schnitt der Ketten ab der G4-Folge
 
