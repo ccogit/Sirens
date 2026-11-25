@@ -4,10 +4,11 @@ Die Aufgaben dieses Verzeichnisses werden als **Ketten** an externe Bearbeiter v
 feste Folge von Aufgaben, die ein Bearbeiter in **einem** Branch und **einem** PR liefert. Der Koordinator
 vergibt, prüft und merged.
 
-**Begriffe.** *Aufgabe* = Datei `AUFGABE-nn-….md` mit Ziel, Umfang und Abnahme; ihre Nummer gehört nur ihr.
-*Kette* = **eine oder mehrere** Aufgaben in fester Reihenfolge (Spalte „Aufgaben“, z. B. `33 → 34 → 35`), ein
-Bearbeiter, ein Branch, ein PR. Abhängigkeiten zwischen Aufgaben einer Kette erledigt die Reihenfolge, zwischen
-Ketten die Spalte „Voraussetzung“. Schnitt: hohe Kohäsion in der Kette (dieselben Dateien, aufeinander
+**Begriffe** (seit 25.11.2026 englisch; IDs `KETTE-nn`, Dateien `AUFGABE-nn` und Präfix `ÜBERGABE` bleiben in diesem
+Projekt). *Task* (früher Aufgabe) = Datei `AUFGABE-nn-….md` mit Ziel, Umfang und Abnahme; ihre Nummer gehört nur ihr.
+*Lane* (früher Kette) = **ein oder mehrere** Tasks in fester Reihenfolge (Spalte „Aufgaben“, z. B. `33 → 34 → 35`), ein
+Bearbeiter, ein Branch, ein PR. Abhängigkeiten zwischen Tasks einer Lane erledigt die Reihenfolge, zwischen
+Lanes die Spalte „Depends on“. Ledger = diese Tabelle, Status = open/assigned/merged/blocked. Schnitt: hohe Kohäsion in der Kette (dieselben Dateien, aufeinander
 aufbauend), geringe Kopplung zwischen Ketten (keine gemeinsam geänderten Dateien), damit möglichst viele Ketten
 parallel laufen und kaum Merge-Konflikte entstehen. Eine Kette mit nur einer Aufgabe ist ein Sonderfall und wird
 unter „Schnitt“ begründet.
@@ -18,44 +19,44 @@ PRs und Chats darauf verweisen.
 
 ## Register
 
-| Kette | Titel | Aufgaben | Voraussetzung | Stand |
+| Lane | Title | Tasks | Depends on | Status |
 |---|---|---|---|---|
-| KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | gemergt |
-| KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 gemergt | gemergt |
-| KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 gemergt | gemergt |
-| KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 gemergt | gemergt |
-| KETTE-14 | Welle 1: Messpfad DEMON | 22 | KETTE-13 gemergt | gemergt |
-| KETTE-15 | Welle 1: Messpfad RAVE und AFTER | 23 | KETTE-13 gemergt | gemergt |
-| KETTE-16 | Welle 1: Messpfad Magenta RealTime | 24 | KETTE-13 gemergt | gemergt |
-| KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 gemergt | gemergt |
-| KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 gemergt | gemergt |
-| KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 gemergt | gemergt |
-| KETTE-24 | Welle 2: BeatGrid, Tonart, MIDI | 10 | KETTE-11 gemergt | gemergt |
-| KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 gemergt | gemergt |
-| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 gemergt, KETTE-21 gemergt, Gate G1 Separation gemessen | gemergt |
-| KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-21 gemergt, KETTE-13 gemergt | gemergt |
-| KETTE-28 | Welle 2: Advanced Stem Studio Teil 2 – Dateijob und Verdrahtung | 25 | KETTE-26 gemergt | gemergt |
-| KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 gemergt, KETTE-22 gemergt, KETTE-23 gemergt | gemergt |
-| KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 gemergt | gemergt |
-| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 gemergt, KETTE-14 gemergt | gemergt |
-| KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 gemergt, KETTE-15 gemergt | gemergt |
-| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 gemergt, KETTE-24 gemergt, Gate G1 Stable Audio gemessen | gemergt |
-| KETTE-38 | Welle 3: Performance Pads Teil 2 – Verdrahtung | 27 | KETTE-35 gemergt | gemergt |
-| KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 gemergt, KETTE-24 gemergt, KETTE-16 gemergt | gemergt |
-| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 gemergt, KETTE-25 gemergt, KETTE-24 gemergt | gemergt |
-| KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 gemergt, KETTE-25 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
-| KETTE-43 | Welle 4: Produktintegration Teil 2 | 26 | KETTE-41 gemergt | gemergt |
-| KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 gemergt, KETTE-37 gemergt, KETTE-32 gemergt | gemergt |
-| KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 gemergt | gemergt |
-| KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 gemergt | gemergt |
-| KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 gemergt, KETTE-43 gemergt, KETTE-28 gemergt | gemergt |
-| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 gemergt | vergeben (24.11.2026) |
-| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | gemergt |
-| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | gemergt |
-| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | gemergt |
-| KETTE-56 | Loop-Wechsel: Server-Teil (Übergabe, Rest in KETTE-58) | 33 | – | gemergt |
-| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | gemergt |
-| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | vergeben (25.11.2026) |
+| KETTE-00 | Welle 0: Baseline und Testgerüst | 00 | – | merged |
+| KETTE-11 | Welle 1: Verträge und Architektur | 01 | KETTE-00 merged | merged |
+| KETTE-12 | Welle 1: Modell-Spikes (Berichte und Messskripte) | 02 | KETTE-00 merged | merged |
+| KETTE-13 | Welle 1: Modell-Spikes Teil 2 – lauffähige Messpfade | 21 | KETTE-12 merged | merged |
+| KETTE-14 | Welle 1: Messpfad DEMON | 22 | KETTE-13 merged | merged |
+| KETTE-15 | Welle 1: Messpfad RAVE und AFTER | 23 | KETTE-13 merged | merged |
+| KETTE-16 | Welle 1: Messpfad Magenta RealTime | 24 | KETTE-13 merged | merged |
+| KETTE-21 | Welle 2: GPU-Manager und Worker-Supervisor | 03 | KETTE-11 merged | merged |
+| KETTE-22 | Welle 2: Audio Core und Data Plane | 04 | KETTE-11 merged | merged |
+| KETTE-23 | Welle 2: Live Lab Shell und GPU-Anzeige | 05 | KETTE-11 merged | merged |
+| KETTE-24 | Welle 2: BeatGrid, Tonart, MIDI | 10 | KETTE-11 merged | merged |
+| KETTE-25 | Welle 2: DSP Rack | 09 | KETTE-22 merged | merged |
+| KETTE-26 | Welle 2: Advanced Stem Studio | 08 | KETTE-13 merged, KETTE-21 merged, Gate G1 Separation gemessen | merged |
+| KETTE-27 | Welle 2: Semantic Stem Extractor | 13 | KETTE-21 merged, KETTE-13 merged | merged |
+| KETTE-28 | Welle 2: Advanced Stem Studio Teil 2 – Dateijob und Verdrahtung | 25 | KETTE-26 merged | merged |
+| KETTE-31 | Welle 3: Mock-Durchstich, Gate G2 | 06 | KETTE-21 merged, KETTE-22 merged, KETTE-23 merged | merged |
+| KETTE-32 | Welle 3: Recorder, Session, Export | 16 | KETTE-22 merged | merged |
+| KETTE-33 | Welle 3: DEMON Neural Remix Deck | 07 | KETTE-31 merged, KETTE-14 merged | merged |
+| KETTE-34 | Welle 3: Neural Mutation (RAVE, AFTER) | 11 | KETTE-31 merged, KETTE-15 merged | merged |
+| KETTE-35 | Welle 3: Generative Performance Pads | 12 | KETTE-31 merged, KETTE-24 merged, Gate G1 Stable Audio gemessen | merged |
+| KETTE-38 | Welle 3: Performance Pads Teil 2 – Verdrahtung | 27 | KETTE-35 merged | merged |
+| KETTE-36 | Welle 3: Generative Companion (optional) | 15 | KETTE-31 merged, KETTE-24 merged, KETTE-16 merged | merged |
+| KETTE-37 | Welle 3: Performance-Tools | 14 | KETTE-22 merged, KETTE-25 merged, KETTE-24 merged | merged |
+| KETTE-41 | Welle 4: Produktintegration und UX | 17 | KETTE-31 merged, KETTE-25 merged, KETTE-37 merged, KETTE-32 merged | merged |
+| KETTE-43 | Welle 4: Produktintegration Teil 2 | 26 | KETTE-41 merged | merged |
+| KETTE-42 | Welle 4: Infinite Mutation (optional) | 18 | KETTE-24 merged, KETTE-37 merged, KETTE-32 merged | merged |
+| KETTE-44 | Welle 4: Alle offenen Hooks in die Oberfläche | 28 | KETTE-43 merged | merged |
+| KETTE-45 | Welle 4: GPU-Regel, Profile, dauerhafter Supervisor | 29 | KETTE-43 merged | merged |
+| KETTE-51 | Welle 5: Systemabnahme, Gate G4 | 19 | KETTE-41 merged, KETTE-43 merged, KETTE-28 merged | merged |
+| KETTE-52 | Welle 5: Rollout und Release Candidate | 20 | KETTE-51 merged | assigned (24.11.2026) |
+| KETTE-53 | Welle 5: Nahtloser Loop- und Epoch-Wechsel (G4-Folge) | 30 | – | merged |
+| KETTE-54 | Welle 5: DSP-Steuerlatenz (G4-Folge) | 31 | – | merged |
+| KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | merged |
+| KETTE-56 | Loop-Wechsel: Server-Teil (Übergabe, Rest in KETTE-58) | 33 | – | merged |
+| KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | merged |
+| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | assigned (25.11.2026) |
 
 ### Schnitt der Ketten ab der G4-Folge
 
