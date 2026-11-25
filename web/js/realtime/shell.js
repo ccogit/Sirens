@@ -74,13 +74,67 @@ export function decodeDry(core, raw, asset) {
   return buffer;
 }
 
+// Die Pumpe plant je Audio-Epoch eine eigene Sequenz und Quellposition.
+function renderGeneration(epoch, frame, source, length, seek=false) {
+  return {audioEpoch:epoch, frame, output:frame, source, seq:0,
+    end:frame+length, seek};
+}
+export function makeRenderPlan(state, offset, length, loop, seek=false) {
+  return {current:renderGeneration(state.epoch,state.frame,offset,length-offset,seek),
+    next:null, loop, length};
+}
+export async function fillRenderPlan(plan, core, session, render, active=()=>true) {
+  const now=core.frame(), capacity=core.transports[0].lookahead;
+  const lead=Math.min(12288,capacity-2048);
+  let current=plan.current;
+  if(core.clock.epoch>current.audioEpoch && plan.loop && core.status){
+    const {cursor,source}=core.status;
+    current=plan.current=plan.next?.audioEpoch===core.clock.epoch?plan.next:
+      renderGeneration(core.clock.epoch,cursor,source,plan.length-source);
+    plan.next=null;
+  }
+  const upcoming=core.loopPlan;
+  const latency=Math.max(Math.ceil(core.rate*.05),core.renderLatencyFrames||0);
+  if(plan.loop && upcoming?.epoch===current.audioEpoch+1 && !plan.next &&
+      upcoming.frame-now<=Math.max(upcoming.preroll,capacity)+latency){
+    plan.next=renderGeneration(upcoming.epoch,upcoming.frame,upcoming.source,upcoming.length);
+  }
+  // Abgelaufene Frames nicht erneut anfordern; die Dry-Rückfallebene bleibt aktiv.
+  if(current.output<now && current.output<current.end){
+    const skipped=Math.min(now-current.output,current.end-current.output);
+    current.output+=skipped;current.source+=skipped;
+  }
+  for(let i=0;i<6 && active();i++){
+    const next=plan.next;
+    const g=current.output<Math.min(current.end,now+lead)?current:
+      next && next.output<next.end && (next.seq===0 || next.output<now+lead)?next:null;
+    if(!g)break;
+    const remaining=Math.min(plan.length-g.source,g.end-g.output);
+    let n=Math.min(2048,remaining);
+    // Auch am Ende einen gültigen PCM-Block behalten.
+    if(remaining>2048 && remaining-2048<256)n=remaining-256;
+    if(n<256)break;
+    const payload={epoch:session.epoch,audio_epoch:g.audioEpoch,seq:g.seq,
+      source_frame:g.source,start_frame:g.output,nframes:n};
+    if(g.seek && g.seq===0)payload.seek=true;
+    core.noteRenderRequest?.(g.audioEpoch,g.seq);
+    try{await render(session,payload);}
+    catch(e){
+      core.forgetRenderRequest?.(g.audioEpoch,g.seq);
+      if(e.status!==503 && e.error!=="stale_epoch")throw e;
+      break;
+    }
+    g.seq++;g.output+=n;g.source+=n;
+  }
+}
+
 // Ein gemeinsamer AudioContext, keine PCM-Übertragung über JSON. Der Client
 // meldet lediglich begrenzte Quell-/Master-Frame-Aufträge; Wet kommt per Sidecar.
 export function createAudioSessionController(api, selection, {openCore=()=>AudioCore.open([0]),
     onStatus=()=>{}}={}) {
   let session=null, core=null, asset=null, buffer=null, grid=null, recorder=null;
   let tail=Promise.resolve(), closed=false, generation=0, timer=null, pumping=false;
-  let plan=null, source=0, mix=0, bypass=false, fallback=false, fault=null;
+  let plan=null, source=0, mix=0, bypass=false, fallback=false, fault=null, seekPending=false;
   let recorded=[], timeline=[], lastExport=null, historyFull=false;
   const enqueue=fn=>{
     const result=tail.then(fn);
@@ -108,7 +162,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     finally{
       const old=session;session=null;
       if(old)await api.close(old);
-      asset=null;buffer=null;grid=null;source=0;fallback=false;recorded=[];timeline=[];lastExport=null;historyFull=false;
+      asset=null;buffer=null;grid=null;source=0;seekPending=false;fallback=false;recorded=[];timeline=[];lastExport=null;historyFull=false;
     }
   }
   async function initialize(){
@@ -141,15 +195,15 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     }catch{fallback=true;core.param(1,{mix:0});}
     timer=setInterval(()=>{pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});},20);
   }
-  function begin(offset){
+  function begin(offset,seek=seekPending){
     if(!core||!buffer)return;
     if(offset>=buffer.length)offset=0;
     source=offset;
     const frame=core.frame()+Math.round(core.rate*.22);
     const loop=asset.id===MOCK_ASSET?buffer.length-offset:0;
-    const state=core.play([buffer],{source:offset,frame,loopLength:loop});
-    plan={audioEpoch:state.epoch,seq:0,output:state.frame,source:offset,
-      offset,loop,end:state.frame+buffer.length-offset};
+    const state=core.play([buffer],{source:offset,frame,loopLength:loop,expectedSeek:seek});
+    seekPending=false;
+    plan=makeRenderPlan(state,offset,buffer.length,loop,seek);
     core.param(1,{mix:fallback?0:mix,bypass,gain:1});
     void pump().catch(e=>{fault=e;fallback=true;core?.param(1,{mix:0});inform();});
   }
@@ -159,34 +213,14 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     pumping=true;
     const active=plan;
     try{
-      if(core.clock.epoch>active.audioEpoch && active.loop && core.status){
-        const cursor=core.status.cursor, position=core.status.source;
-        active.audioEpoch=core.clock.epoch;active.seq=0;
-        active.output=cursor;active.source=position;
-        active.end=cursor+buffer.length-position;
-      }
-      const now=core.frame();
-      if(!active.loop && now>=active.end){
+      if(!active.loop && core.frame()>=active.current.end){
         plan=null;source=0;
         core.pause();
         void enqueue(async()=>{if(session?.state==="playing")session=await api.command(session,"pause");inform();}).catch(e=>{fault=e;inform();});
         return;
       }
-      // Abgelaufene Frames niemals nachliefern; fehlende Wet-Frames fallen auf Dry zurück.
-      if(active.output<now){
-        const skipped=now-active.output;
-        active.output+=skipped;active.source+=skipped;
-      }
-      for(let count=0;count<6 && plan===active && core && session && !fallback;count++){
-        if(active.output>=now+12288 || active.output>=active.end)break;
-        const n=Math.min(2048,buffer.length-active.source,active.end-active.output);
-        if(n<256)break;
-        const payload={epoch:session.epoch,audio_epoch:active.audioEpoch,seq:active.seq++,
-          source_frame:active.source,start_frame:active.output,nframes:n};
-        active.output+=n;active.source+=n;
-        try{await api.render(session,payload);}
-        catch(e){if(e.status!==503 && e.error!=="stale_epoch")throw e;}
-      }
+      await fillRenderPlan(active,core,session,(s,payload)=>api.render(s,payload),
+        ()=>plan===active && !!core && !!session && !fallback);
     }finally{pumping=false;}
   }
   const cancelled=Symbol("Sitzung gestoppt");
@@ -203,7 +237,7 @@ export function createAudioSessionController(api, selection, {openCore=()=>Audio
     else if(name==="pause"){
       plan=null;source=Math.min(buffer.length,core.status?.source??source);core.pause();
     }else if(name==="seek"){
-      source=args.source_frame;plan=null;
+      source=args.source_frame;plan=null;seekPending=true;
       if(before.state==="playing")begin(source);
     }else if(name==="bypass"){
       bypass=args.enabled;core.param(1,{bypass,mix:fallback?0:mix});
