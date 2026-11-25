@@ -16,10 +16,11 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def allowed(self):
-        if self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
+        if (self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}"
+                or self.requestline.split()[1] != self.path):
             return False
         if self.path not in PATHS and not re.fullmatch(
-                r"/web/js/realtime/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.js", self.path):
+                r"/web/js/realtime/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.js", self.path):
             return False
         try:
             file = (ROOT / self.path.lstrip("/")).resolve(strict=True)
