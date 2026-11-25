@@ -41,9 +41,8 @@ def breakdown(data):
         # Zeitstempel und Gerätedaten sind Schätzungen. Inkonsistente
         # Stichproben nicht durch Nullsetzen künstlich beschönigen.
         message = own - sample["received_to_first_ms"] - sample["first_to_90_ms"]
-        if own >= 0:
-            series["sirens_ms"].append(own)
         if message >= 0:
+            series["sirens_ms"].append(own)
             series["message_ms"].append(message)
     return {"total_ms": quantiles(total),
             **{key: quantiles(values) for key, values in series.items()},
@@ -75,7 +74,7 @@ def build(data, machine):
         ]
         if latency["samples_sirens"] != latency["samples_total"]:
             notes.append("Fehlende oder inkonsistente Gerätedaten: keine Sirens-Kennzahl für diese Stichproben.")
-        if not data.get("control_samples"):
+        if "control_samples" not in data:
             notes.append("Altmessung: erste messbare Änderung statt 90 Prozent; keine Sirens-Kennzahl ableitbar.")
     else:
         for phase in metrics:
