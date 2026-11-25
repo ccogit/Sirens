@@ -396,6 +396,8 @@ class Session:
         self.data["epoch"] += 1
         self.data["seq"] = None
         self.render_seq = -1
+        if self.sidecar is not None:
+            self.sidecar.json(op="reset", session=self.data["id"])
 
     def command(self, body):
         with self.lock:
@@ -468,10 +470,6 @@ class Session:
         seek = body.get("seek", False)
         if type(seek) is not bool:
             raise invalid("seek")
-        # PCM v1 reserviert sämtliche Flags; bis zur Vertragsfreigabe
-        # keinen Seek stillschweigend als normalen Render-Auftrag senden.
-        if seek:
-            raise error("unavailable")
         with self.lock:
             if self.data["state"] != "playing":
                 if self.last_error == "busy_gpu":
@@ -498,7 +496,7 @@ class Session:
                 raise invalid("nframes")
             try:
                 self.pending.put_nowait((epoch, audio_epoch, seq, source, start, count,
-                                         dict(self.params), self.bypass))
+                                         dict(self.params), self.bypass, seek))
             except queue.Full:
                 self.dropped += 1
                 raise error("unavailable") from None
@@ -539,7 +537,7 @@ class Session:
                 if not worker.worker.alive() or sidecar.process.poll() is not None:
                     raise error("unavailable")
                 try:
-                    epoch, audio_epoch, seq, source, start, count, params, bypass = self.pending.get(timeout=.1)
+                    epoch, audio_epoch, seq, source, start, count, params, bypass, seek = self.pending.get(timeout=.1)
                 except queue.Empty:
                     continue
                 with self.lock:
@@ -552,7 +550,7 @@ class Session:
                 _, wet = worker.request("process", audio=chunk)
                 previous = (audio_epoch, source + count)
                 block = pack(dict(protocol_version=1, stream_id=1, epoch=audio_epoch, seq=seq,
-                                  start_frame=start, nframes=count, channels=2, flags=0,
+                                  start_frame=start, nframes=count, channels=2, flags=int(seek),
                                   sample_rate=self.data["sample_rate"]), chunk if bypass else wet)
                 with self.lock:
                     if (self.stop.is_set() or epoch != self.data["epoch"] or (not isinstance(self.render_seq, dict) or audio_epoch not in self.render_seq)
