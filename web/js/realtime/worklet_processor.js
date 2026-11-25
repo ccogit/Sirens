@@ -11,15 +11,33 @@ export class RenderPath {
     constructor(latency=0, ramp=64, capacity=16384) {
         if (!Number.isInteger(latency) || latency<0 || latency>192000) throw new RangeError("Latenz");
         this.wet = new RingBuffer(capacity);
+        this.nextWet = new RingBuffer(capacity); this.nextPrepared=false;
         this.delay = new Float32Array(latency*2);
         this.latency=latency; this.index=0;
         this.pair=new Float32Array(2); this.out=new Float32Array(2);
-        this.expectedUnderruns=0; this.lastWet=new Float32Array(2); this.ramp=Math.max(1,ramp);
+        this.expectedUnderruns=0; this.unexpectedUnderruns=0; this.expectedUntil=0; this.lastWet=new Float32Array(2); this.ramp=Math.max(1,ramp);
         this.mix=0; this.target=0; this.gain=1; this.targetGain=1; this.bypass=false;
     }
-    reset(epoch,frame) {
+    reset(epoch,frame,expectedUntil=frame) {
+        this.nextPrepared=false; this.expectedUntil=expectedUntil;
         this.wet.reset(epoch,frame); this.delay.fill(0); this.index=0;
         this.mix=0; this.lastWet.fill(0);
+    }
+    prepare(epoch,frame) {
+        if(this.nextPrepared && this.nextWet.epoch===epoch && this.nextWet.cursor===frame)return;
+        this.nextWet.reset(epoch,frame); this.nextPrepared=true;
+    }
+    switchLoop(epoch,frame) {
+        // Keine Allokation und kein Löschen des vorbereiteten Wet-Rings im Render-Callback.
+        if(this.nextPrepared && this.nextWet.epoch===epoch && this.nextWet.cursor===frame) {
+            const old=this.wet; this.wet=this.nextWet; this.nextWet=old;
+        } else this.wet.reset(epoch,frame);
+        this.nextPrepared=false; this.expectedUntil=frame;
+    }
+    write(epoch,start,samples) {
+        const ring=epoch===this.wet.epoch?this.wet:
+            this.nextPrepared && epoch===this.nextWet.epoch?this.nextWet:null;
+        return ring!==null && ring.write(epoch,start,samples);
     }
     // Dry wird um deklarierte Wet-Latenz verzögert. Wet trägt bereits
     // seine kompensierte Master-Adresse. Bei Lücken blendet der letzte
@@ -31,9 +49,12 @@ export class RenderPath {
             this.delay[i]=left; this.delay[i+1]=right; left=l; right=r;
             this.index=(i+2)%this.delay.length;
         }
-        const ready=this.wet.read(this.pair);
-        if(!ready && this.target>0 && !this.bypass) this.expectedUnderruns++;
-        if(ready) { this.lastWet[0]=this.pair[0]; this.lastWet[1]=this.pair[1]; }
+        const frame=this.wet.cursor, ready=this.wet.read(this.pair);
+        if(!ready && this.target>0 && !this.bypass) {
+            if(frame<this.expectedUntil)this.expectedUnderruns++;
+            else this.unexpectedUnderruns++;
+        }
+        if(ready) { this.expectedUntil=frame; this.lastWet[0]=this.pair[0]; this.lastWet[1]=this.pair[1]; }
         const target=ready && !this.bypass ? this.target : 0;
         this.mix += clamp(target-this.mix,-1/this.ramp,1/this.ramp);
         this.gain += clamp(this.targetGain-this.gain,-1/this.ramp,1/this.ramp);
@@ -60,11 +81,18 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                     this.epoch=m.epoch; this.start=m.frame; this.active=m.active;
                     this.source=m.source; this.loopSource=m.source;
                     this.loopLength=m.loopLength||0; this.nextLoop=this.loopLength?this.start+this.loopLength:Infinity;
-                    for(let j=0;j<this.paths.length;j++){this.paths[j].reset(m.epoch,m.frame);this.racks?.[j].reset();}
+                    for(let j=0;j<this.paths.length;j++){
+                        const p=this.paths[j];
+                        p.reset(m.epoch,m.frame,m.expectedSeek===true?m.frame+p.wet.capacity+p.latency:m.frame);
+                        this.racks?.[j].reset();
+                    }
+                } else if(m.type==="prepareLoop" && this.active && m.epoch===this.epoch+1 &&
+                    m.frame===this.nextLoop && Number.isSafeInteger(m.frame)) {
+                    for(const p of this.paths)p.prepare(m.epoch,m.frame);
                 } else if(m.type==="pcm") {
                     const p=this.paths[m.stream-1];
-                    if(p && !p.wet.write(m.epoch,m.start,m.samples))
-                        this.port.postMessage({type:"reject",stream:m.stream,seq:m.seq,epoch:m.epoch,cursor:p.wet.cursor});
+                    if(p && !p.write(m.epoch,m.start,m.samples))
+                        this.port.postMessage({type:"reject",stream:m.stream,seq:m.seq,epoch:m.epoch,cursor:p.nextPrepared && m.epoch===p.nextWet.epoch?p.nextWet.cursor:p.wet.cursor});
                 } else if(m.type==="param") {
                     const p=this.paths[m.stream-1];
                     if(p) {
@@ -81,7 +109,9 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                     }catch{this.port.postMessage({type:"dspReject",stream:m.stream});}
                 } else if(m.type==="status") {
                     this.port.postMessage({type:"status",epoch:this.epoch,cursor:this.cursor,source:this.source,
-                        streams:this.paths.map(p=>({cursor:p.wet.cursor,underruns:p.expectedUnderruns,rawUnderruns:p.wet.underruns}))});
+                        streams:this.paths.map(p=>({cursor:p.wet.cursor,underruns:p.unexpectedUnderruns,
+                            unexpectedUnderruns:p.unexpectedUnderruns,expectedUnderruns:p.expectedUnderruns,
+                            rawUnderruns:p.wet.underruns+p.nextWet.underruns}))});
                 }
             };
         }
@@ -96,7 +126,7 @@ if(typeof AudioWorkletProcessor !== "undefined") {
                         if(this.epoch===0xffffffff) this.active=false;
                         else {
                             this.epoch++; this.nextLoop+=this.loopLength; this.source=this.loopSource;
-                            for(let j=0;j<this.paths.length;j++){this.paths[j].reset(this.epoch,frame);this.racks?.[j].reset();}
+                            for(const p of this.paths)p.switchLoop(this.epoch,frame);
                         }
                     }
                     if(this.active) this.source++;
