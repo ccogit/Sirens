@@ -390,13 +390,13 @@ class Session:
     def _job_state(self, target):
         self.job["state"] = transition(JOB_TRANSITIONS, self.job["state"], target)
 
-    def _epoch(self):
+    def _epoch(self, *, reset_sidecar=True):
         if self.data["epoch"] == 2**32 - 1:
             raise invalid("epoch")
         self.data["epoch"] += 1
         self.data["seq"] = None
         self.render_seq = -1
-        if self.sidecar is not None:
+        if reset_sidecar and self.sidecar is not None:
             self.sidecar.json(op="reset", session=self.data["id"])
 
     def command(self, body):
@@ -589,7 +589,8 @@ class Session:
             if self.data["state"] == "closed":
                 return self.snapshot()
             if self.data["state"] != "stopping":
-                self._epoch()
+                # Der Sidecar wird beim Schließen widerrufen; auch nach einem Worker-Fehler.
+                self._epoch(reset_sidecar=False)
                 self._state("stopping")
             self.stop.set()
             self.token = None
