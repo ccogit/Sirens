@@ -29,6 +29,7 @@ export class AudioCore {
         this.transports=latencies.map((_,i)=>new Transport(this.node.port,i+1,context.sampleRate));
         this.nextTransports=latencies.map((_,i)=>new Transport(this.node.port,i+1,context.sampleRate));
         this.loopPlan=null; this.loopBase=null;
+        this.renderRequests=new Map(); this.renderLatencyFrames=0;
         this.latency=Math.max(...latencies); this.dspLatency=dspEnabled===true?896:0; this.buffers=[];
         this.status=null; this.socket=null; this.waiting=false; this.closed=false;
         this.node.port.onmessage=({data:m})=>{
@@ -79,7 +80,7 @@ export class AudioCore {
         // dürfen nach einem manuellen Reset nicht erneut gültig werden.
         if(this.loopPlan)this.clock.epoch=Math.max(this.clock.epoch,this.loopPlan.epoch);
         const epoch=this.clock.seek(source);
-        this.clock.playing=active; this.loopPlan=null;
+        this.clock.playing=active; this.loopPlan=null; this.renderRequests.clear();
         this.loopBase=active && loopLength?{epoch,frame,source,length:loopLength}:null;
         for(const t of this.transports) t.reset(epoch,frame);
         this.node.port.postMessage({type:"reset",epoch,frame,source,active,loopLength,expectedSeek});
@@ -107,13 +108,24 @@ export class AudioCore {
     dspParam(stream,family,key,value){this.node.port.postMessage({type:"dspParam",stream,family,key,value});}
     dspPreset(stream,name){this.node.port.postMessage({type:"dspPreset",stream,name});}
     param(stream,values){this.node.port.postMessage({...values,type:"param",stream});}
+    // Vom HTTP-Renderauftrag bis zum angekommenen PCM-Block, in Geräteframes.
+    noteRenderRequest(epoch,seq){
+        if(this.renderRequests.size>=32)this.renderRequests.delete(this.renderRequests.keys().next().value);
+        this.renderRequests.set(epoch+":"+seq,this.frame());
+    }
+    forgetRenderRequest(epoch,seq){this.renderRequests.delete(epoch+":"+seq);}
     push(block){
         if(this.closed) return false;
         const view=new DataView(block instanceof ArrayBuffer?block:block.buffer,block.byteOffset??0,block.byteLength);
         if(view.byteLength<32) return false;
         const epoch=view.getUint32(8,true);
         const transports=epoch===this.loopPlan?.epoch?this.nextTransports:this.transports;
-        return transports[view.getUint32(4,true)-1]?.push(block)??false;
+        const accepted=transports[view.getUint32(4,true)-1]?.push(block)??false;
+        const key=epoch+":"+view.getUint32(12,true), requested=this.renderRequests.get(key);
+        this.renderRequests.delete(key);
+        if(accepted && requested!==undefined)
+            this.renderLatencyFrames=Math.max(this.renderLatencyFrames,this.frame()-requested);
+        return accepted;
     }
     connect(url,token){
         const u=new URL(url);
