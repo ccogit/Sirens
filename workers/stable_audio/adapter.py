@@ -1,6 +1,7 @@
 """Stable Audio 3 small-music, ausschließlich explizit geladener lokaler Cache."""
 import hashlib
 import math
+import json
 import os
 from pathlib import Path
 
@@ -33,6 +34,20 @@ def validate_job(job):
     return dict(job)
 
 
+def find_cache(root=None):
+    """Expliziter Cache hat Vorrang; sonst lokale Modellumgebungen durchsuchen."""
+    explicit = os.environ.get("SIRENS_RT_STABLE_AUDIO_CACHE")
+    if explicit:
+        return Path(explicit)
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    manifest = json.loads((root / "workers/stable_audio/manifest.json").read_text(encoding="utf-8"))
+    for directory in manifest["python_dirs"]:
+        cache = root / directory / "weights"
+        if (cache / MODEL / "snapshots" / REVISION).is_dir():
+            return cache
+    raise ValueError("Lokaler Cache fehlt")
+
+
 def verify_cache(cache):
     root = Path(cache).resolve() / MODEL
     if (root / "refs/main").read_text(encoding="utf-8").strip() != REVISION:
@@ -54,9 +69,7 @@ class Adapter:
 
     @staticmethod
     def _load_model():
-        cache = os.environ.get("SIRENS_RT_STABLE_AUDIO_CACHE")
-        if not cache:
-            raise ValueError("Lokaler Cache fehlt")
+        cache = find_cache()
         verify_cache(cache)
         os.environ["HF_HUB_CACHE"] = str(Path(cache).resolve())
         os.environ["HF_HUB_OFFLINE"] = "1"
