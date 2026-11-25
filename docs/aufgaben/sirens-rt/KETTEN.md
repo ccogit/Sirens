@@ -55,7 +55,7 @@ PRs und Chats darauf verweisen.
 | KETTE-55 | Welle 5: Mess-Harness für G4 (G4-Folge) | 32 | – | gemergt |
 | KETTE-56 | Loop-Wechsel: Server-Teil (Übergabe, Rest in KETTE-58) | 33 | – | gemergt |
 | KETTE-57 | G4-Bericht: erwartete und unerwartete Underruns | 36 | – | gemergt |
-| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | offen |
+| KETTE-58 | Loop-Wechsel Ende-zu-Ende: Sidecar/PCM, Pumpe, Geräterate | 37 → 34 → 35 | – | vergeben (25.11.2026) |
 
 ### Schnitt der Ketten ab der G4-Folge
 
